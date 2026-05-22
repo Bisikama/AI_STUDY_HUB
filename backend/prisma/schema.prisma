@@ -14,85 +14,203 @@ datasource db {
   provider = "postgresql"
 }
 
-// ==========================================
-// 2. ĐỊNH NGHĨA ENUM (Kiểu dữ liệu cố định)
-// ==========================================
-enum Role {
-  USER
+/// Vai trò người dùng trong hệ thống
+enum UserRole {
+  STUDENT
+  TEACHER
   ADMIN
 }
 
-// ==========================================
-// 3. ĐỊNH NGHĨA CÁC THỰC THỂ (MODELS)
-// ==========================================
+/// Trạng thái của tài liệu sau khi upload và xử lý
+enum DocumentStatus {
+  PROCESSING
+  AVAILABLE
+  FAILED
+  DELETED
+}
 
+/// Trạng thái tiến trình upload file lên Cloud Storage
+enum UploadProgressStatus {
+  UPLOADING
+  COMPLETED
+  FAILED
+}
+
+/// Trạng thái xử lý tóm tắt tài liệu của AI
+enum SummaryStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+/// Quản lý thông tin tài khoản người dùng
 model User {
-  id            String   @id @default(uuid())
-  name          String
-  email         String   @unique
-  username      String
-  hash_password String
-  role          Role     @default(USER)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  avatarUrl    String?  @map("avatar_url")
+  role         UserRole @default(STUDENT)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  // Quan hệ 1-N: Một sinh viên có thể tải lên nhiều tài liệu
-  documents Document[]
+  // Quan hệ
+  passwordResetTokens PasswordResetToken[]
+  documents           Document[]
+  uploadStatuses      UploadStatus[]
+  quizzes             Quiz[]
+  quizAttempts        UserQuizAttempt[]
+
+  @@map("users")
 }
 
-model Course {
-  id        String   @id @default(uuid())
-  code      String   @unique // Khóa phụ để tìm kiếm môn học cực nhanh (VD: SWE102)
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+/// Quản lý Token reset mật khẩu (Quên mật khẩu)
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
-  // Quan hệ 1-N: Một môn học bao gồm nhiều tài liệu
-  documents Document[]
+  @@map("password_reset_tokens")
 }
 
+/// Danh mục Môn học/Mã học phần
+model Subject {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        String   @unique
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Quan hệ
+  documents Document[]
+
+  @@map("subjects")
+}
+
+/// Thông tin siêu dữ liệu tài liệu học thuật
 model Document {
-  id        String   @id @default(uuid())
-  userId    String
-  courseId  String
-  title     String
-  fileUrl   String
-  fullText  String   @db.Text // Khai báo rõ kiểu Text để chứa chuỗi khổng lồ
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String         @id @default(uuid()) @db.Uuid
+  title         String
+  description   String?        @db.Text
+  subjectId     Int            @map("subject_id")
+  subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  uploadedBy    String         @map("uploaded_by") @db.Uuid
+  user          User           @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  fileUrl       String         @map("file_url") @db.VarChar(512)
+  previewUrl    String?        @map("preview_url") @db.VarChar(512)
+  fileSize      BigInt         @map("file_size")
+  fileType      String         @map("file_type")
+  downloadCount Int            @default(0) @map("download_count")
+  viewCount     Int            @default(0) @map("view_count")
+  status        DocumentStatus @default(PROCESSING)
+  fullText      String?        @map("full_text") @db.Text
+  isAIGenerated Boolean        @default(false) @map("is_ai_generated")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
 
-  // Định nghĩa Khóa ngoại (Foreign Keys)
-  user   User   @relation(fields: [userId], references: [id])
-  course Course @relation(fields: [courseId], references: [id])
+  // Quan hệ
+  summary        DocumentSummary?
+  uploadStatuses UploadStatus[]
+  quizzes        Quiz[]
 
-  // Định nghĩa Quan hệ với các bảng con
-  summary Summary? // Quan hệ 1-1 (Bản tóm tắt tổng hợp)
-  quizzes Quiz[] // Quan hệ 1-N (Nhiều câu hỏi trắc nghiệm)
-
-  // Đánh chỉ mục GIN để tối ưu Full-Text Search trên cả Tiêu đề và Nội dung
-  // @@index([title, fullText], type: Gin)
+  @@index([subjectId, status])
+  @@map("documents")
 }
 
-model Summary {
-  id         String   @id @default(uuid())
-  documentId String   @unique // Đảm bảo quan hệ 1-1 chặt chẽ
-  content    Json // Chứa mảng JSON các ý chính: ["Ý 1", "Ý 2", "Ý 3"]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+/// Tóm tắt nội dung tài liệu học thuật do AI thực hiện
+model DocumentSummary {
+  id           String        @id @default(uuid()) @db.Uuid
+  documentId   String        @unique @map("document_id") @db.Uuid
+  document     Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  summaryText  String        @map("summary_text") @db.Text
+  keyPoints    String?       @map("key_points") @db.Text
+  status       SummaryStatus @default(PROCESSING)
+  errorMessage String?       @map("error_message") @db.Text
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
 
-  // Ràng buộc Cascade: Xóa Document sẽ tự động xóa luôn bản ghi Summary này
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@map("document_summaries")
 }
 
+/// Theo dõi tiến trình tải file lên Cloud Storage
+model UploadStatus {
+  id           String               @id @default(uuid()) @db.Uuid
+  documentId   String?              @map("document_id") @db.Uuid
+  document     Document?            @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  userId       String               @map("user_id") @db.Uuid
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName     String               @map("file_name")
+  fileSize     BigInt               @map("file_size")
+  status       UploadProgressStatus @default(UPLOADING)
+  progress     Int                  @default(0)
+  errorMessage String?              @map("error_message") @db.Text
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+
+  @@map("upload_status")
+}
+
+/// Bộ câu hỏi trắc nghiệm AI sinh ra từ tài liệu
 model Quiz {
-  id            String   @id @default(uuid())
-  documentId    String
-  question      String
-  options       Json // Chứa mảng JSON các đáp án: ["A", "B", "C", "D"]
-  correctAnswer String // Chứa ký tự đáp án đúng, ví dụ: "A"
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy  String?  @map("created_by") @db.Uuid
+  user       User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  title      String
+  createdAt  DateTime @default(now()) @map("created_at")
 
-  // Ràng buộc Cascade: Xóa Document sẽ tự động xóa luôn các câu Quiz này
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  // Quan hệ
+  questions QuizQuestion[]
+  attempts  UserQuizAttempt[]
+
+  @@index([documentId])
+  @@map("quizzes")
+}
+
+/// Chi tiết câu hỏi trong bộ Quiz trắc nghiệm
+model QuizQuestion {
+  id           String   @id @default(uuid()) @db.Uuid
+  quizId       String   @map("quiz_id") @db.Uuid
+  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  questionText String   @map("question_text") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Quan hệ
+  options QuizOption[]
+
+  @@index([quizId])
+  @@map("quiz_questions")
+}
+
+/// Các đáp án lựa chọn trắc nghiệm của câu hỏi
+model QuizOption {
+  id         String       @id @default(uuid()) @db.Uuid
+  questionId String       @map("question_id") @db.Uuid
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  optionText String       @map("option_text") @db.Text
+  isCorrect  Boolean      @default(false) @map("is_correct")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  @@index([questionId])
+  @@map("quiz_options")
+}
+
+/// Nhật ký/Lịch sử làm bài làm trắc nghiệm của sinh viên
+model UserQuizAttempt {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId      String   @map("quiz_id") @db.Uuid
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  score       Int
+  completedAt DateTime @default(now()) @map("completed_at")
+
+  @@index([userId, completedAt(sort: Desc)])
+  @@map("user_quiz_attempts")
 }

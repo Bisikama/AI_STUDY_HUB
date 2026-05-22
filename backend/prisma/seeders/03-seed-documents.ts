@@ -3,74 +3,93 @@ import { PrismaClient } from '../../generated/prisma/client';
 
 interface User {
   id: string;
-  name: string;
+  fullName: string;
 }
 
-interface Course {
-  id: string;
+interface Subject {
+  id: number;
   code: string;
+  name: string;
 }
 
 export async function seedDocuments(
   prisma: PrismaClient,
   users: User[],
-  courses: Course[],
+  subjects: Subject[],
 ): Promise<any[]> {
   console.log('📄 Creating documents...');
 
   const documentTemplates = [
     {
-      courseCode: 'SWE102',
+      subjectCode: 'SWE102',
       title: 'Introduction to NestJS Framework',
-      topic: 'NestJS, decorators, dependency injection, modules',
+      description: 'A comprehensive guide to NestJS decorators, dependency injection, and modules',
     },
     {
-      courseCode: 'SWE102',
+      subjectCode: 'SWE102',
       title: 'RESTful API Design Principles',
-      topic: 'REST, HTTP methods, status codes, best practices',
+      description:
+        'Best practices for designing REST APIs with proper HTTP methods and status codes',
     },
     {
-      courseCode: 'DBI202',
+      subjectCode: 'DBI202',
       title: 'SQL Query Optimization and Indexing',
-      topic: 'Database indexing, query optimization, execution plans',
+      description:
+        'Advanced techniques for optimizing database queries and creating effective indexes',
     },
     {
-      courseCode: 'DBI202',
+      subjectCode: 'DBI202',
       title: 'PostgreSQL Full-Text Search',
-      topic: 'Full-text search, text vectors, GIN indexes, query syntax',
+      description: 'Implementing full-text search capabilities in PostgreSQL databases',
     },
     {
-      courseCode: 'PRJ301',
+      subjectCode: 'PRJ301',
       title: 'CI/CD Pipeline with GitHub Actions',
-      topic: 'GitHub Actions, automated testing, deployment, release workflow',
+      description: 'Automating testing and deployment workflows using GitHub Actions',
     },
     {
-      courseCode: 'AI101',
+      subjectCode: 'AI101',
       title: 'Machine Learning Fundamentals',
-      topic: 'Supervised learning, unsupervised learning, neural networks, model training',
+      description: 'Core concepts of supervised learning, neural networks, and model training',
+    },
+    {
+      subjectCode: 'WEB101',
+      title: 'Responsive Web Design Techniques',
+      description: 'Creating responsive and mobile-friendly web applications with modern CSS',
+    },
+    {
+      subjectCode: 'SEC101',
+      title: 'Cryptography and Data Encryption',
+      description: 'Understanding encryption algorithms and secure data transmission methods',
     },
   ];
 
   const documents: any[] = [];
+  const fileSize = BigInt(faker.number.int({ min: 1000000, max: 50000000 })); // 1MB - 50MB
 
   for (let i = 0; i < documentTemplates.length; i++) {
     const template = documentTemplates[i];
     const user = users[i % users.length];
-    const course = courses.find((c) => c.code === template.courseCode)!;
+    const subject = subjects.find((s) => s.code === template.subjectCode)!;
 
     const document = await prisma.document.create({
       data: {
-        userId: user.id,
-        courseId: course.id,
         title: template.title,
+        description: template.description,
+        subjectId: subject.id,
+        uploadedBy: user.id,
         fileUrl: `https://cdn.example.com/documents/${faker.string.uuid()}.pdf`,
-        fullText: faker.lorem.paragraphs(8),
+        fileSize: fileSize,
+        fileType: 'application/pdf',
+        status: 'AVAILABLE',
       },
     });
 
     documents.push(document);
 
-    console.log(`   ✓ Document: "${document.title}" (by ${user.name}, course: ${course.code})`);
+    console.log(
+      `   ✓ Document: "${document.title}" (by ${user.fullName}, subject: ${subject.code})`,
+    );
   }
 
   console.log(`✅ Created ${documents.length} documents\n`);

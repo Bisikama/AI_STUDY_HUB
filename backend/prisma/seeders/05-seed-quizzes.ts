@@ -8,7 +8,7 @@ interface Document {
 interface QuizItem {
   question: string;
   options: string[];
-  correctAnswer: string;
+  correctAnswerIndex: number; // Index of correct answer (0-3)
 }
 
 const quizTemplates: { [key: string]: QuizItem[] } = {
@@ -21,7 +21,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Thư viện CSS',
         'Công cụ linting',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: '@Injectable() decorator trong NestJS dùng để làm gì?',
@@ -31,7 +31,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Quản lý session',
         'Mã hóa mật khẩu',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'Module trong NestJS có tác dụng gì?',
@@ -41,14 +41,14 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Quản lý database migrations',
         'Chạy background jobs',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
   ],
   'RESTful API Design Principles': [
     {
       question: 'REST API sử dụng HTTP method nào để tạo resource mới?',
       options: ['POST', 'GET', 'PUT', 'DELETE'],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'HTTP status code 404 có nghĩa là gì?',
@@ -58,7 +58,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Request được chấp nhận',
         'Redirect thành công',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'HATEOAS trong REST là gì?',
@@ -68,19 +68,19 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Cache strategy',
         'Database normalization',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'Nên sử dụng HTTP method nào để cập nhật toàn bộ resource?',
       options: ['PUT', 'PATCH', 'POST', 'GET'],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
   ],
   'SQL Query Optimization and Indexing': [
     {
       question: 'Index nào được tạo tự động khi khai báo PRIMARY KEY?',
       options: ['B-Tree index', 'Hash index', 'GIN index', 'BRIN index'],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'EXPLAIN ANALYZE dùng để làm gì trong PostgreSQL?',
@@ -90,7 +90,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Xóa toàn bộ dữ liệu',
         'Đổi tên bảng',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'Khi nào nên tạo index trên column?',
@@ -100,7 +100,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Không bao giờ cần index',
         'Chỉ khi database có > 1 triệu records',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'Foreign Key constraint có ảnh hưởng gì tới performance?',
@@ -110,17 +110,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Không có ảnh hưởng',
         'Chỉ ảnh hưởng SELECT queries',
       ],
-      correctAnswer: 'A',
-    },
-    {
-      question: 'Normalization bậc 3NF là gì?',
-      options: [
-        'Loại bỏ transitive dependencies, mỗi non-key attribute phụ thuộc vào candidate key',
-        'Chỉ loại bỏ duplicate rows',
-        'Không có ràng buộc nào',
-        'Tất cả columns phải có cùng type',
-      ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
   ],
   'PostgreSQL Full-Text Search': [
@@ -132,7 +122,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'LIMIT queries',
         'JOIN operations',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'to_tsvector() function trong PostgreSQL dùng để làm gì?',
@@ -142,7 +132,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Tính toán hash',
         'Nén dữ liệu',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
   ],
   'CI/CD Pipeline with GitHub Actions': [
@@ -154,12 +144,12 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Text editor',
         'Database management tool',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'Workflow file trong GitHub Actions nên lưu ở đâu?',
       options: ['.github/workflows/ directory', '.gitignore', 'src/ folder', 'package.json'],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'Khi nào workflow được trigger?',
@@ -169,7 +159,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Không bao giờ tự động trigger',
         'Mỗi 1 giờ một lần',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
   ],
   'Machine Learning Fundamentals': [
@@ -181,7 +171,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Tự tối ưu hoá mô hình',
         'Không liên quan tới machine learning',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'Overfitting trong ML có nghĩa là gì?',
@@ -191,7 +181,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Model quá đơn giản',
         'Dữ liệu training quá ít',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'Activation function ReLU là gì?',
@@ -201,7 +191,7 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'f(x) = x - linear function',
         'f(x) = x^2 - quadratic function',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
     },
     {
       question: 'Gradient descent dùng để làm gì?',
@@ -211,33 +201,107 @@ const quizTemplates: { [key: string]: QuizItem[] } = {
         'Xóa model weights',
         'Chuẩn hóa dữ liệu',
       ],
-      correctAnswer: 'A',
+      correctAnswerIndex: 0,
+    },
+  ],
+  'Responsive Web Design Techniques': [
+    {
+      question: 'Responsive design là gì?',
+      options: [
+        'Thiết kế web sao cho hiển thị tốt trên tất cả kích thước màn hình',
+        'Thêm animation cho UI',
+        'Tối ưu hóa tốc độ load',
+        'Sử dụng framework CSS',
+      ],
+      correctAnswerIndex: 0,
+    },
+    {
+      question: 'Mobile-first approach có nghĩa là gì?',
+      options: [
+        'Bắt đầu design cho mobile rồi scale up cho desktop',
+        'Bắt đầu design cho desktop rồi scale down cho mobile',
+        'Không cần thiết phải responsive',
+        'Chỉ hỗ trợ mobile devices',
+      ],
+      correctAnswerIndex: 0,
+    },
+  ],
+  'Cryptography and Data Encryption': [
+    {
+      question: 'Symmetric encryption là gì?',
+      options: [
+        'Sử dụng cùng 1 key cho cả encrypt và decrypt',
+        'Sử dụng 2 keys khác nhau (public/private)',
+        'Không cần key',
+        'Chỉ dùng cho passwords',
+      ],
+      correctAnswerIndex: 0,
+    },
+    {
+      question: 'Asymmetric encryption có lợi ích gì so với symmetric?',
+      options: [
+        'Có thể share public key an toàn mà không cần chia sẻ private key',
+        'Tốc độ nhanh hơn',
+        'Sử dụng ít tài nguyên',
+        'Dễ sử dụng hơn',
+      ],
+      correctAnswerIndex: 0,
     },
   ],
 };
 
 export async function seedQuizzes(prisma: PrismaClient, documents: Document[]): Promise<void> {
-  console.log('❓ Creating quizzes...');
+  console.log('❓ Creating quizzes and questions...');
 
   let totalQuizzes = 0;
+  let totalQuestions = 0;
+  let totalOptions = 0;
 
   for (const document of documents) {
-    const quizzes = quizTemplates[document.title] || [];
+    const quizItems = quizTemplates[document.title] || [];
 
-    if (quizzes.length > 0) {
-      await prisma.quiz.createMany({
-        data: quizzes.map((quiz) => ({
+    if (quizItems.length > 0) {
+      // Tạo Quiz cho document
+      const quiz = await prisma.quiz.create({
+        data: {
           documentId: document.id,
-          question: quiz.question,
-          options: quiz.options,
-          correctAnswer: quiz.correctAnswer,
-        })),
+          title: `${document.title} - Quiz`,
+        },
       });
 
-      totalQuizzes += quizzes.length;
-      console.log(`   ✓ "${document.title}": ${quizzes.length} quizzes`);
+      totalQuizzes++;
+
+      // Tạo các QuizQuestion cho Quiz
+      for (const item of quizItems) {
+        const question = await prisma.quizQuestion.create({
+          data: {
+            quizId: quiz.id,
+            questionText: item.question,
+          },
+        });
+
+        totalQuestions++;
+
+        // Tạo các QuizOption cho Question
+        const optionPromises = item.options.map((optionText, index) =>
+          prisma.quizOption.create({
+            data: {
+              questionId: question.id,
+              optionText: optionText,
+              isCorrect: index === item.correctAnswerIndex,
+            },
+          }),
+        );
+
+        await Promise.all(optionPromises);
+        totalOptions += item.options.length;
+      }
+
+      console.log(`   ✓ "${document.title}": 1 quiz, ${quizItems.length} questions`);
     }
   }
 
-  console.log(`✅ Created ${totalQuizzes} quizzes\n`);
+  console.log(
+    `✅ Created ${totalQuizzes} quizzes, ${totalQuestions} questions, ${totalOptions} options\n`,
+  );
 }
