@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  moduleFormat    = "cjs"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// 2. ĐỊNH NGHĨA ENUM (Kiểu dữ liệu cố định)
+// ==========================================
+enum Role {
+  USER
+  ADMIN
+}
+
+// ==========================================
+// 3. ĐỊNH NGHĨA CÁC THỰC THỂ (MODELS)
+// ==========================================
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  username      String
+  hash_password String
+  role          Role     @default(USER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Quan hệ 1-N: Một sinh viên có thể tải lên nhiều tài liệu
+  documents Document[]
+}
+
+model Course {
+  id        String   @id @default(uuid())
+  code      String   @unique // Khóa phụ để tìm kiếm môn học cực nhanh (VD: SWE102)
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Quan hệ 1-N: Một môn học bao gồm nhiều tài liệu
+  documents Document[]
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId  String
+  title     String
+  fileUrl   String
+  fullText  String   @db.Text // Khai báo rõ kiểu Text để chứa chuỗi khổng lồ
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Định nghĩa Khóa ngoại (Foreign Keys)
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  // Định nghĩa Quan hệ với các bảng con
+  summary Summary? // Quan hệ 1-1 (Bản tóm tắt tổng hợp)
+  quizzes Quiz[] // Quan hệ 1-N (Nhiều câu hỏi trắc nghiệm)
+
+  // Đánh chỉ mục GIN để tối ưu Full-Text Search trên cả Tiêu đề và Nội dung
+  // @@index([title, fullText], type: Gin)
+}
+
+model Summary {
+  id         String   @id @default(uuid())
+  documentId String   @unique // Đảm bảo quan hệ 1-1 chặt chẽ
+  content    Json // Chứa mảng JSON các ý chính: ["Ý 1", "Ý 2", "Ý 3"]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Ràng buộc Cascade: Xóa Document sẽ tự động xóa luôn bản ghi Summary này
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model Quiz {
+  id            String   @id @default(uuid())
+  documentId    String
+  question      String
+  options       Json // Chứa mảng JSON các đáp án: ["A", "B", "C", "D"]
+  correctAnswer String // Chứa ký tự đáp án đúng, ví dụ: "A"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Ràng buộc Cascade: Xóa Document sẽ tự động xóa luôn các câu Quiz này
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
