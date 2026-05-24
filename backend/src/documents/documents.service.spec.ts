@@ -1,16 +1,24 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentsService } from './documents.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Mock the parseDocument utility
 jest.mock('./utils/documentParser', () => ({
   parseDocument: jest.fn().mockResolvedValue('Extracted plain text contents for test.'),
 }));
 
-const { parseDocument } = require('./utils/documentParser');
+import { parseDocument } from './utils/documentParser';
 
 // Mock GoogleGenerativeAI
 const mockCountTokens = jest.fn();
@@ -134,9 +142,9 @@ describe('DocumentsService', () => {
     it('should throw NotFoundException if subject does not exist', async () => {
       mockPrisma.subject.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id')
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id')).rejects.toThrow(
+        NotFoundException,
+      );
       expect(mockPrisma.subject.findUnique).toHaveBeenCalledWith({ where: { id: 1 } });
     });
 
@@ -145,14 +153,17 @@ describe('DocumentsService', () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'invalid-user')
+        service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'invalid-user'),
       ).rejects.toThrow(NotFoundException);
       expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'invalid-user' } });
     });
 
     it('should fallback to first user if no userId is provided', async () => {
       mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, name: 'Subject 1' });
-      mockPrisma.user.findFirst.mockResolvedValue({ id: 'fallback-user-id', fullName: 'First User' });
+      mockPrisma.user.findFirst.mockResolvedValue({
+        id: 'fallback-user-id',
+        fullName: 'First User',
+      });
       mockPrisma.document.create.mockResolvedValue({
         id: 'doc-id',
         title: 'Title',
@@ -162,22 +173,24 @@ describe('DocumentsService', () => {
       const result = await service.uploadAndParse(mockFile, 'Title', 'Desc', 1);
 
       expect(mockPrisma.user.findFirst).toHaveBeenCalled();
-      expect(mockPrisma.document.create).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          uploadedBy: 'fallback-user-id',
+      expect(mockPrisma.document.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            uploadedBy: 'fallback-user-id',
+          }),
         }),
-      }));
+      );
       expect(result).toEqual({ id: 'doc-id', title: 'Title', fileSize: 100 });
     });
 
     it('should throw BadRequestException if parsing fails', async () => {
       mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, name: 'Subject 1' });
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-id' });
-      parseDocument.mockRejectedValueOnce(new Error('Extract error'));
+      (parseDocument as jest.Mock).mockRejectedValueOnce(new Error('Extract error'));
 
-      await expect(
-        service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id')
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -188,9 +201,7 @@ describe('DocumentsService', () => {
     it('should throw NotFoundException if document does not exist', async () => {
       mockPrisma.document.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.analyze(mockDocumentId, mockUserId)
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException if document is not AVAILABLE', async () => {
@@ -199,9 +210,9 @@ describe('DocumentsService', () => {
         status: 'PROCESSING',
       });
 
-      await expect(
-        service.analyze(mockDocumentId, mockUserId)
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException if document has no text content', async () => {
@@ -212,9 +223,9 @@ describe('DocumentsService', () => {
         fileUrl: '',
       });
 
-      await expect(
-        service.analyze(mockDocumentId, mockUserId)
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException if text content exceeds 40,000 characters (Layer 1 Defense)', async () => {
@@ -224,9 +235,9 @@ describe('DocumentsService', () => {
         fullText: 'A'.repeat(40001),
       });
 
-      await expect(
-        service.analyze(mockDocumentId, mockUserId)
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
       expect((mockPrisma.document.findUnique as jest.Mock).mock.calls.length).toBe(1);
     });
 
@@ -238,9 +249,9 @@ describe('DocumentsService', () => {
       });
       mockConfig.get.mockReturnValueOnce(undefined);
 
-      await expect(
-        service.analyze(mockDocumentId, mockUserId)
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
 
     it('should throw BadRequestException if token count exceeds 30,000 (Layer 2 Defense)', async () => {
@@ -251,9 +262,9 @@ describe('DocumentsService', () => {
       });
       mockCountTokens.mockResolvedValueOnce({ totalTokens: 30001 });
 
-      await expect(
-        service.analyze(mockDocumentId, mockUserId)
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
       expect(mockCountTokens).toHaveBeenCalledWith('Short content');
     });
 
@@ -266,9 +277,9 @@ describe('DocumentsService', () => {
       mockCountTokens.mockResolvedValueOnce({ totalTokens: 100 });
       mockGenerateContent.mockRejectedValueOnce(new Error('Gemini API is down'));
 
-      await expect(
-        service.analyze(mockDocumentId, mockUserId)
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
 
     it('should throw InternalServerErrorException if Gemini returns invalid JSON structure', async () => {
@@ -284,9 +295,9 @@ describe('DocumentsService', () => {
         },
       });
 
-      await expect(
-        service.analyze(mockDocumentId, mockUserId)
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
 
     it('should throw InternalServerErrorException if Gemini returns JSON missing required keys', async () => {
@@ -302,9 +313,9 @@ describe('DocumentsService', () => {
         },
       });
 
-      await expect(
-        service.analyze(mockDocumentId, mockUserId)
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
 
     it('should run transaction to save summary and quiz on success', async () => {
@@ -339,7 +350,10 @@ describe('DocumentsService', () => {
       });
 
       // Transaction step returns
-      mockPrisma.documentSummary.create.mockResolvedValue({ id: 'summary-id', summaryText: 'text' });
+      mockPrisma.documentSummary.create.mockResolvedValue({
+        id: 'summary-id',
+        summaryText: 'text',
+      });
       mockPrisma.quiz.create.mockResolvedValue({ id: 'quiz-id', title: 'Quiz' });
       mockPrisma.quizQuestion.create.mockResolvedValue({ id: 'question-id' });
       mockPrisma.quizOption.create.mockResolvedValue({ id: 'option-id' });
@@ -361,8 +375,12 @@ describe('DocumentsService', () => {
       const result = await service.analyze(mockDocumentId, mockUserId);
 
       // Verify db cleanups
-      expect(mockPrisma.documentSummary.deleteMany).toHaveBeenCalledWith({ where: { documentId: mockDocumentId } });
-      expect(mockPrisma.quiz.deleteMany).toHaveBeenCalledWith({ where: { documentId: mockDocumentId } });
+      expect(mockPrisma.documentSummary.deleteMany).toHaveBeenCalledWith({
+        where: { documentId: mockDocumentId },
+      });
+      expect(mockPrisma.quiz.deleteMany).toHaveBeenCalledWith({
+        where: { documentId: mockDocumentId },
+      });
 
       // Verify create summary
       expect(mockPrisma.documentSummary.create).toHaveBeenCalledWith({
@@ -417,9 +435,7 @@ describe('DocumentsService', () => {
     it('should throw NotFoundException if document does not exist', async () => {
       mockPrisma.document.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getDetails('invalid-id')
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getDetails('invalid-id')).rejects.toThrow(NotFoundException);
     });
 
     it('should return document structure with summary and quizzes', async () => {

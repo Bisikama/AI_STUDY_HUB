@@ -20,8 +20,7 @@ jest.mock('pdf-parse', () => {
     }),
   };
 });
-
-const { PDFParse: mockPDFParse } = require('pdf-parse');
+import { PDFParse } from 'pdf-parse';
 
 describe('DocumentParser Utility', () => {
   beforeEach(() => {
@@ -49,7 +48,7 @@ describe('DocumentParser Utility', () => {
 
       const result = await parseDocument(buffer, 'test.pdf', 'application/pdf');
 
-      expect(mockPDFParse).toHaveBeenCalledWith({ data: buffer });
+      expect(PDFParse).toHaveBeenCalledWith({ data: buffer });
       expect(mockGetText).toHaveBeenCalled();
       expect(mockDestroy).toHaveBeenCalled();
       expect(result).toBe('Extracted PDF text content');
@@ -59,18 +58,24 @@ describe('DocumentParser Utility', () => {
       const buffer = Buffer.from('corrupted pdf');
       mockGetText.mockRejectedValueOnce(new Error('Parse error'));
 
-      await expect(
-        parseDocument(buffer, 'test.pdf', 'application/pdf')
-      ).rejects.toThrow('Failed to parse PDF file: Parse error');
+      await expect(parseDocument(buffer, 'test.pdf', 'application/pdf')).rejects.toThrow(
+        'Failed to parse PDF file: Parse error',
+      );
     });
   });
 
   describe('DOCX Parser', () => {
     it('should call mammoth and return extracted text', async () => {
       const buffer = Buffer.from('docx data dummy');
-      (mammoth.extractRawText as jest.Mock).mockResolvedValue({ value: 'Extracted DOCX text content' });
+      (mammoth.extractRawText as jest.Mock).mockResolvedValue({
+        value: 'Extracted DOCX text content',
+      });
 
-      const result = await parseDocument(buffer, 'test.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      const result = await parseDocument(
+        buffer,
+        'test.docx',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
 
       expect(mammoth.extractRawText).toHaveBeenCalledWith({ buffer });
       expect(result).toBe('Extracted DOCX text content');
@@ -81,7 +86,11 @@ describe('DocumentParser Utility', () => {
       (mammoth.extractRawText as jest.Mock).mockRejectedValue(new Error('Mammoth error'));
 
       await expect(
-        parseDocument(buffer, 'test.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+        parseDocument(
+          buffer,
+          'test.docx',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ),
       ).rejects.toThrow('Failed to parse DOCX file: Mammoth error');
     });
   });
@@ -89,7 +98,9 @@ describe('DocumentParser Utility', () => {
   describe('DOC (old format) Parser', () => {
     it('should try mammoth first and return text if doc is actually a renamed docx', async () => {
       const buffer = Buffer.from('doc dummy');
-      (mammoth.extractRawText as jest.Mock).mockResolvedValue({ value: 'Extracted renamed docx content' });
+      (mammoth.extractRawText as jest.Mock).mockResolvedValue({
+        value: 'Extracted renamed docx content',
+      });
 
       const result = await parseDocument(buffer, 'test.doc', 'application/msword');
       expect(result).toBe('Extracted renamed docx content');
@@ -99,18 +110,18 @@ describe('DocumentParser Utility', () => {
       const buffer = Buffer.from('real binary doc');
       (mammoth.extractRawText as jest.Mock).mockRejectedValue(new Error('Not a zip file'));
 
-      await expect(
-        parseDocument(buffer, 'test.doc', 'application/msword')
-      ).rejects.toThrow('Format .doc (Word 97-2003) is not supported directly. Please convert it to .docx or .pdf before uploading.');
+      await expect(parseDocument(buffer, 'test.doc', 'application/msword')).rejects.toThrow(
+        'Format .doc (Word 97-2003) is not supported directly. Please convert it to .docx or .pdf before uploading.',
+      );
     });
   });
 
   describe('Unsupported Formats', () => {
     it('should throw error for unsupported extension and mime type', async () => {
       const buffer = Buffer.from('png data dummy');
-      await expect(
-        parseDocument(buffer, 'image.png', 'image/png')
-      ).rejects.toThrow('Unsupported file format: png (image/png)');
+      await expect(parseDocument(buffer, 'image.png', 'image/png')).rejects.toThrow(
+        'Unsupported file format: png (image/png)',
+      );
     });
   });
 });

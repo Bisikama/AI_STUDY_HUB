@@ -1,4 +1,3 @@
-/// <reference types="multer" />
 import {
   Controller,
   Post,
@@ -12,6 +11,11 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentsService } from './documents.service';
+import type {
+  SanitizedDocument,
+  SanitizedDocumentDetails,
+  AnalyzeResult,
+} from './types/document.types';
 
 @Controller('api/documents')
 export class DocumentsController {
@@ -21,7 +25,7 @@ export class DocumentsController {
   async analyze(
     @Param('id') id: string,
     @Headers('x-user-id') userId?: string,
-  ) {
+  ): Promise<{ statusCode: number; message: string; data: AnalyzeResult }> {
     const result = await this.documentsService.analyze(id, userId);
     return {
       statusCode: 201,
@@ -39,7 +43,7 @@ export class DocumentsController {
     @Body('subjectId') subjectIdStr: string,
     @Body('userId') userIdFromBody?: string,
     @Headers('x-user-id') userIdFromHeader?: string,
-  ) {
+  ): Promise<{ statusCode: number; message: string; data: SanitizedDocument }> {
     if (!file) {
       throw new BadRequestException('File is required');
     }
@@ -73,7 +77,9 @@ export class DocumentsController {
   }
 
   @Get(':id')
-  async getDetails(@Param('id') id: string) {
+  async getDetails(
+    @Param('id') id: string,
+  ): Promise<{ statusCode: number; message: string; data: SanitizedDocumentDetails }> {
     const document = await this.documentsService.getDetails(id);
     return {
       statusCode: 200,

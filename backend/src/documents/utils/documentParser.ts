@@ -1,11 +1,10 @@
+import { PDFParse } from 'pdf-parse';
 import * as mammoth from 'mammoth';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { PDFParse } = require('pdf-parse');
 
 /**
  * Parses a document file buffer and extracts plain text.
  * Supports PDF, TXT, and DOCX (DOC is supported via best-effort or throws error if binary .doc).
- * 
+ *
  * @param fileBuffer The file buffer to parse
  * @param originalName The original file name to inspect extension
  * @param mimeType The file mime type
@@ -26,13 +25,15 @@ export async function parseDocument(
 
   // 2. PDF
   if (extension === 'pdf' || mime === 'application/pdf') {
-    let parser;
+    let parser: PDFParse | undefined;
     try {
       parser = new PDFParse({ data: fileBuffer });
       const data = await parser.getText();
       return data.text || '';
     } catch (error) {
-      throw new Error(`Failed to parse PDF file: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to parse PDF file: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       if (parser) {
         await parser.destroy();
@@ -41,12 +42,17 @@ export async function parseDocument(
   }
 
   // 3. DOCX
-  if (extension === 'docx' || mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+  if (
+    extension === 'docx' ||
+    mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ) {
     try {
       const result = await mammoth.extractRawText({ buffer: fileBuffer });
       return result.value || '';
     } catch (error) {
-      throw new Error(`Failed to parse DOCX file: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to parse DOCX file: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
