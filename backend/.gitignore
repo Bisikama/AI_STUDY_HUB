@@ -64,6 +64,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 upload_test.ts
 verify_ai_integration
 
-document_ai_explanations.md
+../document_ai_explanation.md
+
 /documents/VALIDATION_EXAMPLES.ts
 src/documents/VALIDATION_EXAMPLES.ts
