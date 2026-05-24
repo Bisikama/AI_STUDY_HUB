@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentsService } from './documents.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,12 +14,11 @@ import {
 } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Mock the parseDocument utility
 jest.mock('./utils/documentParser', () => ({
   parseDocument: jest.fn().mockResolvedValue('Extracted plain text contents for test.'),
 }));
 
-const { parseDocument } = require('./utils/documentParser');
+import { parseDocument } from './utils/documentParser';
 
 // Mock GoogleGenerativeAI
 const mockCountTokens = jest.fn();
@@ -182,7 +186,7 @@ describe('DocumentsService', () => {
     it('should throw BadRequestException if parsing fails', async () => {
       mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, name: 'Subject 1' });
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-id' });
-      parseDocument.mockRejectedValueOnce(new Error('Extract error'));
+      (parseDocument as jest.Mock).mockRejectedValueOnce(new Error('Extract error'));
 
       await expect(service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id')).rejects.toThrow(
         BadRequestException,

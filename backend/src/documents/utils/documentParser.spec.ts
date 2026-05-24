@@ -20,8 +20,7 @@ jest.mock('pdf-parse', () => {
     }),
   };
 });
-
-const { PDFParse: mockPDFParse } = require('pdf-parse');
+import { PDFParse } from 'pdf-parse';
 
 describe('DocumentParser Utility', () => {
   beforeEach(() => {
@@ -49,7 +48,7 @@ describe('DocumentParser Utility', () => {
 
       const result = await parseDocument(buffer, 'test.pdf', 'application/pdf');
 
-      expect(mockPDFParse).toHaveBeenCalledWith({ data: buffer });
+      expect(PDFParse).toHaveBeenCalledWith({ data: buffer });
       expect(mockGetText).toHaveBeenCalled();
       expect(mockDestroy).toHaveBeenCalled();
       expect(result).toBe('Extracted PDF text content');

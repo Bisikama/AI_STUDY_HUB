@@ -1,6 +1,5 @@
+import { PDFParse } from 'pdf-parse';
 import * as mammoth from 'mammoth';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { PDFParse } = require('pdf-parse');
 
 /**
  * Parses a document file buffer and extracts plain text.
@@ -26,7 +25,7 @@ export async function parseDocument(
 
   // 2. PDF
   if (extension === 'pdf' || mime === 'application/pdf') {
-    let parser;
+    let parser: PDFParse | undefined;
     try {
       parser = new PDFParse({ data: fileBuffer });
       const data = await parser.getText();

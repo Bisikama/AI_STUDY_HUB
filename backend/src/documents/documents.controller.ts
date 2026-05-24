@@ -1,4 +1,3 @@
-/// <reference types="multer" />
 import {
   Controller,
   Post,
@@ -7,18 +6,31 @@ import {
   Headers,
   UploadedFile,
   UseInterceptors,
-  BadRequestException,
   Get,
+  ParseUUIDPipe,
+  Optional,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentsService } from './documents.service';
+import { ValidateFilePipe } from './pipes';
+import { UploadDocumentDto } from './dto';
+import type {
+  SanitizedDocument,
+  SanitizedDocumentDetails,
+  AnalyzeResult,
+} from './types/document.types';
 
 @Controller('api/documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Post(':id/analyze')
-  async analyze(@Param('id') id: string, @Headers('x-user-id') userId?: string) {
+  async analyze(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Optional()
+    @Headers('x-user-id')
+    userId?: string,
+  ): Promise<{ statusCode: number; message: string; data: AnalyzeResult }> {
     const result = await this.documentsService.analyze(id, userId);
     return {
       statusCode: 201,
@@ -30,35 +42,17 @@ export class DocumentsController {
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async upload(
-    @UploadedFile() file: Express.Multer.File,
-    @Body('title') title: string,
-    @Body('description') description: string,
-    @Body('subjectId') subjectIdStr: string,
-    @Body('userId') userIdFromBody?: string,
-    @Headers('x-user-id') userIdFromHeader?: string,
-  ) {
-    if (!file) {
-      throw new BadRequestException('File is required');
-    }
-    if (!title) {
-      throw new BadRequestException('Title is required');
-    }
-    if (!subjectIdStr) {
-      throw new BadRequestException('subjectId is required');
-    }
-
-    const subjectId = parseInt(subjectIdStr, 10);
-    if (isNaN(subjectId)) {
-      throw new BadRequestException('subjectId must be a number');
-    }
-
-    const userId = userIdFromHeader || userIdFromBody;
-
+    @UploadedFile(new ValidateFilePipe()) file: Express.Multer.File,
+    @Body() dto: UploadDocumentDto,
+    @Optional()
+    @Headers('x-user-id')
+    userId?: string,
+  ): Promise<{ statusCode: number; message: string; data: SanitizedDocument }> {
     const document = await this.documentsService.uploadAndParse(
       file,
-      title,
-      description,
-      subjectId,
+      dto.title,
+      dto.description,
+      dto.subjectId,
       userId,
     );
 
@@ -70,7 +64,9 @@ export class DocumentsController {
   }
 
   @Get(':id')
-  async getDetails(@Param('id') id: string) {
+  async getDetails(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<{ statusCode: number; message: string; data: SanitizedDocumentDetails }> {
     const document = await this.documentsService.getDetails(id);
     return {
       statusCode: 200,

@@ -1,4 +1,3 @@
-/// <reference types="multer" />
 import {
   Inject,
   Injectable,
@@ -10,6 +9,11 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseDocument } from './utils/documentParser';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import type {
+  SanitizedDocument,
+  SanitizedDocumentDetails,
+  AnalyzeResult,
+} from './types/document.types';
 
 @Injectable()
 export class DocumentsService {
@@ -21,18 +25,21 @@ export class DocumentsService {
   /**
    * Helper function to convert BigInt to Number/String in objects to prevent serialization crashes.
    */
-  private sanitizeData(data: any): any {
-    if (data === null || data === undefined) return data;
-    if (typeof data === 'bigint') return Number(data);
-    if (Array.isArray(data)) return data.map((item) => this.sanitizeData(item));
-    if (typeof data === 'object') {
-      const copy = {};
-      for (const key of Object.keys(data)) {
-        copy[key] = this.sanitizeData(data[key]);
-      }
-      return copy;
+  private sanitizeData<T>(data: unknown): T {
+    if (data === null || data === undefined) return data as unknown as T;
+    if (typeof data === 'bigint') return Number(data) as unknown as T;
+    if (Array.isArray(data)) {
+      return data.map((item: unknown) => this.sanitizeData<unknown>(item)) as unknown as T;
     }
-    return data;
+    if (typeof data === 'object') {
+      const obj = data as Record<string, unknown>;
+      const copy: Record<string, unknown> = {};
+      for (const key of Object.keys(obj)) {
+        copy[key] = this.sanitizeData<unknown>(obj[key]);
+      }
+      return copy as unknown as T;
+    }
+    return data as T;
   }
 
   /**
@@ -44,7 +51,7 @@ export class DocumentsService {
     description: string | undefined,
     subjectId: number,
     userId?: string,
-  ) {
+  ): Promise<SanitizedDocument> {
     // 1. Verify Subject exists
     const subject = await this.prisma.subject.findUnique({
       where: { id: subjectId },
@@ -99,7 +106,7 @@ export class DocumentsService {
   /**
    * Performs AI summary and quiz generation using 3-Layer Defense and Prisma Transaction.
    */
-  async analyze(documentId: string, userId?: string) {
+  async analyze(documentId: string, userId?: string): Promise<AnalyzeResult> {
     // ==========================================
     // LAYER 3: Logic and Security Defense
     // ==========================================
@@ -251,7 +258,11 @@ Quy định chặt chẽ:
         .replace(/^```json\s*/i, '')
         .replace(/```\s*$/, '')
         .trim();
-      parsedData = JSON.parse(cleanedJson);
+      parsedData = JSON.parse(cleanedJson) as {
+        summary: { heading: string; content: string }[];
+        keyPoints: string[];
+        quizzes: { question: string; options: string[]; correctAnswer: number }[];
+      };
     } catch (error) {
       throw new InternalServerErrorException(
         `Failed to parse JSON response from AI: ${error instanceof Error ? error.message : String(error)}. Raw response was: ${responseText}`,
@@ -334,23 +345,29 @@ Quy định chặt chẽ:
           },
         });
 
-        return {
-          summary: docSummary,
-          quiz: await tx.quiz.findUnique({
-            where: { id: quiz.id },
-            include: {
-              questions: {
-                include: {
-                  options: true,
-                },
+        const quizWithQuestions = await tx.quiz.findUnique({
+          where: { id: quiz.id },
+          include: {
+            questions: {
+              include: {
+                options: true,
               },
             },
-          }),
+          },
+        });
+
+        if (!quizWithQuestions) {
+          throw new InternalServerErrorException('Generated quiz could not be retrieved');
+        }
+
+        return {
+          summary: docSummary,
+          quiz: quizWithQuestions,
           document: updatedDoc,
         };
       });
 
-      return this.sanitizeData(transactionResult);
+      return this.sanitizeData<AnalyzeResult>(transactionResult);
     } catch (error) {
       throw new InternalServerErrorException(
         `Database transaction failed, changes rolled back: ${error instanceof Error ? error.message : String(error)}`,
@@ -361,7 +378,7 @@ Quy định chặt chẽ:
   /**
    * Retrieves document metadata along with its AI summary and quizzes.
    */
-  async getDetails(documentId: string) {
+  async getDetails(documentId: string): Promise<SanitizedDocumentDetails> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
       include: {
@@ -382,6 +399,6 @@ Quy định chặt chẽ:
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
-    return this.sanitizeData(document);
+    return this.sanitizeData<SanitizedDocumentDetails>(document);
   }
 }
