@@ -18,10 +18,7 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Post(':id/analyze')
-  async analyze(
-    @Param('id') id: string,
-    @Headers('x-user-id') userId?: string,
-  ) {
+  async analyze(@Param('id') id: string, @Headers('x-user-id') userId?: string) {
     const result = await this.documentsService.analyze(id, userId);
     return {
       statusCode: 201,
