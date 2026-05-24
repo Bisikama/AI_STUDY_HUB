@@ -59,3 +59,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Ignore backup files
 /backup
+
+# Ignore file test
+upload_test
+verify_ai_integration

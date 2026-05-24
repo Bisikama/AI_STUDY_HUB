@@ -26,11 +26,13 @@ async function testApi() {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter });
 
-  let user = await prisma.user.findFirst();
-  let subject = await prisma.subject.findFirst();
+  const user = await prisma.user.findFirst();
+  const subject = await prisma.subject.findFirst();
 
   if (!user || !subject) {
-    console.error('❌ Could not find a user or subject in database. Please run migrations/seed first.');
+    console.error(
+      '❌ Could not find a user or subject in database. Please run migrations/seed first.',
+    );
     await prisma.$disconnect();
     process.exit(1);
   }
@@ -40,9 +42,11 @@ async function testApi() {
   await prisma.$disconnect();
 
   // 2. Prepare multipart form data using Node.js standard FormData (Node 18+)
-  console.log(`\n📤 Uploading file "${fileName}" to http://localhost:3000/api/documents/upload ...`);
+  console.log(
+    `\n📤 Uploading file "${fileName}" to http://localhost:3000/api/documents/upload ...`,
+  );
   const formData = new FormData();
-  
+
   // Create a Blob from the file buffer to append to FormData
   const fileBlob = new Blob([fileBuffer]);
   formData.append('file', fileBlob, fileName);
@@ -71,7 +75,9 @@ async function testApi() {
     console.log(`✓ Extracted Text Length: ${uploadData.data.fullText?.length || 0} characters.`);
 
     // 3. Trigger AI Analysis
-    console.log(`\n🤖 Calling AI analysis endpoint http://localhost:3000/api/documents/${documentId}/analyze ...`);
+    console.log(
+      `\n🤖 Calling AI analysis endpoint http://localhost:3000/api/documents/${documentId}/analyze ...`,
+    );
     const analyzeRes = await fetch(`http://localhost:3000/api/documents/${documentId}/analyze`, {
       method: 'POST',
       headers: {
@@ -79,7 +85,7 @@ async function testApi() {
         'x-user-id': user.id,
       },
     });
-
+    //d
     const analyzeData = await analyzeRes.json();
     if (!analyzeRes.ok) {
       throw new Error(`AI Analysis failed (${analyzeRes.status}): ${JSON.stringify(analyzeData)}`);
@@ -88,7 +94,7 @@ async function testApi() {
     console.log('🎉 AI Analysis completed successfully!');
     console.log('\n================== SUMMARY ==================');
     console.log(analyzeData.data.summary.summaryText);
-    
+
     console.log('\n================ KEY POINTS =================');
     console.log(analyzeData.data.summary.keyPoints);
 
@@ -100,10 +106,14 @@ async function testApi() {
         console.log(`  [${opt.isCorrect ? 'x' : ' '}] ${opt.optionText}`);
       });
     });
-
   } catch (error) {
-    console.error('\n❌ API testing failed with error:', error instanceof Error ? error.message : error);
-    console.log('💡 Note: Make sure the NestJS server is running on http://localhost:3000 (run: npm run start:dev)');
+    console.error(
+      '\n❌ API testing failed with error:',
+      error instanceof Error ? error.message : error,
+    );
+    console.log(
+      '💡 Note: Make sure the NestJS server is running on http://localhost:3000 (run: npm run start:dev)',
+    );
   }
 }
 
