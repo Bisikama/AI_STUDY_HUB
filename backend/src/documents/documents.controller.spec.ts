@@ -60,33 +60,40 @@ describe('DocumentsController', () => {
 
     it('should throw BadRequestException if file is missing', async () => {
       await expect(
-        controller.upload(undefined as any, 'Title', 'Desc', '1', 'user-123')
+        controller.upload(undefined as any, 'Title', 'Desc', '1', 'user-123'),
       ).rejects.toThrow(new BadRequestException('File is required'));
     });
 
     it('should throw BadRequestException if title is missing', async () => {
-      await expect(
-        controller.upload(mockFile, '', 'Desc', '1', 'user-123')
-      ).rejects.toThrow(new BadRequestException('Title is required'));
+      await expect(controller.upload(mockFile, '', 'Desc', '1', 'user-123')).rejects.toThrow(
+        new BadRequestException('Title is required'),
+      );
     });
 
     it('should throw BadRequestException if subjectId is missing', async () => {
-      await expect(
-        controller.upload(mockFile, 'Title', 'Desc', '', 'user-123')
-      ).rejects.toThrow(new BadRequestException('subjectId is required'));
+      await expect(controller.upload(mockFile, 'Title', 'Desc', '', 'user-123')).rejects.toThrow(
+        new BadRequestException('subjectId is required'),
+      );
     });
 
     it('should throw BadRequestException if subjectId is not a valid number string', async () => {
-      await expect(
-        controller.upload(mockFile, 'Title', 'Desc', 'abc', 'user-123')
-      ).rejects.toThrow(new BadRequestException('subjectId must be a number'));
+      await expect(controller.upload(mockFile, 'Title', 'Desc', 'abc', 'user-123')).rejects.toThrow(
+        new BadRequestException('subjectId must be a number'),
+      );
     });
 
     it('should parse subjectId and call uploadAndParse, returning wrapped response', async () => {
       const mockDoc = { id: 'doc-123', title: 'Title' };
       mockDocumentsService.uploadAndParse.mockResolvedValue(mockDoc);
 
-      const response = await controller.upload(mockFile, 'Title', 'Desc', '42', 'user-123', 'user-header');
+      const response = await controller.upload(
+        mockFile,
+        'Title',
+        'Desc',
+        '42',
+        'user-123',
+        'user-header',
+      );
 
       expect(mockDocumentsService.uploadAndParse).toHaveBeenCalledWith(
         mockFile,
