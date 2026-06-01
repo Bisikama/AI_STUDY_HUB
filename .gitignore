@@ -1,24 +1,25 @@
-# Nestjs specific
-/dist
-/node_modules
-/build
-/tmp
+# --- THƯ MỤC THƯ VIỆN (TUYỆT ĐỐI KHÔNG PUSH) ---
+node_modules/
+frontend/node_modules/
+backend/node_modules/
 
-# Logs
-logs
-*.log
+# --- THƯ MỤC BUILD & COMPILE ---
+frontend/.next/
+frontend/out/
+frontend/build/
+backend/dist/
+
+# --- BIẾN MÔI TRƯỜNG (CHỨA MẬT KHẨU, API KEY) ---
+.env
+.env.local
+.env.*
+!.env.example
+
+# --- FILE HỆ THỐNG RÁC ---
+.DS_Store
+Thumbs.db
+
+# --- LOG FILES ---
 npm-debug.log*
-pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
-
-# dotenv environment variable files
-.env
-.env.development
-.env.test
-.env.production
-
-# temp directory
-.temp
-.tmp

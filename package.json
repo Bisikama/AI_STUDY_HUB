@@ -1,0 +1,23 @@
+{
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.8.0"
+  },
+  "lint-staged": {
+    "frontend/**/*.{js,jsx,ts,tsx,mjs}": [
+      "node frontend/node_modules/eslint/bin/eslint.js -c frontend/eslint.config.mjs --fix",
+      "prettier --write"
+    ],
+    "backend/**/*.ts": [
+      "node backend/node_modules/eslint/bin/eslint.js -c backend/eslint.config.mjs --fix",
+      "prettier --write"
+    ]
+  }
+}
