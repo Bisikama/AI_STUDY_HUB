@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { DocumentStatus } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { GetExploreQueryDto } from './dto/getExploreQuery.dto';
 import { ExploreDocumentItem } from './types/exploreDocumentItem.type';
@@ -9,53 +8,52 @@ export class ExploreService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async getExploreDocuments(query: GetExploreQueryDto): Promise<ExploreDocumentItem[]> {
-    const search = query.search?.trim();
+    const keyword = query.search?.trim();
 
     const documents = await this.prismaService.document.findMany({
       where: {
-        status: DocumentStatus.AVAILABLE,
-        ...(search
+        status: 'AVAILABLE',
+        ...(keyword
           ? {
               OR: [
                 {
                   title: {
-                    contains: search,
-                    mode: 'insensitive',
+                    contains: keyword,
+                    mode: 'insensitive' as const,
                   },
                 },
                 {
                   description: {
-                    contains: search,
-                    mode: 'insensitive',
+                    contains: keyword,
+                    mode: 'insensitive' as const,
+                  },
+                },
+                {
+                  subject: {
+                    is: {
+                      name: {
+                        contains: keyword,
+                        mode: 'insensitive' as const,
+                      },
+                    },
+                  },
+                },
+                {
+                  subject: {
+                    is: {
+                      code: {
+                        contains: keyword,
+                        mode: 'insensitive' as const,
+                      },
+                    },
                   },
                 },
               ],
             }
           : {}),
       },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        fileUrl: true,
-        previewUrl: true,
-        fileType: true,
-        fileSize: true,
-        downloadCount: true,
-        viewCount: true,
-        createdAt: true,
-        subject: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-          },
-        },
-        summary: {
-          select: {
-            id: true,
-          },
-        },
+      include: {
+        subject: true,
         _count: {
           select: {
             quizzes: true,
@@ -67,20 +65,28 @@ export class ExploreService {
       },
     });
 
-    return documents.map((document) => ({
-      id: document.id,
-      title: document.title,
-      description: document.description,
-      subject: document.subject,
-      fileUrl: document.fileUrl,
-      previewUrl: document.previewUrl,
-      fileType: document.fileType,
-      fileSize: document.fileSize.toString(),
-      downloadCount: document.downloadCount,
-      viewCount: document.viewCount,
-      quizCount: document._count.quizzes,
-      hasSummary: Boolean(document.summary),
-      createdAt: document.createdAt,
-    }));
+    return documents
+      .filter((document) => document.subject !== null)
+      .map((document): ExploreDocumentItem => {
+        return {
+          id: document.id,
+          title: document.title,
+          description: document.description,
+          subject: {
+            id: document.subject!.id,
+            name: document.subject!.name,
+            code: document.subject!.code,
+          },
+          fileUrl: document.fileUrl,
+          previewUrl: document.previewUrl,
+          fileType: document.fileType,
+          fileSize: document.fileSize.toString(),
+          downloadCount: document.downloadCount,
+          viewCount: document.viewCount,
+          quizCount: document._count.quizzes,
+          hasSummary: false,
+          createdAt: document.createdAt,
+        };
+      });
   }
 }
