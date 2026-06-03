@@ -1,7 +1,8 @@
 'use client';
 
 import useSWR from 'swr';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 type Subject = {
   id: number;
@@ -51,19 +52,6 @@ const fetcher = async (url: string): Promise<ExploreDocument[]> => {
   return result.data;
 };
 
-function useDebounce<T>(value: T, delay = 500): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return debouncedValue;
-}
 
 function formatFileSize(fileSize: string): string {
   const size = Number(fileSize);
@@ -198,79 +186,182 @@ const MOCK_DOCUMENTS: ExploreDocument[] = [
   },
 ];
 
-function getRating(docId: string, index: number): string {
-  if (docId === 'mock-1') return '98%';
-  if (docId === 'mock-2') return '95%';
-  const ratings = ['98%', '95%', '99%', '92%', '97%', '96%'];
-  return ratings[index % ratings.length];
+function getDocumentCategory(doc: ExploreDocument): string {
+  const title = doc.title.toLowerCase();
+  if (title.includes('note') || title.includes('guide')) {
+    return 'Lecture notes';
+  }
+  if (title.includes('summary') || title.includes('principles') || title.includes('analysis')) {
+    return 'Summaries';
+  }
+  if (title.includes('exam') || title.includes('midterm') || title.includes('quiz')) {
+    return 'Past Exams';
+  }
+  return 'Essays';
 }
 
-function getFileTypeIconAndStyle(fileType: string) {
-  const type = fileType.toLowerCase();
-  if (type.includes('pdf')) {
-    return {
-      icon: 'picture_as_pdf',
-      bgClass: 'bg-error-container text-on-error-container',
-    };
-  } else if (
-    type.includes('word') ||
-    type.includes('document') ||
-    type.includes('docx') ||
-    type.includes('msword')
-  ) {
-    return {
-      icon: 'description',
-      bgClass: 'bg-primary-fixed text-on-primary-fixed-variant',
-    };
-  } else if (type.includes('zip') || type.includes('rar') || type.includes('archive')) {
-    return {
-      icon: 'folder_zip',
-      bgClass: 'bg-surface-dim text-on-surface',
-    };
-  } else {
-    return {
-      icon: 'description',
-      bgClass: 'bg-surface-container-high text-secondary',
-    };
+function getUniversityName(doc: ExploreDocument): string {
+  if (doc.id.startsWith('mock-')) {
+    if (doc.id === 'mock-1') return 'Stanford University';
+    if (doc.id === 'mock-2') return 'London School of Economics';
+    if (doc.id === 'mock-3') return 'MIT';
+    if (doc.id === 'mock-4') return 'Harvard University';
+    return 'UC Berkeley';
+  }
+  const idNum = doc.title.charCodeAt(0) + doc.title.charCodeAt(doc.title.length - 1);
+  const unis = ['Stanford University', 'MIT', 'Harvard University'];
+  return unis[idNum % unis.length];
+}
+
+function getCategoryIcon(category: string): string {
+  switch (category) {
+    case 'Lecture notes':
+      return 'menu_book';
+    case 'Summaries':
+      return 'history_edu';
+    case 'Past Exams':
+      return 'quiz';
+    default:
+      return 'article';
   }
 }
 
-export default function ExplorePage() {
-  const [search, setSearch] = useState('');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [savedDocIds, setSavedDocIds] = useState<string[]>([]);
-  const debouncedSearch = useDebounce(search);
+function SearchExplore() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const urlQuery = searchParams.get('search') ?? '';
+  const [prevUrlQuery, setPrevUrlQuery] = useState(urlQuery);
+  const [search, setSearch] = useState(urlQuery);
+  const [activeQuery, setActiveQuery] = useState(urlQuery);
+
+  if (urlQuery !== prevUrlQuery) {
+    setPrevUrlQuery(urlQuery);
+    setSearch(urlQuery);
+    setActiveQuery(urlQuery);
+  }
+
+  // Reset activeQuery immediately when search bar is cleared
+  if (search.trim() === '' && activeQuery !== '') {
+    setActiveQuery('');
+  }
+
+  // Filters State
+  const [sortBy, setSortBy] = useState<'recent' | 'viewed'>('recent');
+  const [selectedUnis, setSelectedUnis] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedYear, setSelectedYear] = useState('2023 / 2024');
+
+  // Collapse sections
+  const [collapsedSections, setCollapsedSections] = useState<{ [key: string]: boolean }>({
+    sort: false,
+    uni: false,
+    type: false,
+    year: false,
+  });
+
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
+
+  // Update URL search parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (activeQuery.trim()) {
+      params.set('search', activeQuery.trim());
+    } else {
+      params.delete('search');
+    }
+    router.replace(`/explore?${params.toString()}`);
+  }, [activeQuery, router]);
+
+  const handleSearchSubmit = () => {
+    setActiveQuery(search);
+  };
 
   const exploreUrl = useMemo(() => {
     const params = new URLSearchParams();
-
-    if (debouncedSearch.trim()) {
-      params.set('search', debouncedSearch.trim());
+    if (activeQuery.trim()) {
+      params.set('search', activeQuery.trim());
     }
-
     const queryString = params.toString();
-
     return `${API_BASE_URL}/api/explore${queryString ? `?${queryString}` : ''}`;
-  }, [debouncedSearch]);
+  }, [activeQuery]);
 
   const { data: documents = [], error, isLoading } = useSWR(exploreUrl, fetcher);
-
-  const isSearching = search.trim() !== '';
 
   const displayDocs = useMemo(() => {
     if (documents.length > 0) {
       return documents;
     }
-    return MOCK_DOCUMENTS;
-  }, [documents]);
+    if (activeQuery.trim() === '') {
+      return MOCK_DOCUMENTS;
+    }
+    // If the backend is running but returned 0 results, we don't display mock documents.
+    // However, if SWR failed to connect (error), we fall back to mock documents to keep the interface testable.
+    if (error) {
+      return MOCK_DOCUMENTS.filter((doc) => {
+        const query = activeQuery.toLowerCase();
+        return (
+          doc.title.toLowerCase().includes(query) ||
+          (doc.description && doc.description.toLowerCase().includes(query)) ||
+          getUniversityName(doc).toLowerCase().includes(query) ||
+          doc.subject?.code.toLowerCase().includes(query)
+        );
+      });
+    }
+    return [];
+  }, [documents, activeQuery, error]);
 
-  const recentlyViewed = useMemo(() => {
-    return displayDocs.slice(0, 2);
-  }, [displayDocs]);
+  const filteredDocuments = useMemo(() => {
+    let list = [...displayDocs];
 
-  const trendingDocs = useMemo(() => {
-    return displayDocs.slice(2);
-  }, [displayDocs]);
+    // Filter by University
+    if (selectedUnis.length > 0) {
+      list = list.filter((doc) => selectedUnis.includes(getUniversityName(doc)));
+    }
+
+    // Filter by Document Type
+    if (selectedTypes.length > 0) {
+      list = list.filter((doc) => selectedTypes.includes(getDocumentCategory(doc)));
+    }
+
+    // Sorting
+    if (sortBy === 'recent') {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortBy === 'viewed') {
+      list.sort((a, b) => b.viewCount - a.viewCount);
+    }
+
+    return list;
+  }, [displayDocs, selectedUnis, selectedTypes, sortBy]);
+
+  const toggleSection = (section: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const handleUniversityChange = (uni: string) => {
+    setSelectedUnis((prev) =>
+      prev.includes(uni) ? prev.filter((u) => u !== uni) : [...prev, uni]
+    );
+  };
+
+  const handleTypeChange = (type: string) => {
+    setSelectedTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
+
+  const handleClearAll = () => {
+    setSelectedUnis([]);
+    setSelectedTypes([]);
+    setSortBy('recent');
+  };
+
+  const toggleBookmark = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setBookmarkedIds((prev) =>
+      prev.includes(id) ? prev.filter((bId) => bId !== id) : [...prev, id]
+    );
+  };
 
   const handleCardClick = (fileUrl: string) => {
     if (fileUrl === '#') {
@@ -280,541 +371,570 @@ export default function ExplorePage() {
     window.open(getDocumentUrl(fileUrl), '_blank', 'noopener,noreferrer');
   };
 
-  const toggleSaveDoc = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSavedDocIds((prev) =>
-      prev.includes(id) ? prev.filter((dId) => dId !== id) : [...prev, id]
-    );
+  const handleSuggestionClick = (discipline: string) => {
+    setSearch(discipline);
+    setActiveQuery(discipline);
   };
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex font-sans">
-      {/* Sidebar Nav */}
-      <nav
-        className={`${
-          mobileMenuOpen ? 'flex' : 'hidden'
-        } md:flex fixed left-0 top-0 h-full flex-col p-4 border-r border-outline-variant bg-surface-container-lowest shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-64 z-20 transition-all`}
-      >
-        <div className="flex items-center justify-between mb-8 px-4">
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-primary text-3xl">school</span>
-            <div>
-              <h1 className="font-headline-md text-headline-md text-primary">ScholarHub</h1>
-              <p className="font-label-sm text-label-sm text-secondary">Academic Excellence</p>
-            </div>
-          </div>
-          {/* Mobile Close Button */}
-          <button
-            onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden text-secondary p-1 hover:text-primary"
-          >
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        </div>
+    <div className="bg-surface text-on-surface selection:bg-primary-fixed-dim min-h-screen flex flex-col font-sans">
+      {/* TopNavBar */}
+      <header className="w-full sticky top-0 z-50 bg-surface shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all duration-300">
+        <div className="flex justify-between items-center px-container-margin-desktop py-4 w-full gap-8">
+          <div className="flex items-center gap-8 flex-1">
+            <a
+              className="text-headline-md font-headline-md font-bold text-primary shrink-0"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                router.push('/');
+              }}
+            >
+              ScholarHub
+            </a>
 
-        <div className="mb-6 px-4">
-          <button
-            onClick={() => alert('New Research flow initiated (Simulated)')}
-            className="w-full bg-primary-container text-on-primary py-3 px-4 rounded-lg font-label-md text-label-md flex justify-center items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            <span className="material-symbols-outlined">add</span> New Research
-          </button>
-        </div>
-
-        <ul className="flex flex-col gap-2 flex-grow">
-          <li>
-            <a
-              className="flex items-center gap-3 bg-secondary-container text-on-secondary-container rounded-lg px-4 py-3 font-label-md text-label-md active:scale-95 transition-transform"
-              href="#"
-            >
-              <span className="material-symbols-outlined filled">explore</span> Discover
-            </a>
-          </li>
-          <li>
-            <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('My Documents section clicked (Simulated)');
-              }}
-            >
-              <span className="material-symbols-outlined">description</span> My Documents
-            </a>
-          </li>
-          <li>
-            <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('Practice Mode clicked (Simulated)');
-              }}
-            >
-              <span className="material-symbols-outlined">school</span> Practice Mode
-            </a>
-          </li>
-          <li>
-            <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('AI Assistant clicked (Simulated)');
-              }}
-            >
-              <span className="material-symbols-outlined">psychology</span> AI Assistant
-            </a>
-          </li>
-        </ul>
-
-        <ul className="flex flex-col gap-2 mt-auto border-t border-outline-variant pt-4">
-          <li>
-            <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('Settings clicked (Simulated)');
-              }}
-            >
-              <span className="material-symbols-outlined">settings</span> Settings
-            </a>
-          </li>
-          <li>
-            <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('Help section clicked (Simulated)');
-              }}
-            >
-              <span className="material-symbols-outlined">help</span> Help
-            </a>
-          </li>
-        </ul>
-      </nav>
-
-      {/* Main Content Area */}
-      <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
-        {/* Top Header */}
-        <header className="sticky top-0 z-10 bg-surface shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-full">
-          <div className="flex justify-between items-center w-full px-container-margin-desktop max-w-max-width mx-auto h-16">
-            {/* Mobile Menu Trigger & Logo */}
-            <div className="flex items-center gap-4 md:hidden">
-              <button
-                onClick={() => setMobileMenuOpen(true)}
-                className="text-primary hover:text-secondary transition-colors p-2 cursor-pointer"
+            {/* Central Search Bar */}
+            <div className="relative max-w-xl w-full">
+              <span
+                onClick={handleSearchSubmit}
+                className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary cursor-pointer hover:text-primary transition-colors"
               >
-                <span className="material-symbols-outlined">menu</span>
-              </button>
-              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
-            </div>
-
-            {/* Desktop Search Bar */}
-            <div className="hidden md:flex flex-1 max-w-2xl mx-8 relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary">
                 search
               </span>
               <input
+                className="w-full h-12 pl-12 pr-4 bg-surface-container-low border-none rounded-lg font-body-md text-primary focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all outline-none"
+                type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-surface-container-low border-none rounded-full py-2.5 pl-12 pr-4 text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all font-body-md text-body-md outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearchSubmit();
+                  }
+                }}
                 placeholder="Search for courses, documents, or keywords..."
-                type="text"
               />
             </div>
+          </div>
 
-            {/* Header Right Actions */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => alert('Upload process clicked (Simulated)')}
-                className="hidden md:flex items-center gap-2 px-4 py-2 bg-[#212529] text-white rounded-full font-label-md text-label-md hover:opacity-90 transition-opacity h-10 cursor-pointer"
+          <div className="flex items-center gap-6">
+            <nav className="hidden md:flex items-center gap-8">
+              <a
+                className="text-primary font-bold border-b-2 border-primary py-1 transition-colors"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/explore');
+                }}
               >
-                <span className="material-symbols-outlined text-[20px]">upload</span> Upload
-              </button>
+                Discover
+              </a>
+              <a
+                className="text-secondary font-label-md hover:text-primary transition-colors"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  alert('My Documents clicked (Simulated)');
+                }}
+              >
+                My Documents
+              </a>
+              <a
+                className="text-secondary font-label-md hover:text-primary transition-colors"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  alert('AI Assistant clicked (Simulated)');
+                }}
+              >
+                AI Assistant
+              </a>
+            </nav>
 
-              <button className="text-secondary hover:text-primary transition-colors p-2 relative cursor-pointer">
-                <span className="material-symbols-outlined">notifications</span>
-                <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+            <div className="flex items-center gap-4 border-l border-outline-variant pl-6">
+              <button
+                onClick={() => alert('Notifications clicked (Simulated)')}
+                className="material-symbols-outlined text-secondary hover:bg-surface-container-low p-2 rounded-full transition-colors active:scale-95 cursor-pointer"
+              >
+                notifications
               </button>
-
-              <button className="w-10 h-10 rounded-full overflow-hidden border border-outline-variant hover:border-primary transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-2">
+              <button
+                onClick={() => alert('Settings clicked (Simulated)')}
+                className="material-symbols-outlined text-secondary hover:bg-surface-container-low p-2 rounded-full transition-colors active:scale-95 cursor-pointer"
+              >
+                settings
+              </button>
+              <div className="w-10 h-10 rounded-full overflow-hidden border border-outline-variant bg-surface-container-high">
                 <img
-                  alt="User profile avatar"
+                  alt="User Profile"
                   className="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYqSMGF3Z3oHdYhn5TKuHMKRLqgbBxxxtoRNxnakx4QY5gEAylvvaC7DqnO-6wRdWbBIdm8lN9SEhMxCbp8hakT47O6vbJLl91-97D8pkJXLj50c3nW8qB-8avFTT50YGPsF-9s6SN75_vCxKk31GsSz7WxQH4X-qlX6XGkFSqpq9alyYCX-ZxYLwHMCljNf0kwH5AertyqfjrTSYFBaxqzh-1604Hz7HFbNugFP3ndIVAs_2OpIbQSJgwvDs5Kcf11UWU6_PEEOQ"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmRIQIc6LO9lV5rVtojZ7Vh-4aAm0za_O0i5ayKA2xj5hmmtTyNfQvFCZNPhEfrXG_1djLfBLkYl-oRMknt4VMjwDxAHTLWyqk3U8mvXoulTPKmZi_lPoDe5yP9DJa1_HnZhUWZF8pI3XxjStB2JqRcoeuyOfo7DSOd9-q8HaWShAn_Rqgu1w26jKT2gX7DqpcPd3kC4Uam3KP7ywqZsOefPY_o9YIMdPmCJHLvDhiQBVe4ou63D8uVWKJY3uShYdVn9kYtYeSsJg"
                 />
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Main Workspace Canvas */}
-        <main className="flex-1 p-container-margin-mobile md:p-container-margin-desktop max-w-max-width mx-auto w-full">
-          {/* Welcome section */}
-          <section className="mb-12">
-            <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
-              Welcome back, Alex
-            </h2>
-            <p className="font-body-lg text-body-lg text-secondary">
-              Here's what's happening in your academic world today.
-            </p>
-          </section>
-
-          {/* Mobile Search Bar */}
-          <div className="md:hidden mb-6 relative">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary">
-              search
-            </span>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface-container-low border-none rounded-full py-2.5 pl-12 pr-4 text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all font-body-md text-body-md outline-none"
-              placeholder="Search for courses, documents, or keywords..."
-              type="text"
-            />
-          </div>
-
-          {/* Connection Error Banner (styled as error container, displays mock documents when API is unreachable) */}
-          {error && (
-            <div className="bg-error-container text-on-error-container p-4 rounded-xl flex items-center gap-3 mb-8 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] border border-error/10">
-              <span className="material-symbols-outlined text-[24px]">error</span>
-              <div>
-                <p className="font-label-md text-label-md font-semibold">Backend server offline</p>
-                <p className="text-xs opacity-80">
-                  Could not load database documents from {API_BASE_URL}. Showing simulated content
-                  instead.
-                </p>
               </div>
             </div>
-          )}
+          </div>
+        </div>
+      </header>
 
-          {/* Main Grid Layout */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            {/* Left Column: Documents Content */}
-            <div className="xl:col-span-2 flex flex-col gap-8">
-              {isSearching ? (
-                /* SEARCH RESULTS VIEW */
-                <section>
-                  <div className="flex justify-between items-end mb-6">
-                    <h3 className="font-headline-md text-headline-md text-on-surface">
-                      Search Results
-                    </h3>
-                    <p className="font-label-sm text-label-sm text-secondary">
-                      {isLoading ? 'Searching...' : `${documents.length} matches found`}
+      {/* Main Layout Area */}
+      <main className="flex flex-col md:flex-row flex-1 w-full min-h-[calc(100vh-80px)]">
+        {/* Sidebar Filter Panel */}
+        <aside className="w-full md:w-[25%] bg-surface border-r border-outline-variant p-container-margin-desktop md:sticky md:top-[80px] md:h-[calc(100vh-80px)] overflow-y-auto custom-scrollbar">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="font-headline-md text-label-md text-primary uppercase tracking-widest">
+              Filters
+            </h2>
+            <button
+              onClick={handleClearAll}
+              className="text-label-sm text-secondary hover:text-primary transition-colors cursor-pointer"
+            >
+              Clear All
+            </button>
+          </div>
+
+          {/* Filter Groups */}
+          <div className="space-y-8">
+            {/* Sort By */}
+            <section>
+              <div
+                onClick={() => toggleSection('sort')}
+                className="flex items-center justify-between mb-4 group cursor-pointer"
+              >
+                <h3 className="font-label-md text-primary">Sort By</h3>
+                <span
+                  className={`material-symbols-outlined text-secondary transition-transform ${
+                    collapsedSections.sort ? 'rotate-[-90deg]' : ''
+                  }`}
+                >
+                  expand_more
+                </span>
+              </div>
+              {!collapsedSections.sort && (
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input
+                      type="radio"
+                      name="sort"
+                      checked={sortBy === 'recent'}
+                      onChange={() => setSortBy('recent')}
+                      className="w-4 h-4 border-outline-variant text-primary focus:ring-primary"
+                    />
+                    <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
+                      Most Recent
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input
+                      type="radio"
+                      name="sort"
+                      checked={sortBy === 'viewed'}
+                      onChange={() => setSortBy('viewed')}
+                      className="w-4 h-4 border-outline-variant text-primary focus:ring-primary"
+                    />
+                    <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
+                      Most Viewed
+                    </span>
+                  </label>
+                </div>
+              )}
+            </section>
+
+            <hr className="border-outline-variant" />
+
+            {/* University */}
+            <section>
+              <div
+                onClick={() => toggleSection('uni')}
+                className="flex items-center justify-between mb-4 group cursor-pointer"
+              >
+                <h3 className="font-label-md text-primary">University</h3>
+                <span
+                  className={`material-symbols-outlined text-secondary transition-transform ${
+                    collapsedSections.uni ? 'rotate-[-90deg]' : ''
+                  }`}
+                >
+                  expand_more
+                </span>
+              </div>
+              {!collapsedSections.uni && (
+                <div className="space-y-3">
+                  {['Stanford University', 'London School of Economics', 'MIT', 'Harvard University', 'UC Berkeley'].map((uni) => (
+                    <label key={uni} className="flex items-center gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={selectedUnis.includes(uni)}
+                        onChange={() => handleUniversityChange(uni)}
+                        className="filter-checkbox w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
+                      />
+                      <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
+                        {uni}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <hr className="border-outline-variant" />
+
+            {/* Document Type */}
+            <section>
+              <div
+                onClick={() => toggleSection('type')}
+                className="flex items-center justify-between mb-4 group cursor-pointer"
+              >
+                <h3 className="font-label-md text-primary">Document Type</h3>
+                <span
+                  className={`material-symbols-outlined text-secondary transition-transform ${
+                    collapsedSections.type ? 'rotate-[-90deg]' : ''
+                  }`}
+                >
+                  expand_more
+                </span>
+              </div>
+              {!collapsedSections.type && (
+                <div className="space-y-3">
+                  {['Lecture notes', 'Summaries', 'Past Exams', 'Essays'].map((type) => (
+                    <label key={type} className="flex items-center gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={selectedTypes.includes(type)}
+                        onChange={() => handleTypeChange(type)}
+                        className="filter-checkbox w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
+                      />
+                      <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
+                        {type}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <hr className="border-outline-variant" />
+
+            {/* Academic Year */}
+            <section>
+              <div
+                onClick={() => toggleSection('year')}
+                className="flex items-center justify-between mb-4 group cursor-pointer"
+              >
+                <h3 className="font-label-md text-primary">Academic Year</h3>
+                <span
+                  className={`material-symbols-outlined text-secondary transition-transform ${
+                    collapsedSections.year ? 'rotate-[-90deg]' : ''
+                  }`}
+                >
+                  expand_more
+                </span>
+              </div>
+              {!collapsedSections.year && (
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="w-full bg-surface-container-low border-none rounded-lg font-label-md text-on-surface-variant focus:ring-2 focus:ring-primary py-2.5 px-4 outline-none"
+                >
+                  <option>2023 / 2024</option>
+                  <option>2022 / 2023</option>
+                  <option>2021 / 2022</option>
+                </select>
+              )}
+            </section>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <div className="w-full md:w-[75%] bg-surface-container-lowest p-container-margin-desktop flex flex-col">
+          {filteredDocuments.length > 0 ? (
+            <div className="max-w-4xl mx-auto w-full">
+              {/* Results Header */}
+              <div className="flex items-end justify-between mb-8 pb-4 border-b border-outline-variant">
+                <div>
+                  <h1 className="font-headline-lg text-primary mb-1">Search Results</h1>
+                  <p className="font-body-md text-on-surface-variant">
+                    Showing{' '}
+                    <span className="font-bold text-primary">
+                      {filteredDocuments.length}
+                    </span>{' '}
+                    results for &quot;
+                    <span className="italic">{activeQuery || 'All Documents'}</span>&quot;
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => alert('Grid view clicked (Simulated)')}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container-low text-label-md text-primary hover:bg-surface-container-high transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">grid_view</span>
+                  </button>
+                  <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-label-md transition-all active:scale-95 shadow-sm cursor-pointer">
+                    <span className="material-symbols-outlined text-[20px]">
+                      format_list_bulleted
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Connection Error Banner (in Results list) */}
+              {error && (
+                <div className="bg-error-container text-on-error-container p-4 rounded-xl flex items-center gap-3 mb-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] border border-error/10">
+                  <span className="material-symbols-outlined text-[24px]">error</span>
+                  <div>
+                    <p className="font-label-md text-label-md font-semibold">Backend offline</p>
+                    <p className="text-xs opacity-80">
+                      Could not load database documents. Showing matching simulated documents.
                     </p>
                   </div>
+                </div>
+              )}
 
-                  {isLoading && (
-                    <div className="bg-surface-container-lowest rounded-xl p-12 text-center text-secondary shadow-[0px_4px_12px_rgba(0,0,0,0.03)] flex flex-col items-center gap-2">
-                      <span className="material-symbols-outlined animate-spin text-3xl">sync</span>
-                      <p className="font-label-md text-label-md">Loading matching documents...</p>
-                    </div>
-                  )}
-
-                  {!isLoading && documents.length === 0 && (
-                    <div className="bg-surface-container-lowest rounded-xl p-12 text-center text-secondary shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
-                      <span className="material-symbols-outlined text-4xl mb-2 text-secondary/60">
-                        search_off
-                      </span>
-                      <p className="font-body-lg text-body-lg font-semibold text-on-surface">
-                        No documents found
-                      </p>
-                      <p className="font-body-md text-body-md text-secondary mt-1">
-                        Try searching for another keyword or course code.
-                      </p>
-                    </div>
-                  )}
-
-                  {!isLoading && documents.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {documents.map((doc, idx) => (
-                        <div
-                          key={doc.id}
-                          onClick={() => handleCardClick(doc.fileUrl)}
-                          className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[180px]"
-                        >
-                          <div>
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="bg-[#E9ECEF] text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">
-                                {doc.subject?.code ?? 'GEN101'}
-                              </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(
-                                    getDocumentUrl(doc.fileUrl),
-                                    '_blank',
-                                    'noopener,noreferrer'
-                                  );
-                                }}
-                                className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
-                                title="Download"
-                              >
-                                <span className="material-symbols-outlined">download</span>
-                              </button>
-                            </div>
-                            <h4 className="font-body-lg text-body-lg font-semibold text-on-surface mb-1 line-clamp-2">
-                              {doc.title}
-                            </h4>
-                            <p className="font-body-md text-body-md text-secondary line-clamp-2 mb-2">
-                              {doc.description ?? 'No description provided.'}
-                            </p>
-                            <p className="font-label-sm text-label-sm text-secondary">
-                              {doc.subject?.name ?? 'General'}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E9ECEF] text-secondary">
-                            <div className="flex items-center gap-4">
-                              <span className="flex items-center gap-1 font-label-sm text-label-sm">
-                                <span className="material-symbols-outlined text-[16px]">
-                                  visibility
-                                </span>{' '}
-                                {doc.viewCount}
-                              </span>
-                              <span className="flex items-center gap-1 font-label-sm text-label-sm">
-                                <span className="material-symbols-outlined text-[16px]">
-                                  thumb_up
-                                </span>{' '}
-                                {getRating(doc.id, idx)}
-                              </span>
-                            </div>
-                            <span className="font-label-sm text-label-sm text-secondary bg-surface-container-low px-2 py-0.5 rounded">
-                              {formatFileType(doc.fileType)} ({formatFileSize(doc.fileSize)})
-                            </span>
-                          </div>
+              {/* Results List */}
+              <div className="space-y-4">
+                {filteredDocuments.map((doc) => {
+                  const category = getDocumentCategory(doc);
+                  return (
+                    <article
+                      key={doc.id}
+                      onClick={() => handleCardClick(doc.fileUrl)}
+                      className="group relative bg-surface-container-lowest border border-outline-variant rounded-xl p-6 hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
+                    >
+                      <div className="flex gap-6 items-start">
+                        <div className="w-16 h-20 shrink-0 bg-surface-container-low rounded-lg flex items-center justify-center border border-outline-variant group-hover:border-primary transition-colors">
+                          <span className="material-symbols-outlined text-[32px] text-secondary group-hover:text-primary transition-colors">
+                            {getCategoryIcon(category)}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              ) : (
-                /* DEFAULT DASHBOARD VIEW */
-                <>
-                  {/* Recently Viewed */}
-                  <section>
-                    <div className="flex justify-between items-end mb-6">
-                      <h3 className="font-headline-md text-headline-md text-on-surface">
-                        Recently Viewed
-                      </h3>
-                      <a
-                        className="font-label-md text-label-md text-primary-container hover:underline cursor-pointer"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          alert('Showing all recently viewed documents (Simulated)');
-                        }}
-                      >
-                        View all
-                      </a>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {recentlyViewed.map((doc, idx) => (
-                        <div
-                          key={doc.id}
-                          onClick={() => handleCardClick(doc.fileUrl)}
-                          className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[160px]"
-                        >
-                          <div>
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="bg-[#E9ECEF] text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="font-headline-md text-primary group-hover:text-primary-container leading-tight">
+                              {doc.title}
+                            </h3>
+                            <button
+                              onClick={(e) => toggleBookmark(doc.id, e)}
+                              className="material-symbols-outlined text-secondary hover:text-primary transition-colors cursor-pointer"
+                            >
+                              <span
+                                className={`material-symbols-outlined ${
+                                  bookmarkedIds.includes(doc.id) ? 'filled text-primary' : ''
+                                }`}
+                              >
+                                bookmark
+                              </span>
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
+                            <div className="flex items-center gap-2">
+                              <span className="material-symbols-outlined text-[18px] text-on-tertiary-container">
+                                account_balance
+                              </span>
+                              <span className="font-label-md text-on-surface-variant">
+                                {getUniversityName(doc)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="material-symbols-outlined text-[18px] text-on-tertiary-container">
+                                code
+                              </span>
+                              <span className="font-label-md text-on-surface-variant">
                                 {doc.subject?.code ?? 'GEN101'}
                               </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(
-                                    getDocumentUrl(doc.fileUrl),
-                                    '_blank',
-                                    'noopener,noreferrer'
-                                  );
-                                }}
-                                className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
-                              >
-                                <span className="material-symbols-outlined">download</span>
-                              </button>
                             </div>
-                            <h4 className="font-body-lg text-body-lg font-semibold text-on-surface mb-1 line-clamp-2">
-                              {doc.title}
-                            </h4>
-                            <p className="font-body-md text-body-md text-secondary line-clamp-1">
-                              {doc.subject?.name ?? 'General'}
-                            </p>
+                            <div className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-label-sm text-secondary uppercase tracking-wider">
+                              {category}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#E9ECEF] text-secondary">
-                            <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                          <div className="flex items-center gap-6 text-label-sm text-secondary border-t border-outline-variant pt-4">
+                            <span className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[16px]">
+                                description
+                              </span>{' '}
+                              {formatFileSize(doc.fileSize)}
+                            </span>
+                            <span className="flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-[16px]">
                                 visibility
                               </span>{' '}
                               {doc.viewCount >= 1000
                                 ? `${(doc.viewCount / 1000).toFixed(1)}k`
-                                : doc.viewCount}
+                                : doc.viewCount}{' '}
+                                Views
                             </span>
-                            <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                            <span className="flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-[16px]">
-                                thumb_up
+                                calendar_today
                               </span>{' '}
-                              {getRating(doc.id, idx)}
+                              {new Date(doc.createdAt).toLocaleDateString('en-US', {
+                                month: 'short',
+                                year: 'numeric',
+                              })}
                             </span>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </section>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
 
-                  {/* Trending network documents */}
-                  <section>
-                    <h3 className="font-headline-md text-headline-md text-on-surface mb-6">
-                      Trending in your network
-                    </h3>
-                    <div className="bg-surface-container-lowest rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.03)] overflow-hidden">
-                      {trendingDocs.map((doc, idx) => {
-                        const fileInfo = getFileTypeIconAndStyle(doc.fileType);
-                        return (
-                          <div
-                            key={doc.id}
-                            onClick={() => handleCardClick(doc.fileUrl)}
-                            className="flex items-center justify-between p-4 sm:p-6 border-b border-[#E9ECEF] last:border-b-0 hover:bg-surface-container-low transition-colors cursor-pointer group"
-                          >
-                            <div className="flex items-start gap-4">
-                              <div
-                                className={`w-12 h-12 rounded ${fileInfo.bgClass} flex items-center justify-center flex-shrink-0`}
-                              >
-                                <span className="material-symbols-outlined">{fileInfo.icon}</span>
-                              </div>
-                              <div>
-                                <h4 className="font-body-md text-body-md font-semibold text-on-surface line-clamp-1">
-                                  {doc.title}
-                                </h4>
-                                <div className="flex flex-wrap items-center gap-2 mt-1 text-secondary font-label-sm text-label-sm">
-                                  <span>{doc.subject?.name ?? 'General'}</span>
-                                  <span>•</span>
-                                  <span>{doc.subject?.code ?? 'GEN101'}</span>
-                                  <span>•</span>
-                                  <span className="text-[#212529]">
-                                    Added {formatCreatedAt(doc.createdAt)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <button
-                              onClick={(e) => toggleSaveDoc(doc.id, e)}
-                              className={`hidden sm:block px-4 py-2 border rounded-full font-label-sm text-label-sm transition-colors cursor-pointer ${
-                                savedDocIds.includes(doc.id)
-                                  ? 'bg-primary-container text-white border-primary-container'
-                                  : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
-                              }`}
-                            >
-                              {savedDocIds.includes(doc.id) ? 'Saved' : 'Save'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
-                </>
-              )}
-            </div>
-
-            {/* Right Column: Bento Sidebar */}
-            <div className="flex flex-col gap-8">
-              {/* Top Contributors Card */}
-              <section className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] h-fit">
-                <h3 className="font-headline-md text-headline-md text-on-surface mb-6">
-                  Top Contributors
-                </h3>
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        alt="Sarah J. avatar profile picture"
-                        className="w-10 h-10 rounded-full object-cover"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCbKnnE9P8WplUJMxgDKRUPtxvrITGrpi-hIFPFfkPJz6oIZBQQwhURIyhGnsxfdGzugqzkbfErVWvEXVDQj40Z8jZPgGOqIZxv-iQyguS7fnYjLa36ZJQnXbCk_lBFV7OxsVwQ3nvdhn0hnYgs75Q3OEbKjYauRURKkxAFUml8OZhtI9RB61neoZvyycGXvBcD6FfN7pEdKb-2n0h7XV1Hm6YScxugLFyu6R1-OspAxktJA0roF_6UUt98S76BVyaYvqEqcy1khE"
-                      />
-                      <div>
-                        <p className="font-label-md text-label-md text-on-surface">Sarah J.</p>
-                        <p className="font-label-sm text-label-sm text-secondary">
-                          42 docs uploaded
-                        </p>
-                      </div>
-                    </div>
-                    <span className="bg-primary-fixed-dim text-on-primary-fixed px-2 py-1 rounded text-xs font-bold">
-                      #1
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        alt="Michael T. avatar profile picture"
-                        className="w-10 h-10 rounded-full object-cover"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9oEKKeSTGWU2aMKR3uIJjXccVa_ApxQ96iHoa3ZIY_fK-Eru2ODGjVBSM-Ot3QYwTQcFovUpYv4p5hMugpW95zvu2FNrnu3sH_LKPJ795Unfp_WkNm3NETpHEXztHgptc2Z-2V3S53oBbYbFIlDgVyVpK7FrWYJvZTMMTnqYIB1Qlxaz0cUXnQ3dMgjx53S_Yf4L92SgHMKhkrvovBy94za6Va35s-KRjK8N-g5R9XuupjLW1RdU1r9yHas58uqAX1SO3WeThAIc"
-                      />
-                      <div>
-                        <p className="font-label-md text-label-md text-on-surface">Michael T.</p>
-                        <p className="font-label-sm text-label-sm text-secondary">
-                          38 docs uploaded
-                        </p>
-                      </div>
-                    </div>
-                    <span className="bg-surface-variant text-on-surface-variant px-2 py-1 rounded text-xs font-bold">
-                      #2
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        alt="Emily R. avatar profile picture"
-                        className="w-10 h-10 rounded-full object-cover"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuCLzW5NgJtFtUnPROHmp5OiPtOFcLRfXICeEm2wazxYt8sTF4aiFaYMAnUfN6PiBeRqLd1h726ph7PBxyMUbQa4gWQdGtEeygAUQzhJE803Il3X4CT5-2kL_rYsz3_tXaR5twW4iQ_jhERXGtG-yOnfVvnjlorL3eK42Xlae2OarbZR_vsqeIBqrE-AdpY66fFBzLMY6DkDeuTdaBTBjUsh-tMTohgJCQ7CguJFWsTp_-0xYLtlniFiS7b8CLz6eZ-s7OCixOs3-2M"
-                      />
-                      <div>
-                        <p className="font-label-md text-label-md text-on-surface">Emily R.</p>
-                        <p className="font-label-sm text-label-sm text-secondary">
-                          29 docs uploaded
-                        </p>
-                      </div>
-                    </div>
-                    <span className="bg-surface-variant text-on-surface-variant px-2 py-1 rounded text-xs font-bold">
-                      #3
-                    </span>
-                  </div>
-                </div>
+              {/* Pagination */}
+              <div className="mt-12 flex items-center justify-center gap-4">
                 <button
-                  onClick={() => alert('Leaderboard clicked (Simulated)')}
-                  className="w-full mt-6 py-2 border border-[#E9ECEF] text-on-surface rounded-lg font-label-md text-label-md hover:bg-surface-container-low transition-colors cursor-pointer"
+                  disabled
+                  className="flex items-center justify-center w-10 h-10 rounded-lg border border-outline-variant text-secondary hover:bg-surface-container-low transition-colors disabled:opacity-30 cursor-not-allowed"
                 >
-                  View Leaderboard
+                  <span className="material-symbols-outlined">chevron_left</span>
                 </button>
-              </section>
-
-              {/* Unlock Premium Bento Card */}
-              <section className="bg-primary-container text-on-primary-container rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] relative overflow-hidden group">
-                <div className="relative z-10">
-                  <span className="material-symbols-outlined text-4xl mb-4 text-[#e0e3e8]">
-                    workspace_premium
-                  </span>
-                  <h3 className="font-headline-md text-headline-md text-white mb-2 font-semibold">
-                    Unlock Premium
-                  </h3>
-                  <p className="font-body-md text-body-md text-[#bfc7d0] mb-6">
-                    Get unlimited access to millions of documents, practice tests, and expert answers.
-                  </p>
+                <div className="flex gap-2">
+                  <button className="w-10 h-10 rounded-lg bg-primary text-on-primary font-label-md">
+                    1
+                  </button>
                   <button
-                    onClick={() => alert('Subscription flow initiated (Simulated)')}
-                    className="bg-white text-[#212529] px-6 py-3 rounded-full font-label-md text-label-md font-semibold hover:bg-[#e0e3e6] transition-colors w-full text-center cursor-pointer"
+                    onClick={() => alert('Page 2 clicked (Simulated)')}
+                    className="w-10 h-10 rounded-lg border border-outline-variant text-primary font-label-md hover:bg-surface-container-low transition-colors cursor-pointer"
                   >
-                    Start Free Trial
+                    2
+                  </button>
+                  <button
+                    onClick={() => alert('Page 3 clicked (Simulated)')}
+                    className="w-10 h-10 rounded-lg border border-outline-variant text-primary font-label-md hover:bg-surface-container-low transition-colors cursor-pointer"
+                  >
+                    3
+                  </button>
+                  <span className="flex items-center px-2 text-secondary">...</span>
+                  <button
+                    onClick={() => alert('Page 12 clicked (Simulated)')}
+                    className="w-10 h-10 rounded-lg border border-outline-variant text-primary font-label-md hover:bg-surface-container-low transition-colors cursor-pointer"
+                  >
+                    12
                   </button>
                 </div>
-                {/* Decorative Blur Bubble */}
-                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white opacity-5 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500"></div>
-              </section>
+                <button
+                  onClick={() => alert('Next page clicked (Simulated)')}
+                  className="flex items-center justify-center w-10 h-10 rounded-lg border border-outline-variant text-secondary hover:bg-surface-container-low transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined">chevron_right</span>
+                </button>
+              </div>
             </div>
-          </div>
-        </main>
-      </div>
+          ) : (
+            /* ================= EXPLORE EMPTY STATE ================= */
+            <div className="flex-grow flex flex-col items-center justify-center text-center py-12 md:py-24 px-4 w-full max-w-4xl mx-auto">
+              {/* Connection Error Banner (in Empty state) */}
+              {error && (
+                <div className="max-w-xl w-full bg-error-container text-on-error-container p-4 rounded-xl flex items-center gap-3 mb-8 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] border border-error/10">
+                  <span className="material-symbols-outlined text-[24px]">error</span>
+                  <div className="text-left">
+                    <p className="font-label-md text-label-md font-semibold">Backend server offline</p>
+                    <p className="text-xs opacity-80">
+                      Failed to query backend database. Try starting port 3000.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Illustration Section */}
+              <div className="relative w-full max-w-lg mb-12 animate-fade-in">
+                <img
+                  alt="Search Not Found Illustration"
+                  className="w-full h-auto"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDjq4iiNttHXdhtTrh_gAe3aSgH5Meq3lX3cu9VbuzXrlfBB9bxx7BKYDh05hLAXQnUox7kJcaR2IC_cWCxbsfGKbeRIrXvS7iA-7G3GMPIt3w2KsuF1oBrFWS2X_4YS1mV8UPLDSNXD0OmQ4nIfZuaa97IwApBLlrdvRkIJ1-XqvUHIb2T1jZUx-keKNdiEduQ_LsvdQxjTt2cs4s9FcnXdRffee4vp4mzk3CgJ7UlmUAT_G5yArIk_d0QEHgY2S7l4NOEjKa_19w"
+                />
+              </div>
+
+              {/* Feedback Content */}
+              <div className="max-w-2xl space-y-6">
+                <h1 className="font-headline-xl text-headline-xl text-primary tracking-tight">
+                  We couldn&apos;t find any documents matching your search
+                </h1>
+                <p className="font-body-lg text-body-lg text-secondary">
+                  Check your spelling, use more general keywords, or try a different subject. Sometimes
+                  the most specific knowledge is yet to be shared.
+                </p>
+              </div>
+
+              {/* CTA Action Buttons */}
+              <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <button
+                  onClick={() => alert('Upload Document dialog initiated (Simulated)')}
+                  className="h-12 px-8 bg-primary-container text-white rounded-lg font-label-md text-label-md hover:shadow-lg active:scale-98 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">upload_file</span>
+                  Upload Your Own Document
+                </button>
+                <button
+                  onClick={() => alert('Opening AI Support chatbot (Simulated)')}
+                  className="h-12 px-8 border border-outline-variant bg-white text-primary rounded-lg font-label-md text-label-md hover:bg-surface-container-low active:scale-98 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">smart_toy</span>
+                  Ask AI Support
+                </button>
+              </div>
+
+              {/* Suggestion Chips */}
+              <div className="mt-16 pt-8 border-t border-outline-variant w-full max-w-xl">
+                <p className="font-label-sm text-label-sm uppercase tracking-widest text-outline mb-6">
+                  Popular Disciplines
+                </p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {['Computer Science', 'Molecular Biology', 'Microeconomics', 'Applied Ethics'].map(
+                    (discipline) => (
+                      <button
+                        key={discipline}
+                        onClick={() => handleSuggestionClick(discipline)}
+                        className="px-4 py-2 bg-secondary-container text-on-secondary-container rounded-full font-label-md text-label-md hover:bg-outline-variant transition-colors cursor-pointer"
+                      >
+                        {discipline}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Footer Credit */}
+      <footer className="w-full px-container-margin-desktop py-8 border-t border-outline-variant flex justify-between items-center text-outline text-secondary bg-surface z-10">
+        <p className="font-label-sm text-label-sm">
+          © 2024 Academic Precision. All intellectual property reserved.
+        </p>
+        <div className="flex gap-6">
+          <a
+            className="font-label-sm text-label-sm hover:text-primary transition-colors"
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              alert('Privacy Policy clicked (Simulated)');
+            }}
+          >
+            Privacy Policy
+          </a>
+          <a
+            className="font-label-sm text-label-sm hover:text-primary transition-colors"
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              alert('Terms of Service clicked (Simulated)');
+            }}
+          >
+            Terms of Service
+          </a>
+        </div>
+      </footer>
     </div>
+  );
+}
+
+export default function ExplorePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="bg-surface min-h-screen flex items-center justify-center">
+          <span className="material-symbols-outlined animate-spin text-3xl text-secondary">sync</span>
+        </div>
+      }
+    >
+      <SearchExplore />
+    </Suspense>
   );
 }
