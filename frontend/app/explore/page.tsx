@@ -120,14 +120,125 @@ function getDocumentUrl(fileUrl: string): string {
   return `${API_BASE_URL}${fileUrl}`;
 }
 
-function getStaticRating(index: number): string {
-  const ratings = ['4.8', '4.5', '4.9', '4.2', '4.7', '4.6'];
+const MOCK_DOCUMENTS: ExploreDocument[] = [
+  {
+    id: 'mock-1',
+    title: 'Introduction to Data Structures & Algorithms - Midterm Notes',
+    description: 'A comprehensive study guide covering linked lists, trees, graphs, and basic sorting algorithms.',
+    subject: { id: 101, name: 'Stanford University', code: 'CS101' },
+    fileUrl: '#',
+    previewUrl: null,
+    fileType: 'application/pdf',
+    fileSize: '2457600',
+    downloadCount: 1200,
+    viewCount: 1200,
+    quizCount: 3,
+    hasSummary: true,
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'mock-2',
+    title: 'Macroeconomics: Full Semester Study Guide',
+    description: 'Complete notes for ECON201 containing aggregate demand, supply, monetary policies, and inflation.',
+    subject: { id: 201, name: 'London School of Economics', code: 'ECON201' },
+    fileUrl: '#',
+    previewUrl: null,
+    fileType: 'application/pdf',
+    fileSize: '3584000',
+    downloadCount: 3400,
+    viewCount: 3400,
+    quizCount: 5,
+    hasSummary: true,
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'mock-3',
+    title: 'Calculus III: Vector Analysis Cheat Sheet',
+    description: 'Vector fields, line integrals, Green\'s theorem, Stokes\' theorem, and divergence theorem equations.',
+    subject: { id: 301, name: 'MIT', code: 'MATH202' },
+    fileUrl: '#',
+    previewUrl: null,
+    fileType: 'application/pdf',
+    fileSize: '1536000',
+    downloadCount: 850,
+    viewCount: 920,
+    quizCount: 2,
+    hasSummary: false,
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'mock-4',
+    title: 'Organic Chemistry Reactions Summary',
+    description: 'Summary sheet of key organic chemistry mechanisms including nucleophilic substitutions and eliminations.',
+    subject: { id: 401, name: 'Harvard University', code: 'CHEM101' },
+    fileUrl: '#',
+    previewUrl: null,
+    fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    fileSize: '1843200',
+    downloadCount: 1900,
+    viewCount: 2100,
+    quizCount: 4,
+    hasSummary: true,
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'mock-5',
+    title: 'Machine Learning Past Exams (2018-2023)',
+    description: 'Compilation of midterm and final exams with detailed solutions for CS229.',
+    subject: { id: 501, name: 'UC Berkeley', code: 'CS229' },
+    fileUrl: '#',
+    previewUrl: null,
+    fileType: 'application/zip',
+    fileSize: '12582912',
+    downloadCount: 3100,
+    viewCount: 3400,
+    quizCount: 0,
+    hasSummary: false,
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
 
+function getRating(docId: string, index: number): string {
+  if (docId === 'mock-1') return '98%';
+  if (docId === 'mock-2') return '95%';
+  const ratings = ['98%', '95%', '99%', '92%', '97%', '96%'];
   return ratings[index % ratings.length];
+}
+
+function getFileTypeIconAndStyle(fileType: string) {
+  const type = fileType.toLowerCase();
+  if (type.includes('pdf')) {
+    return {
+      icon: 'picture_as_pdf',
+      bgClass: 'bg-error-container text-on-error-container',
+    };
+  } else if (
+    type.includes('word') ||
+    type.includes('document') ||
+    type.includes('docx') ||
+    type.includes('msword')
+  ) {
+    return {
+      icon: 'description',
+      bgClass: 'bg-primary-fixed text-on-primary-fixed-variant',
+    };
+  } else if (type.includes('zip') || type.includes('rar') || type.includes('archive')) {
+    return {
+      icon: 'folder_zip',
+      bgClass: 'bg-surface-dim text-on-surface',
+    };
+  } else {
+    return {
+      icon: 'description',
+      bgClass: 'bg-surface-container-high text-secondary',
+    };
+  }
 }
 
 export default function ExplorePage() {
   const [search, setSearch] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [savedDocIds, setSavedDocIds] = useState<string[]>([]);
   const debouncedSearch = useDebounce(search);
 
   const exploreUrl = useMemo(() => {
@@ -144,216 +255,566 @@ export default function ExplorePage() {
 
   const { data: documents = [], error, isLoading } = useSWR(exploreUrl, fetcher);
 
+  const isSearching = search.trim() !== '';
+
+  const displayDocs = useMemo(() => {
+    if (documents.length > 0) {
+      return documents;
+    }
+    return MOCK_DOCUMENTS;
+  }, [documents]);
+
+  const recentlyViewed = useMemo(() => {
+    return displayDocs.slice(0, 2);
+  }, [displayDocs]);
+
+  const trendingDocs = useMemo(() => {
+    return displayDocs.slice(2);
+  }, [displayDocs]);
+
+  const handleCardClick = (fileUrl: string) => {
+    if (fileUrl === '#') {
+      alert('This is a simulated document view.');
+      return;
+    }
+    window.open(getDocumentUrl(fileUrl), '_blank', 'noopener,noreferrer');
+  };
+
+  const toggleSaveDoc = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSavedDocIds((prev) =>
+      prev.includes(id) ? prev.filter((dId) => dId !== id) : [...prev, id]
+    );
+  };
+
   return (
-    <main className="min-h-screen bg-[#070b1f] text-white">
-      <aside className="fixed top-0 left-0 hidden h-screen w-72 border-r border-white/10 bg-[#0b1028] lg:block">
-        <div className="flex h-20 items-center gap-3 border-b border-white/10 px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-purple-600 text-lg font-bold">
-            {}
-          </div>
-          <div>
-            <p className="text-sm font-bold tracking-[0.3em] text-cyan-300">AI STUDY HUB</p>
-          </div>
-        </div>
-
-        <nav className="px-4 py-8">
-          <p className="mb-5 px-3 text-xs font-semibold tracking-[0.25em] text-slate-500 uppercase">
-            Main Menu
-          </p>
-
-          <div className="space-y-3">
-            <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white">
-              <span className="text-lg">▦</span>
-              Overview
-            </button>
-
-            <button className="flex w-full items-center gap-3 rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-cyan-500/20 to-purple-600/20 px-4 py-3 text-left text-sm font-semibold text-cyan-300">
-              <span className="text-lg">▤</span>
-              Library
-            </button>
-
-            <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white">
-              <span className="text-lg">⌘</span>
-              Courses
-            </button>
-          </div>
-        </nav>
-
-        <div className="absolute right-4 bottom-6 left-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+    <div className="bg-background text-on-background min-h-screen flex font-sans">
+      {/* Sidebar Nav */}
+      <nav
+        className={`${
+          mobileMenuOpen ? 'flex' : 'hidden'
+        } md:flex fixed left-0 top-0 h-full flex-col p-4 border-r border-outline-variant bg-surface-container-lowest shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-64 z-20 transition-all`}
+      >
+        <div className="flex items-center justify-between mb-8 px-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-lg font-bold">
-              N
+            <span className="material-symbols-outlined text-primary text-3xl">school</span>
+            <div>
+              <h1 className="font-headline-md text-headline-md text-primary">ScholarHub</h1>
+              <p className="font-label-sm text-label-sm text-secondary">Academic Excellence</p>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-white">Sinh viên Nguyễn Văn</p>
-              <span className="mt-1 inline-flex rounded-md bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-300">
-                USER
-              </span>
-            </div>
-            <span className="text-slate-500">⌃</span>
           </div>
+          {/* Mobile Close Button */}
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="md:hidden text-secondary p-1 hover:text-primary"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
         </div>
-      </aside>
 
-      <section className="min-h-screen lg:pl-72">
-        <header className="flex h-20 items-center justify-between border-b border-white/10 bg-[#0b1028]/70 px-6 backdrop-blur-xl lg:px-8">
-          <p className="text-xs font-bold tracking-[0.35em] text-slate-400 uppercase">
-            AI Study Hub System
-          </p>
+        <div className="mb-6 px-4">
+          <button
+            onClick={() => alert('New Research flow initiated (Simulated)')}
+            className="w-full bg-primary-container text-on-primary py-3 px-4 rounded-lg font-label-md text-label-md flex justify-center items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer"
+          >
+            <span className="material-symbols-outlined">add</span> New Research
+          </button>
+        </div>
 
-          <div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2">
-            <p className="flex items-center gap-2 text-xs font-bold tracking-[0.2em] text-emerald-300 uppercase">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              System Online
-            </p>
+        <ul className="flex flex-col gap-2 flex-grow">
+          <li>
+            <a
+              className="flex items-center gap-3 bg-secondary-container text-on-secondary-container rounded-lg px-4 py-3 font-label-md text-label-md active:scale-95 transition-transform"
+              href="#"
+            >
+              <span className="material-symbols-outlined filled">explore</span> Discover
+            </a>
+          </li>
+          <li>
+            <a
+              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                alert('My Documents section clicked (Simulated)');
+              }}
+            >
+              <span className="material-symbols-outlined">description</span> My Documents
+            </a>
+          </li>
+          <li>
+            <a
+              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                alert('Practice Mode clicked (Simulated)');
+              }}
+            >
+              <span className="material-symbols-outlined">school</span> Practice Mode
+            </a>
+          </li>
+          <li>
+            <a
+              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                alert('AI Assistant clicked (Simulated)');
+              }}
+            >
+              <span className="material-symbols-outlined">psychology</span> AI Assistant
+            </a>
+          </li>
+        </ul>
+
+        <ul className="flex flex-col gap-2 mt-auto border-t border-outline-variant pt-4">
+          <li>
+            <a
+              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                alert('Settings clicked (Simulated)');
+              }}
+            >
+              <span className="material-symbols-outlined">settings</span> Settings
+            </a>
+          </li>
+          <li>
+            <a
+              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                alert('Help section clicked (Simulated)');
+              }}
+            >
+              <span className="material-symbols-outlined">help</span> Help
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      {/* Main Content Area */}
+      <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
+        {/* Top Header */}
+        <header className="sticky top-0 z-10 bg-surface shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-full">
+          <div className="flex justify-between items-center w-full px-container-margin-desktop max-w-max-width mx-auto h-16">
+            {/* Mobile Menu Trigger & Logo */}
+            <div className="flex items-center gap-4 md:hidden">
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="text-primary hover:text-secondary transition-colors p-2 cursor-pointer"
+              >
+                <span className="material-symbols-outlined">menu</span>
+              </button>
+              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
+            </div>
+
+            {/* Desktop Search Bar */}
+            <div className="hidden md:flex flex-1 max-w-2xl mx-8 relative">
+              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary">
+                search
+              </span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-surface-container-low border-none rounded-full py-2.5 pl-12 pr-4 text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all font-body-md text-body-md outline-none"
+                placeholder="Search for courses, documents, or keywords..."
+                type="text"
+              />
+            </div>
+
+            {/* Header Right Actions */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => alert('Upload process clicked (Simulated)')}
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-[#212529] text-white rounded-full font-label-md text-label-md hover:opacity-90 transition-opacity h-10 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">upload</span> Upload
+              </button>
+
+              <button className="text-secondary hover:text-primary transition-colors p-2 relative cursor-pointer">
+                <span className="material-symbols-outlined">notifications</span>
+                <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+              </button>
+
+              <button className="w-10 h-10 rounded-full overflow-hidden border border-outline-variant hover:border-primary transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                <img
+                  alt="User profile avatar"
+                  className="w-full h-full object-cover"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYqSMGF3Z3oHdYhn5TKuHMKRLqgbBxxxtoRNxnakx4QY5gEAylvvaC7DqnO-6wRdWbBIdm8lN9SEhMxCbp8hakT47O6vbJLl91-97D8pkJXLj50c3nW8qB-8avFTT50YGPsF-9s6SN75_vCxKk31GsSz7WxQH4X-qlX6XGkFSqpq9alyYCX-ZxYLwHMCljNf0kwH5AertyqfjrTSYFBaxqzh-1604Hz7HFbNugFP3ndIVAs_2OpIbQSJgwvDs5Kcf11UWU6_PEEOQ"
+                />
+              </button>
+            </div>
           </div>
         </header>
 
-        <div className="relative min-h-[calc(100vh-5rem)] overflow-hidden px-5 py-8 sm:px-8">
-          <div className="pointer-events-none absolute top-0 right-0 h-[520px] w-[520px] rounded-full bg-purple-700/30 blur-[130px]" />
-          <div className="pointer-events-none absolute top-20 left-20 h-[420px] w-[420px] rounded-full bg-cyan-500/20 blur-[120px]" />
+        {/* Main Workspace Canvas */}
+        <main className="flex-1 p-container-margin-mobile md:p-container-margin-desktop max-w-max-width mx-auto w-full">
+          {/* Welcome section */}
+          <section className="mb-12">
+            <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
+              Welcome back, Alex
+            </h2>
+            <p className="font-body-lg text-body-lg text-secondary">
+              Here's what's happening in your academic world today.
+            </p>
+          </section>
 
-          <div className="relative mx-auto max-w-7xl">
-            <div className="mb-7 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-              <div>
-                <h1 className="text-4xl font-extrabold tracking-tight text-white">My Library</h1>
-                <p className="mt-2 text-sm text-slate-400">
-                  Manage all your uploaded and saved study materials
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200 transition hover:bg-white/10">
-                  ⌄ Filter
-                </button>
-                <button className="rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-purple-900/30 transition hover:scale-[1.02]">
-                  Upload New
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-7 rounded-3xl border border-white/10 bg-white/5 p-3 backdrop-blur-xl">
-              <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#090e25]/80 px-5 py-4">
-                <span className="text-xl text-slate-500">⌕</span>
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search documents by name, type, subject code..."
-                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
-                />
-              </div>
-            </div>
-
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Community Documents</h2>
-                <p className="mt-1 text-sm text-slate-400">
-                  {documents.length} document{documents.length !== 1 ? 's' : ''} found
-                </p>
-              </div>
-            </div>
-
-            {isLoading && (
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-10 text-center text-slate-400">
-                Loading documents...
-              </div>
-            )}
-
-            {error && (
-              <div className="rounded-3xl border border-red-400/20 bg-red-500/10 p-10 text-center text-red-300">
-                Không thể tải danh sách tài liệu. Kiểm tra backend port 3000.
-              </div>
-            )}
-
-            {!isLoading && !error && documents.length === 0 && (
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-10 text-center text-slate-400">
-                Không tìm thấy tài liệu phù hợp.
-              </div>
-            )}
-
-            {!isLoading && !error && documents.length > 0 && (
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
-                {documents.map((document, index) => (
-                  <article
-                    key={document.id}
-                    className="group rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-400/30 hover:bg-white/[0.07]"
-                  >
-                    <div className="mb-5 flex items-start justify-between">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/10 text-2xl text-cyan-300">
-                        ▤
-                      </div>
-
-                      <div className="rounded-xl bg-yellow-400/10 px-3 py-1 text-xs font-bold text-yellow-300">
-                        ★ {getStaticRating(index)}
-                      </div>
-                    </div>
-
-                    <h3 className="mb-3 min-h-14 text-xl leading-7 font-extrabold text-white">
-                      {document.title}
-                    </h3>
-
-                    <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                      <span className="rounded-md bg-white/5 px-2 py-1 text-slate-300">
-                        {formatFileType(document.fileType)}
-                      </span>
-                      <span>•</span>
-                      <span>{formatFileSize(document.fileSize)}</span>
-                      <span>•</span>
-                      <span>{document.subject?.code ?? 'No Code'}</span>
-                    </div>
-
-                    <p className="mb-4 min-h-12 text-sm leading-6 text-slate-400">
-                      {document.description ?? 'Chưa có mô tả cho tài liệu này.'}
-                    </p>
-
-                    <p className="mb-5 text-sm font-semibold text-slate-300">
-                      {document.subject?.name ?? 'Unknown subject'}
-                    </p>
-
-                    <div className="border-t border-white/10 pt-4">
-                      <div className="mb-4 grid grid-cols-3 gap-3 text-center">
-                        <div className="rounded-2xl bg-[#0b1028]/70 px-3 py-3">
-                          <p className="text-sm font-bold text-white">{document.quizCount}</p>
-                          <p className="text-xs text-slate-500">Quiz</p>
-                        </div>
-
-                        <div className="rounded-2xl bg-[#0b1028]/70 px-3 py-3">
-                          <p className="text-sm font-bold text-white">{document.viewCount}</p>
-                          <p className="text-xs text-slate-500">Views</p>
-                        </div>
-
-                        <div className="rounded-2xl bg-[#0b1028]/70 px-3 py-3">
-                          <p className="text-sm font-bold text-white">
-                            {document.hasSummary ? 'Yes' : 'No'}
-                          </p>
-                          <p className="text-xs text-slate-500">Summary</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm text-slate-400">
-                          <span>◷</span>
-                          <span>{formatCreatedAt(document.createdAt)}</span>
-                        </div>
-
-                        <a
-                          href={getDocumentUrl(document.fileUrl)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-400 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-300"
-                          title="Open document"
-                        >
-                          ⤓
-                        </a>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
+          {/* Mobile Search Bar */}
+          <div className="md:hidden mb-6 relative">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary">
+              search
+            </span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-surface-container-low border-none rounded-full py-2.5 pl-12 pr-4 text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all font-body-md text-body-md outline-none"
+              placeholder="Search for courses, documents, or keywords..."
+              type="text"
+            />
           </div>
-        </div>
-      </section>
-    </main>
+
+          {/* Connection Error Banner (styled as error container, displays mock documents when API is unreachable) */}
+          {error && (
+            <div className="bg-error-container text-on-error-container p-4 rounded-xl flex items-center gap-3 mb-8 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] border border-error/10">
+              <span className="material-symbols-outlined text-[24px]">error</span>
+              <div>
+                <p className="font-label-md text-label-md font-semibold">Backend server offline</p>
+                <p className="text-xs opacity-80">
+                  Could not load database documents from {API_BASE_URL}. Showing simulated content
+                  instead.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Main Grid Layout */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            {/* Left Column: Documents Content */}
+            <div className="xl:col-span-2 flex flex-col gap-8">
+              {isSearching ? (
+                /* SEARCH RESULTS VIEW */
+                <section>
+                  <div className="flex justify-between items-end mb-6">
+                    <h3 className="font-headline-md text-headline-md text-on-surface">
+                      Search Results
+                    </h3>
+                    <p className="font-label-sm text-label-sm text-secondary">
+                      {isLoading ? 'Searching...' : `${documents.length} matches found`}
+                    </p>
+                  </div>
+
+                  {isLoading && (
+                    <div className="bg-surface-container-lowest rounded-xl p-12 text-center text-secondary shadow-[0px_4px_12px_rgba(0,0,0,0.03)] flex flex-col items-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-3xl">sync</span>
+                      <p className="font-label-md text-label-md">Loading matching documents...</p>
+                    </div>
+                  )}
+
+                  {!isLoading && documents.length === 0 && (
+                    <div className="bg-surface-container-lowest rounded-xl p-12 text-center text-secondary shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
+                      <span className="material-symbols-outlined text-4xl mb-2 text-secondary/60">
+                        search_off
+                      </span>
+                      <p className="font-body-lg text-body-lg font-semibold text-on-surface">
+                        No documents found
+                      </p>
+                      <p className="font-body-md text-body-md text-secondary mt-1">
+                        Try searching for another keyword or course code.
+                      </p>
+                    </div>
+                  )}
+
+                  {!isLoading && documents.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {documents.map((doc, idx) => (
+                        <div
+                          key={doc.id}
+                          onClick={() => handleCardClick(doc.fileUrl)}
+                          className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[180px]"
+                        >
+                          <div>
+                            <div className="flex justify-between items-start mb-2">
+                              <span className="bg-[#E9ECEF] text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">
+                                {doc.subject?.code ?? 'GEN101'}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(
+                                    getDocumentUrl(doc.fileUrl),
+                                    '_blank',
+                                    'noopener,noreferrer'
+                                  );
+                                }}
+                                className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
+                                title="Download"
+                              >
+                                <span className="material-symbols-outlined">download</span>
+                              </button>
+                            </div>
+                            <h4 className="font-body-lg text-body-lg font-semibold text-on-surface mb-1 line-clamp-2">
+                              {doc.title}
+                            </h4>
+                            <p className="font-body-md text-body-md text-secondary line-clamp-2 mb-2">
+                              {doc.description ?? 'No description provided.'}
+                            </p>
+                            <p className="font-label-sm text-label-sm text-secondary">
+                              {doc.subject?.name ?? 'General'}
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E9ECEF] text-secondary">
+                            <div className="flex items-center gap-4">
+                              <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                                <span className="material-symbols-outlined text-[16px]">
+                                  visibility
+                                </span>{' '}
+                                {doc.viewCount}
+                              </span>
+                              <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                                <span className="material-symbols-outlined text-[16px]">
+                                  thumb_up
+                                </span>{' '}
+                                {getRating(doc.id, idx)}
+                              </span>
+                            </div>
+                            <span className="font-label-sm text-label-sm text-secondary bg-surface-container-low px-2 py-0.5 rounded">
+                              {formatFileType(doc.fileType)} ({formatFileSize(doc.fileSize)})
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              ) : (
+                /* DEFAULT DASHBOARD VIEW */
+                <>
+                  {/* Recently Viewed */}
+                  <section>
+                    <div className="flex justify-between items-end mb-6">
+                      <h3 className="font-headline-md text-headline-md text-on-surface">
+                        Recently Viewed
+                      </h3>
+                      <a
+                        className="font-label-md text-label-md text-primary-container hover:underline cursor-pointer"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          alert('Showing all recently viewed documents (Simulated)');
+                        }}
+                      >
+                        View all
+                      </a>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {recentlyViewed.map((doc, idx) => (
+                        <div
+                          key={doc.id}
+                          onClick={() => handleCardClick(doc.fileUrl)}
+                          className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[160px]"
+                        >
+                          <div>
+                            <div className="flex justify-between items-start mb-2">
+                              <span className="bg-[#E9ECEF] text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">
+                                {doc.subject?.code ?? 'GEN101'}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(
+                                    getDocumentUrl(doc.fileUrl),
+                                    '_blank',
+                                    'noopener,noreferrer'
+                                  );
+                                }}
+                                className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined">download</span>
+                              </button>
+                            </div>
+                            <h4 className="font-body-lg text-body-lg font-semibold text-on-surface mb-1 line-clamp-2">
+                              {doc.title}
+                            </h4>
+                            <p className="font-body-md text-body-md text-secondary line-clamp-1">
+                              {doc.subject?.name ?? 'General'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#E9ECEF] text-secondary">
+                            <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                              <span className="material-symbols-outlined text-[16px]">
+                                visibility
+                              </span>{' '}
+                              {doc.viewCount >= 1000
+                                ? `${(doc.viewCount / 1000).toFixed(1)}k`
+                                : doc.viewCount}
+                            </span>
+                            <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                              <span className="material-symbols-outlined text-[16px]">
+                                thumb_up
+                              </span>{' '}
+                              {getRating(doc.id, idx)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Trending network documents */}
+                  <section>
+                    <h3 className="font-headline-md text-headline-md text-on-surface mb-6">
+                      Trending in your network
+                    </h3>
+                    <div className="bg-surface-container-lowest rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.03)] overflow-hidden">
+                      {trendingDocs.map((doc, idx) => {
+                        const fileInfo = getFileTypeIconAndStyle(doc.fileType);
+                        return (
+                          <div
+                            key={doc.id}
+                            onClick={() => handleCardClick(doc.fileUrl)}
+                            className="flex items-center justify-between p-4 sm:p-6 border-b border-[#E9ECEF] last:border-b-0 hover:bg-surface-container-low transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-start gap-4">
+                              <div
+                                className={`w-12 h-12 rounded ${fileInfo.bgClass} flex items-center justify-center flex-shrink-0`}
+                              >
+                                <span className="material-symbols-outlined">{fileInfo.icon}</span>
+                              </div>
+                              <div>
+                                <h4 className="font-body-md text-body-md font-semibold text-on-surface line-clamp-1">
+                                  {doc.title}
+                                </h4>
+                                <div className="flex flex-wrap items-center gap-2 mt-1 text-secondary font-label-sm text-label-sm">
+                                  <span>{doc.subject?.name ?? 'General'}</span>
+                                  <span>•</span>
+                                  <span>{doc.subject?.code ?? 'GEN101'}</span>
+                                  <span>•</span>
+                                  <span className="text-[#212529]">
+                                    Added {formatCreatedAt(doc.createdAt)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={(e) => toggleSaveDoc(doc.id, e)}
+                              className={`hidden sm:block px-4 py-2 border rounded-full font-label-sm text-label-sm transition-colors cursor-pointer ${
+                                savedDocIds.includes(doc.id)
+                                  ? 'bg-primary-container text-white border-primary-container'
+                                  : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
+                              }`}
+                            >
+                              {savedDocIds.includes(doc.id) ? 'Saved' : 'Save'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                </>
+              )}
+            </div>
+
+            {/* Right Column: Bento Sidebar */}
+            <div className="flex flex-col gap-8">
+              {/* Top Contributors Card */}
+              <section className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] h-fit">
+                <h3 className="font-headline-md text-headline-md text-on-surface mb-6">
+                  Top Contributors
+                </h3>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img
+                        alt="Sarah J. avatar profile picture"
+                        className="w-10 h-10 rounded-full object-cover"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCbKnnE9P8WplUJMxgDKRUPtxvrITGrpi-hIFPFfkPJz6oIZBQQwhURIyhGnsxfdGzugqzkbfErVWvEXVDQj40Z8jZPgGOqIZxv-iQyguS7fnYjLa36ZJQnXbCk_lBFV7OxsVwQ3nvdhn0hnYgs75Q3OEbKjYauRURKkxAFUml8OZhtI9RB61neoZvyycGXvBcD6FfN7pEdKb-2n0h7XV1Hm6YScxugLFyu6R1-OspAxktJA0roF_6UUt98S76BVyaYvqEqcy1khE"
+                      />
+                      <div>
+                        <p className="font-label-md text-label-md text-on-surface">Sarah J.</p>
+                        <p className="font-label-sm text-label-sm text-secondary">
+                          42 docs uploaded
+                        </p>
+                      </div>
+                    </div>
+                    <span className="bg-primary-fixed-dim text-on-primary-fixed px-2 py-1 rounded text-xs font-bold">
+                      #1
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img
+                        alt="Michael T. avatar profile picture"
+                        className="w-10 h-10 rounded-full object-cover"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9oEKKeSTGWU2aMKR3uIJjXccVa_ApxQ96iHoa3ZIY_fK-Eru2ODGjVBSM-Ot3QYwTQcFovUpYv4p5hMugpW95zvu2FNrnu3sH_LKPJ795Unfp_WkNm3NETpHEXztHgptc2Z-2V3S53oBbYbFIlDgVyVpK7FrWYJvZTMMTnqYIB1Qlxaz0cUXnQ3dMgjx53S_Yf4L92SgHMKhkrvovBy94za6Va35s-KRjK8N-g5R9XuupjLW1RdU1r9yHas58uqAX1SO3WeThAIc"
+                      />
+                      <div>
+                        <p className="font-label-md text-label-md text-on-surface">Michael T.</p>
+                        <p className="font-label-sm text-label-sm text-secondary">
+                          38 docs uploaded
+                        </p>
+                      </div>
+                    </div>
+                    <span className="bg-surface-variant text-on-surface-variant px-2 py-1 rounded text-xs font-bold">
+                      #2
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img
+                        alt="Emily R. avatar profile picture"
+                        className="w-10 h-10 rounded-full object-cover"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuCLzW5NgJtFtUnPROHmp5OiPtOFcLRfXICeEm2wazxYt8sTF4aiFaYMAnUfN6PiBeRqLd1h726ph7PBxyMUbQa4gWQdGtEeygAUQzhJE803Il3X4CT5-2kL_rYsz3_tXaR5twW4iQ_jhERXGtG-yOnfVvnjlorL3eK42Xlae2OarbZR_vsqeIBqrE-AdpY66fFBzLMY6DkDeuTdaBTBjUsh-tMTohgJCQ7CguJFWsTp_-0xYLtlniFiS7b8CLz6eZ-s7OCixOs3-2M"
+                      />
+                      <div>
+                        <p className="font-label-md text-label-md text-on-surface">Emily R.</p>
+                        <p className="font-label-sm text-label-sm text-secondary">
+                          29 docs uploaded
+                        </p>
+                      </div>
+                    </div>
+                    <span className="bg-surface-variant text-on-surface-variant px-2 py-1 rounded text-xs font-bold">
+                      #3
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => alert('Leaderboard clicked (Simulated)')}
+                  className="w-full mt-6 py-2 border border-[#E9ECEF] text-on-surface rounded-lg font-label-md text-label-md hover:bg-surface-container-low transition-colors cursor-pointer"
+                >
+                  View Leaderboard
+                </button>
+              </section>
+
+              {/* Unlock Premium Bento Card */}
+              <section className="bg-primary-container text-on-primary-container rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] relative overflow-hidden group">
+                <div className="relative z-10">
+                  <span className="material-symbols-outlined text-4xl mb-4 text-[#e0e3e8]">
+                    workspace_premium
+                  </span>
+                  <h3 className="font-headline-md text-headline-md text-white mb-2 font-semibold">
+                    Unlock Premium
+                  </h3>
+                  <p className="font-body-md text-body-md text-[#bfc7d0] mb-6">
+                    Get unlimited access to millions of documents, practice tests, and expert answers.
+                  </p>
+                  <button
+                    onClick={() => alert('Subscription flow initiated (Simulated)')}
+                    className="bg-white text-[#212529] px-6 py-3 rounded-full font-label-md text-label-md font-semibold hover:bg-[#e0e3e6] transition-colors w-full text-center cursor-pointer"
+                  >
+                    Start Free Trial
+                  </button>
+                </div>
+                {/* Decorative Blur Bubble */}
+                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white opacity-5 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500"></div>
+              </section>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
   );
 }
