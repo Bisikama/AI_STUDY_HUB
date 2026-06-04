@@ -68,10 +68,17 @@ export class SupabaseService {
     // Ví dụ: "documents/1748950000000_a1b2c3d4_bai-giang.pdf"
     const timestamp = Date.now();
     const uniqueId = uuidv4().substring(0, 8); // Lấy 8 ký tự đầu của UUID cho ngắn gọn
-    const safeFileName = originalFileName.replace(/\s+/g, '-'); // Thay khoảng trắng bằng dấu gạch ngang
+    const safeFileName = originalFileName
+      .normalize('NFD') // Tách dấu ra khỏi chữ cái
+      .replace(/[\u0300-\u036f]/g, '') // Xóa toàn bộ dấu
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D') // Xử lý riêng chữ Đ của tiếng Việt
+      .replace(/[^a-zA-Z0-9.-]/g, '-') // Biến mọi ký tự không phải chữ, số, dấu chấm thành gạch ngang
+      .replace(/-+/g, '-'); // Gộp các dấu gạch ngang liên tiếp thành 1 dấu duy nhất cho đẹp
+
     const filePath = `documents/${timestamp}_${uniqueId}_${safeFileName}`;
 
-    this.logger.log(`Bắt đầu upload file lên Supabase Storage: ${filePath}`);
+    this.logger.log(`Start uploading files to Supabase Storage: ${filePath}`);
 
     // Thực hiện upload lên Supabase Storage
     const { data, error } = await this.supabase.storage
@@ -84,13 +91,13 @@ export class SupabaseService {
 
     // Xử lý lỗi từ Supabase
     if (error) {
-      this.logger.error(`Upload thất bại: ${error.message}`, error.stack);
+      this.logger.error(`Upload failed: ${error.message}`, error.stack);
       throw new InternalServerErrorException(
-        `Không thể upload file lên Supabase Storage: ${error.message}`,
+        `Unable to upload file to Supabase Storage: ${error.message}`,
       );
     }
 
-    this.logger.log(`Upload thành công. File path: ${data.path}`);
+    this.logger.log(`Upload successful. File path: ${data.path}`);
 
     // Lấy Public URL của file vừa upload
     const { data: publicUrlData } = this.supabase.storage

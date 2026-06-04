@@ -14,12 +14,14 @@ import type {
   SanitizedDocumentDetails,
   AnalyzeResult,
 } from './types/document.types';
+import { SupabaseService } from 'src/supabase/supabase.service';
 
 @Injectable()
 export class DocumentsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(ConfigService) private readonly configService: ConfigService,
+    @Inject(SupabaseService) private readonly supabaseService: SupabaseService,
   ) {}
 
   /**
@@ -85,14 +87,28 @@ export class DocumentsService {
       throw new BadRequestException(error instanceof Error ? error.message : String(error));
     }
 
-    // 4. Create document record in database
+    // 4. Upload file to Supabase Storage
+    let fileUrl: string;
+    try {
+      fileUrl = await this.supabaseService.uploadToSupabase(
+        file.buffer, //Nội dung file dưới dạng Buffer
+        file.originalname, //Tên file gốc
+        file.mimetype, // Tên file gốc
+      );
+    } catch (error) {
+      throw new InternalServerErrorException(
+        `Failed to upload file to Supabase Storage: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // 5. Create document record in database
     const document = await this.prisma.document.create({
       data: {
         title,
         description: description || null,
         subjectId,
         uploadedBy: finalUserId,
-        fileUrl: `/uploads/${Date.now()}_${file.originalname}`,
+        fileUrl,
         fileSize: BigInt(file.size),
         fileType: file.mimetype,
         status: 'AVAILABLE',

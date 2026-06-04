@@ -23,7 +23,7 @@ export class AdminService {
     }
     return data as T;
   }
-  
+
   async getSystemMetrics() {
     try {
       // 1. Đếm tổng số lượng user[cite: 1]
@@ -55,37 +55,34 @@ export class AdminService {
     }
   }
 
-  async approveOrRejectDoc(
-    docId: string,
-    status: 'AVAILABLE' | 'FAILED',
-  ) {
-    try{
+  async approveOrRejectDoc(docId: string, status: 'AVAILABLE' | 'FAILED') {
+    try {
       const document = await this.prisma.document.findUnique({
-        where: {id: docId},
-      })
+        where: { id: docId },
+      });
 
-      if(!document){
+      if (!document) {
         throw new NotFoundException('Không tìm thấy tài liệu với ID đã cho');
       }
 
       const updatedDoc = await this.prisma.document.update({
-        where: {id: docId},
+        where: { id: docId },
         data: {
           status,
         },
-      })
+      });
 
       return {
         success: true,
         message: `Tài liệu đã được cập nhật trạng thái thành ${status}`,
         document: this.sanitizeData(updatedDoc), // Trả về document đã được sanitize để convert BigInt về Number nếu có
-      }
-    }catch(error){
+      };
+    } catch (error) {
       if (error instanceof NotFoundException) {
-      throw error;
-    }
-    console.error('Lỗi khi phê duyệt/từ chối document:', error);
-    throw new InternalServerErrorException('Không thể cập nhật trạng thái document');
+        throw error;
+      }
+      console.error('Lỗi khi phê duyệt/từ chối document:', error);
+      throw new InternalServerErrorException('Không thể cập nhật trạng thái document');
     }
   }
 }
