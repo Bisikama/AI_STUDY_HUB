@@ -15,6 +15,7 @@ import type {
   AnalyzeResult,
 } from './types/document.types';
 import { SupabaseService } from 'src/supabase/supabase.service';
+import { ERROR_MESSAGES } from 'src/common/error-messages.constant';
 
 @Injectable()
 export class DocumentsService {
@@ -87,6 +88,19 @@ export class DocumentsService {
       throw new BadRequestException(error instanceof Error ? error.message : String(error));
     }
 
+    //Chặn file ảnh / file trống
+    const cleanText = extractedText.trim();
+    if (!cleanText || cleanText.length < 50) {
+      throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.EMPTY_TEXT);
+    }
+
+    //Chặn file rác / lỗi font (Heuristic check)
+    const weirdChars = cleanText.match(/[^\w\s\\.,;:!?'"()\\[\]{}\-\u00C0-\u1EF9]/g) || [];
+    if (weirdChars.length / cleanText.length > 0.15) {
+      // Ngưỡng 15%
+      throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.INVALID_FONT);
+    }
+
     // 4. Upload file to Supabase Storage
     let fileUrl: string;
     try {
@@ -111,7 +125,7 @@ export class DocumentsService {
         fileUrl,
         fileSize: BigInt(file.size),
         fileType: file.mimetype,
-        status: 'AVAILABLE',
+        status: 'PRIVATE',
         fullText: extractedText,
       },
     });
@@ -133,10 +147,8 @@ export class DocumentsService {
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
-    if (document.status !== 'AVAILABLE') {
-      throw new BadRequestException(
-        `Document status is ${document.status}. Only AVAILABLE documents can be analyzed.`,
-      );
+    if (document.status !== 'PENDING') {
+      throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.ANALYZING_DOCUMENT);
     }
 
     // Determine user ID who triggered this (fallback to uploader)
