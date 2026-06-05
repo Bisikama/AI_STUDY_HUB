@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
-import { BadRequestException } from '@nestjs/common';
 
 describe('DocumentsController', () => {
   let controller: DocumentsController;
@@ -32,6 +31,7 @@ describe('DocumentsController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+    expect(service).toBeDefined();
   });
 
   describe('analyze', () => {
@@ -51,56 +51,31 @@ describe('DocumentsController', () => {
   });
 
   describe('upload', () => {
-    const mockFile: any = {
+    const mockFile = {
       originalname: 'test.pdf',
       buffer: Buffer.from('dummy'),
       size: 100,
       mimetype: 'application/pdf',
-    };
+    } as Express.Multer.File;
 
-    it('should throw BadRequestException if file is missing', async () => {
-      await expect(
-        controller.upload(undefined as any, 'Title', 'Desc', '1', 'user-123'),
-      ).rejects.toThrow(new BadRequestException('File is required'));
-    });
-
-    it('should throw BadRequestException if title is missing', async () => {
-      await expect(controller.upload(mockFile, '', 'Desc', '1', 'user-123')).rejects.toThrow(
-        new BadRequestException('Title is required'),
-      );
-    });
-
-    it('should throw BadRequestException if subjectId is missing', async () => {
-      await expect(controller.upload(mockFile, 'Title', 'Desc', '', 'user-123')).rejects.toThrow(
-        new BadRequestException('subjectId is required'),
-      );
-    });
-
-    it('should throw BadRequestException if subjectId is not a valid number string', async () => {
-      await expect(controller.upload(mockFile, 'Title', 'Desc', 'abc', 'user-123')).rejects.toThrow(
-        new BadRequestException('subjectId must be a number'),
-      );
-    });
-
-    it('should parse subjectId and call uploadAndParse, returning wrapped response', async () => {
+    it('should call uploadAndParse, returning wrapped response', async () => {
       const mockDoc = { id: 'doc-123', title: 'Title' };
       mockDocumentsService.uploadAndParse.mockResolvedValue(mockDoc);
 
-      const response = await controller.upload(
-        mockFile,
-        'Title',
-        'Desc',
-        '42',
-        'user-123',
-        'user-header',
-      );
+      const dto = {
+        title: 'Title',
+        description: 'Desc',
+        subjectId: 42,
+      };
+
+      const response = await controller.upload(mockFile, dto, 'user-123');
 
       expect(mockDocumentsService.uploadAndParse).toHaveBeenCalledWith(
         mockFile,
         'Title',
         'Desc',
         42,
-        'user-header', // x-user-id header has priority in controllers line 58: userIdFromHeader || userIdFromBody
+        'user-123',
       );
       expect(response).toEqual({
         statusCode: 201,

@@ -2,20 +2,31 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentsService } from './documents.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+
+interface ServiceWithPrivateMethods {
+  sanitizeData<T>(data: unknown): T;
+}
 
 jest.mock('./utils/documentParser', () => ({
   parseDocument: jest.fn().mockResolvedValue('Extracted plain text contents for test.'),
+}));
+
+jest.mock('fs', () => ({
+  existsSync: jest.fn().mockReturnValue(true),
+  promises: {
+    mkdir: jest.fn().mockResolvedValue(undefined),
+    writeFile: jest.fn().mockResolvedValue(undefined),
+  },
 }));
 
 import { parseDocument } from './utils/documentParser';
@@ -97,6 +108,8 @@ describe('DocumentsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+    expect(prismaService).toBeDefined();
+    expect(configService).toBeDefined();
   });
 
   describe('sanitizeData helper', () => {
@@ -110,7 +123,11 @@ describe('DocumentsService', () => {
         },
       };
 
-      const result = (service as any).sanitizeData(input);
+      const result = (service as unknown as ServiceWithPrivateMethods).sanitizeData<{
+        id: number;
+        fileSize: number;
+        nested: { someVal: number; array: number[] };
+      }>(input);
       expect(result).toEqual({
         id: 1,
         fileSize: 5000,
@@ -124,20 +141,21 @@ describe('DocumentsService', () => {
     });
 
     it('should pass non-objects and null through', () => {
-      expect((service as any).sanitizeData(null)).toBeNull();
-      expect((service as any).sanitizeData(undefined)).toBeUndefined();
-      expect((service as any).sanitizeData('string')).toBe('string');
-      expect((service as any).sanitizeData(123)).toBe(123);
+      const serviceWithPrivates = service as unknown as ServiceWithPrivateMethods;
+      expect(serviceWithPrivates.sanitizeData(null)).toBeNull();
+      expect(serviceWithPrivates.sanitizeData(undefined)).toBeUndefined();
+      expect(serviceWithPrivates.sanitizeData('string')).toBe('string');
+      expect(serviceWithPrivates.sanitizeData(123)).toBe(123);
     });
   });
 
   describe('uploadAndParse', () => {
-    const mockFile: any = {
+    const mockFile = {
       buffer: Buffer.from('test'),
       originalname: 'test.txt',
       mimetype: 'text/plain',
       size: 100,
-    };
+    } as Express.Multer.File;
 
     it('should throw NotFoundException if subject does not exist', async () => {
       mockPrisma.subject.findUnique.mockResolvedValue(null);

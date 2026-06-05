@@ -4,7 +4,7 @@ import {
   Quiz,
   QuizQuestion,
   QuizOption,
-} from '../../../generated/prisma/client';
+} from '../../../../generated/prisma/client';
 
 export type SanitizedDocument = Omit<Document, 'fileSize'> & {
   fileSize: number;

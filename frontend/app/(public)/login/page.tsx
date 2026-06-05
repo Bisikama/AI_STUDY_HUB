@@ -22,8 +22,8 @@ export default function Login() {
         try {
             // 3. Gọi hàm login từ Hook
             const user = await login(data);
-            // Điều hướng sang trang welcome nếu đăng nhập thành công
-            router.push("/welcome");
+            // Điều hướng sang trang home nếu đăng nhập thành công
+            router.push("/");
         } catch (err) {
             // Lỗi đã được Hook xử lý và lưu vào biến 'error', 
             // ở đây chỉ catch để tránh crash ứng dụng.
@@ -129,7 +129,7 @@ export default function Login() {
 
                     <div className="text-center mt-6">
                         <p className="text-gray-600 text-sm">
-                            Don't have an account?{" "}
+                            Don&apos;t have an account?{" "}
                             <span className="text-rose-600 font-semibold cursor-pointer hover:text-rose-700">
                                 Sign up
                             </span>

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import LandingPage from '@/components/LandingPage';
 
 type Subject = {
   id: number;
@@ -161,7 +162,7 @@ function formatCreatedAt(createdAt: string): string {
   return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
 }
 
-export default function HomePage() {
+function DashboardPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -297,6 +298,19 @@ export default function HomePage() {
               <span className="material-symbols-outlined">help</span> Help
             </a>
           </li>
+          <li>
+            <a
+              className="flex items-center gap-3 text-error px-4 py-3 hover:bg-red-50 hover:text-rose-700 rounded-lg font-label-md text-label-md active:scale-95 transition-transform cursor-pointer"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                localStorage.removeItem("token");
+                window.location.reload();
+              }}
+            >
+              <span className="material-symbols-outlined text-error">logout</span> Logout
+            </a>
+          </li>
         </ul>
       </nav>
 
@@ -360,7 +374,7 @@ export default function HomePage() {
               Welcome back, Alex
             </h2>
             <p className="font-body-lg text-body-lg text-secondary">
-              Here's what's happening in your academic world today.
+              Here&apos;s what&apos;s happening in your academic world today.
             </p>
           </section>
 
@@ -590,4 +604,32 @@ export default function HomePage() {
       </div>
     </div>
   );
+}
+
+export default function HomePage() {
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const timer = setTimeout(() => {
+      setIsLoggedIn(!!token);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoggedIn === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <span className="material-symbols-outlined animate-spin text-3xl text-secondary">
+          sync
+        </span>
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return <LandingPage />;
+  }
+
+  return <DashboardPage />;
 }

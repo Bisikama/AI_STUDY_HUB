@@ -11,12 +11,11 @@ export class AdminController {
     return this.adminService.getSystemMetrics();
   }
 
-  @Patch('documents/:id/approve')// Endpoint cụ thể: PATCH /api/admin/documents/:id/approve
+  @Patch('documents/:id/approve') // Endpoint cụ thể: PATCH /api/admin/documents/:id/approve
   async approveOrRejectDoc(
-   @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() body: { status: 'AVAILABLE' | 'FAILED' },
   ) {
     return this.adminService.approveOrRejectDoc(id, body.status);
   }
-
 }
