@@ -13,7 +13,7 @@ export default function Welcome() {
                     <h1 className="text-5xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent mb-4">
                         Welcome! 👋
                     </h1>
-                    <p className="text-gray-600 text-xl">You've successfully logged in</p>
+                    <p className="text-gray-600 text-xl">You&apos;ve successfully logged in</p>
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-2xl p-12 border-2 border-rose-100">

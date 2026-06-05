@@ -6,9 +6,11 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../database/prisma.service';
 import { parseDocument } from './utils/documentParser';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import * as fs from 'fs';
+import * as path from 'path';
 import type {
   SanitizedDocument,
   SanitizedDocumentDetails,
@@ -85,14 +87,31 @@ export class DocumentsService {
       throw new BadRequestException(error instanceof Error ? error.message : String(error));
     }
 
-    // 4. Create document record in database
+    // 4. Save file physically to local disk
+    const uploadDir = path.join(process.cwd(), 'uploads');
+    const uniqueFileName = `${Date.now()}_${file.originalname}`;
+    const filePath = path.join(uploadDir, uniqueFileName);
+
+    try {
+      if (!fs.existsSync(uploadDir)) {
+        await fs.promises.mkdir(uploadDir, { recursive: true });
+      }
+      await fs.promises.writeFile(filePath, file.buffer);
+    } catch (writeError) {
+      throw new InternalServerErrorException(
+        `Failed to save file physically: ${writeError instanceof Error ? writeError.message : String(writeError)}`,
+      );
+    }
+
+    // 5. Create document record in database
     const document = await this.prisma.document.create({
       data: {
         title,
         description: description || null,
         subjectId,
         uploadedBy: finalUserId,
-        fileUrl: `/uploads/${Date.now()}_${file.originalname}`,
+        fileUrl: `/uploads/${uniqueFileName}`,
+        previewUrl: `/uploads/${uniqueFileName}`,
         fileSize: BigInt(file.size),
         fileType: file.mimetype,
         status: 'AVAILABLE',
