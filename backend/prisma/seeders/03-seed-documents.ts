@@ -72,23 +72,32 @@ export async function seedDocuments(
     const user = users[i % users.length];
     const subject = subjects.find((s) => s.code === template.subjectCode)!;
 
+    // 1. Random trạng thái cho thực tế (để UI có nhiều màu sắc khác nhau)
+    const randomStatus = faker.helpers.arrayElement(['PRIVATE', 'PENDING', 'APPROVED']);
+
+    // 2. Format lại chuẩn URL của Supabase
+    const fakeSupabaseUrl = `https://${process.env.SUPABASE_PROJECT_REF}.supabase.co/storage/v1/object/public/documents/seed-${faker.string.uuid()}.pdf`;
+
     const document = await prisma.document.create({
       data: {
         title: template.title,
         description: template.description,
         subjectId: subject.id,
         uploadedBy: user.id,
-        fileUrl: `https://cdn.example.com/documents/${faker.string.uuid()}.pdf`,
+        fileUrl: fakeSupabaseUrl,
         fileSize: fileSize,
         fileType: 'application/pdf',
-        status: 'AVAILABLE',
+        status: randomStatus, // Đã fix đúng chuẩn Schema mới
+
+        // [QUAN TRỌNG] Thêm text giả để lát nữa làm Task AI có cái cho Gemini đọc
+        fullText: `Đây là nội dung học thuật giả lập cho môn học ${subject.code}. ${faker.lorem.paragraphs(3)}`,
       },
     });
 
     documents.push(document);
 
     console.log(
-      `   ✓ Document: "${document.title}" (by ${user.fullName}, subject: ${subject.code})`,
+      `   ✓ Document: "${document.title}" (by ${user.fullName}, status: ${randomStatus})`,
     );
   }
 

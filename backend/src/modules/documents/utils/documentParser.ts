@@ -72,3 +72,6 @@ export async function parseDocument(
 
   throw new Error(`Unsupported file format: ${extension} (${mimeType})`);
 }
+declare module 'pdf-parse' {
+  export default function pdfParse(dataBuffer: Buffer, options?: any): Promise<{ text: string }>;
+}
