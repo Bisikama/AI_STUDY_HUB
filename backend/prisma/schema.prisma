@@ -21,12 +21,14 @@ enum UserRole {
   ADMIN
 }
 
-/// Trạng thái của tài liệu sau khi upload và xử lý
+/// Trạng thái kiểm duyệt tài liệu học thuật
+/// PRIVATE: Vừa upload, chỉ người dùng thấy
+/// PENDING: Đang chờ Admin kiểm duyệt
+/// APPROVED: Đã được duyệt, công khai cho mọi người
 enum DocumentStatus {
-  PROCESSING
-  AVAILABLE
-  FAILED
-  DELETED
+  PRIVATE
+  PENDING
+  APPROVED
 }
 
 /// Trạng thái tiến trình upload file lên Cloud Storage
@@ -107,7 +109,7 @@ model Document {
   fileType      String         @map("file_type")
   downloadCount Int            @default(0) @map("download_count")
   viewCount     Int            @default(0) @map("view_count")
-  status        DocumentStatus @default(PROCESSING)
+  status        DocumentStatus @default(PRIVATE)
   fullText      String?        @map("full_text") @db.Text
   isAIGenerated Boolean        @default(false) @map("is_ai_generated")
   createdAt     DateTime       @default(now()) @map("created_at")

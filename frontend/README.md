@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ScholarHub Frontend
 
-## Getting Started
+Dự án Frontend cho hệ thống ScholarHub (AI Study Hub), được xây dựng bằng **Next.js** (App Router), **Tailwind CSS v4**, **HeroUI**, **SWR** và **Axios**.
 
-First, run the development server:
+## 🚀 Hướng dẫn khởi chạy
+
+Cài đặt các dependency và khởi chạy dự án ở chế độ phát triển:
 
 ```bash
+# Cài đặt thư viện
+npm install
+
+# Khởi chạy dev server (mặc định cấu hình ở cổng 5000)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📁 Cấu trúc thư mục chi tiết (Directory Structure)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Thư mục nguồn được tổ chức theo tiêu chuẩn của Next.js App Router, chia rõ các lớp (layer) xử lý giao diện, logic và kết nối dữ liệu:
 
-## Learn More
+```text
+frontend/
+├── app/                            # Lớp Routing & Layout (App Router)
+│   ├── (private)/                  # Nhóm các Route yêu cầu ĐĂNG NHẬP (Private Routes)
+│   │   ├── admin/
+│   │   │   └── page.tsx            # Bảng điều khiển Admin Dashboard
+│   │   ├── explore/
+│   │   │   └── page.tsx            # Trang tìm kiếm và khám phá tài liệu học tập
+│   │   ├── welcome/
+│   │   │   └── page.tsx            # Trang chào mừng sau khi đăng nhập thành công
+│   │   └── layout.tsx              # Route Guard: Kiểm tra Token trong localStorage để bảo vệ trang
+│   ├── (public)/                   # Nhóm các Route công khai (Public Routes)
+│   │   └── login/
+│   │       └── page.tsx            # Trang đăng nhập tài khoản
+│   ├── globals.css                 # File Style toàn cục (Tailwind CSS v4 custom theme)
+│   ├── layout.tsx                  # Root Layout toàn dự án (chứa Google Fonts, Icons)
+│   ├── page.tsx                    # Cổng phân luồng (Chưa đăng nhập -> LandingPage, đã đăng nhập -> Dashboard)
+│   └── providers.tsx               # Nơi chứa các Providers dùng chung (HeroUIProvider)
+│
+├── components/                     # Lớp Giao diện (UI Components)
+│   ├── pages/                      # Các component lớn đại diện cho cả trang
+│   │   └── admin/
+│   │       └── metrics.tsx         # Component hiển thị các thẻ thống kê hệ thống
+│   ├── modal/                      # Các cửa sổ Pop-up, Modal dùng chung (đang phát triển)
+│   └── LandingPage.tsx             # Giao diện giới thiệu dự án (MindForge)
+│
+├── hooks/                          # Lớp Logic và Trạng thái (Custom Hooks)
+│   ├── useAdminMetrics.ts          # Hook quản lý fetch số liệu hệ thống của Admin
+│   └── useAuth.ts                  # Hook quản lý đăng nhập, đăng xuất và kiểm duyệt Email/Password
+│
+├── services/                       # Lớp Giao tiếp API (API Service Layer)
+│   ├── adminApi.ts                 # Gọi các API thống kê số liệu của Admin
+│   └── authApi.ts                  # Xử lý xác thực (kiểm tra tài khoản thực tế hoặc mock qua lib/users.ts)
+│
+├── lib/                            # Lớp Dữ liệu tĩnh & Cấu hình cục bộ
+│   └── users.ts                    # Dữ liệu tài khoản mock để chạy thử hệ thống khi chưa bật Backend
+│
+├── utils/                          # Lớp Tiện ích dùng chung (Helper Utilities)
+│   └── axios.ts                    # Axios Client tự động lấy Token từ localStorage để gửi kèm trong Header
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔒 Cơ chế phân luồng & Bảo mật (Route Guard)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Hệ thống phân chia các trang thành 2 vùng chính:
 
-## Deploy on Vercel
+1. **Vùng Công Khai (Public Routes):**
+   * `/login`: Nơi người dùng thực hiện đăng nhập.
+   * `/` (khi chưa đăng nhập): Hiển thị trang giới thiệu (Landing Page).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. **Vùng Riêng Tư (Private Routes - nằm trong thư mục `app/(private)/`):**
+   * `/explore`, `/admin`, `/welcome`...
+   * **Cách hoạt động:** Khi người dùng cố gắng truy cập vào bất kỳ đường dẫn nào nằm trong `app/(private)/`, file `app/(private)/layout.tsx` (Route Guard) sẽ được kích hoạt trước tiên. Nó kiểm tra xem có `token` trong `localStorage` hay không. 
+     * Nếu **không có token**, người dùng ngay lập tức bị chuyển hướng về `/login`.
+     * Nếu **có token**, trang web sẽ tiếp tục render nội dung bình thường.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 🛠️ Công nghệ sử dụng chính
+
+* **Framework:** Next.js (App Router)
+* **Styling:** Tailwind CSS v4 (Sử dụng `@theme` directive trực tiếp trong `globals.css` để cấu hình biến màu sắc Material Design).
+* **UI Library:** HeroUI (bọc bên ngoài bằng `Providers` trong `providers.tsx`).
+* **Data Fetching:** SWR (dùng để tự động revalidate, cache và tải bất đồng bộ các API dữ liệu).
+* **HTTP Client:** Axios (cấu hình Base URL linh hoạt và tự động đính kèm bearer token qua Axios Interceptors).

@@ -16,12 +16,15 @@ import type {
   SanitizedDocumentDetails,
   AnalyzeResult,
 } from './types/document.types';
+import { SupabaseService } from 'src/supabase/supabase.service';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constant';
 
 @Injectable()
 export class DocumentsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(ConfigService) private readonly configService: ConfigService,
+    @Inject(SupabaseService) private readonly supabaseService: SupabaseService,
   ) {}
 
   /**
@@ -87,19 +90,30 @@ export class DocumentsService {
       throw new BadRequestException(error instanceof Error ? error.message : String(error));
     }
 
-    // 4. Save file physically to local disk
-    const uploadDir = path.join(process.cwd(), 'uploads');
-    const uniqueFileName = `${Date.now()}_${file.originalname}`;
-    const filePath = path.join(uploadDir, uniqueFileName);
+    //Chặn file ảnh / file trống
+    const cleanText = extractedText.trim();
+    if (!cleanText || cleanText.length < 50) {
+      throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.EMPTY_TEXT);
+    }
 
+    //Chặn file rác / lỗi font (Heuristic check)
+    const weirdChars = cleanText.match(/[^\w\s\\.,;:!?'"()\\[\]{}\-\u00C0-\u1EF9]/g) || [];
+    if (weirdChars.length / cleanText.length > 0.15) {
+      // Ngưỡng 15%
+      throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.INVALID_FONT);
+    }
+
+    // 4. Upload file to Supabase Storage
+    let fileUrl: string;
     try {
-      if (!fs.existsSync(uploadDir)) {
-        await fs.promises.mkdir(uploadDir, { recursive: true });
-      }
-      await fs.promises.writeFile(filePath, file.buffer);
-    } catch (writeError) {
+      fileUrl = await this.supabaseService.uploadToSupabase(
+        file.buffer, //Nội dung file dưới dạng Buffer
+        file.originalname, //Tên file gốc
+        file.mimetype, // Tên file gốc
+      );
+    } catch (error) {
       throw new InternalServerErrorException(
-        `Failed to save file physically: ${writeError instanceof Error ? writeError.message : String(writeError)}`,
+        `Failed to upload file to Supabase Storage: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 
@@ -110,11 +124,10 @@ export class DocumentsService {
         description: description || null,
         subjectId,
         uploadedBy: finalUserId,
-        fileUrl: `/uploads/${uniqueFileName}`,
-        previewUrl: `/uploads/${uniqueFileName}`,
+        fileUrl,
         fileSize: BigInt(file.size),
         fileType: file.mimetype,
-        status: 'AVAILABLE',
+        status: 'PRIVATE',
         fullText: extractedText,
       },
     });
@@ -136,10 +149,8 @@ export class DocumentsService {
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
-    if (document.status !== 'AVAILABLE') {
-      throw new BadRequestException(
-        `Document status is ${document.status}. Only AVAILABLE documents can be analyzed.`,
-      );
+    if (document.status !== 'PENDING') {
+      throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.ANALYZING_DOCUMENT);
     }
 
     // Determine user ID who triggered this (fallback to uploader)
