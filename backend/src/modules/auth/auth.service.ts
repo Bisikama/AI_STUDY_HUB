@@ -44,12 +44,12 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu!');
     }
-
     // 2. Kiểm tra mật khẩu
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu!');
     }
+    console.log('>>> ĐANG LOGIN VỚI QUYỀN:', user.role);
 
     // 3. Tạo JWT Token
     const payload = { sub: user.id, email: user.email, role: user.role };

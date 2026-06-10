@@ -7,24 +7,28 @@ import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Thiết lập tiền tố /api cho tất cả route
+  app.setGlobalPrefix('api');
+
+  // Phục vụ file tĩnh
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
   });
 
-  // Enable CORS
+  // Bật CORS (Bắt buộc phải có credentials: true để nhận Cookie)
   app.enableCors({
     origin: ['http://localhost:3000', 'http://localhost:5000'],
     credentials: true,
   });
 
-  // Enable global validation pipe
+  // Pipeline validate dữ liệu
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Remove properties that are not defined in DTO
-      forbidNonWhitelisted: true, // Throw error if extra properties are sent
-      transform: true, // Auto-transform to DTO class
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
       transformOptions: {
-        enableImplicitConversion: true, // Automatically convert primitives
+        enableImplicitConversion: true,
       },
     }),
   );
