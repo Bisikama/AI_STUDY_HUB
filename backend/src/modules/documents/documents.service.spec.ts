@@ -7,6 +7,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentsService } from './documents.service';
 import { PrismaService } from '../../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { SupabaseService } from '../../supabase/supabase.service';
 import {
   NotFoundException,
   BadRequestException,
@@ -18,7 +19,7 @@ interface ServiceWithPrivateMethods {
 }
 
 jest.mock('./utils/documentParser', () => ({
-  parseDocument: jest.fn().mockResolvedValue('Extracted plain text contents for test.'),
+  parseDocument: jest.fn().mockResolvedValue('Extracted plain text contents for test. This content must be longer than fifty characters to pass validation.'),
 }));
 
 jest.mock('fs', () => ({
@@ -90,6 +91,10 @@ describe('DocumentsService', () => {
     get: jest.fn().mockReturnValue('mock-api-key-123'),
   };
 
+  const mockSupabase = {
+    uploadToSupabase: jest.fn().mockResolvedValue('http://mock-supabase-url.com/file.pdf'),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -98,6 +103,7 @@ describe('DocumentsService', () => {
         DocumentsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: SupabaseService, useValue: mockSupabase },
       ],
     }).compile();
 
@@ -222,10 +228,10 @@ describe('DocumentsService', () => {
       await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw BadRequestException if document is not AVAILABLE', async () => {
+    it('should throw BadRequestException if document is not PENDING', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
-        status: 'PROCESSING',
+        status: 'APPROVED',
       });
 
       await expect(service.analyze(mockDocumentId, mockUserId)).rejects.toThrow(
@@ -236,7 +242,7 @@ describe('DocumentsService', () => {
     it('should throw BadRequestException if document has no text content', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
-        status: 'AVAILABLE',
+        status: 'PENDING',
         fullText: '',
         fileUrl: '',
       });
@@ -249,7 +255,7 @@ describe('DocumentsService', () => {
     it('should throw BadRequestException if text content exceeds 40,000 characters (Layer 1 Defense)', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
-        status: 'AVAILABLE',
+        status: 'PENDING',
         fullText: 'A'.repeat(40001),
       });
 
@@ -262,7 +268,7 @@ describe('DocumentsService', () => {
     it('should throw InternalServerErrorException if GEMINI_API_KEY is not set', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
-        status: 'AVAILABLE',
+        status: 'PENDING',
         fullText: 'Short content',
       });
       mockConfig.get.mockReturnValueOnce(undefined);
@@ -275,7 +281,7 @@ describe('DocumentsService', () => {
     it('should throw BadRequestException if token count exceeds 30,000 (Layer 2 Defense)', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
-        status: 'AVAILABLE',
+        status: 'PENDING',
         fullText: 'Short content',
       });
       mockCountTokens.mockResolvedValueOnce({ totalTokens: 30001 });
@@ -289,7 +295,7 @@ describe('DocumentsService', () => {
     it('should throw InternalServerErrorException if Gemini SDK fails', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
-        status: 'AVAILABLE',
+        status: 'PENDING',
         fullText: 'Short content',
       });
       mockCountTokens.mockResolvedValueOnce({ totalTokens: 100 });
@@ -303,7 +309,7 @@ describe('DocumentsService', () => {
     it('should throw InternalServerErrorException if Gemini returns invalid JSON structure', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
-        status: 'AVAILABLE',
+        status: 'PENDING',
         fullText: 'Short content',
       });
       mockCountTokens.mockResolvedValueOnce({ totalTokens: 100 });
@@ -321,7 +327,7 @@ describe('DocumentsService', () => {
     it('should throw InternalServerErrorException if Gemini returns JSON missing required keys', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
-        status: 'AVAILABLE',
+        status: 'PENDING',
         fullText: 'Short content',
       });
       mockCountTokens.mockResolvedValueOnce({ totalTokens: 100 });
@@ -339,7 +345,7 @@ describe('DocumentsService', () => {
     it('should run transaction to save summary and quiz on success', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
-        status: 'AVAILABLE',
+        status: 'PENDING',
         title: 'Document Title',
         fullText: 'Short content',
         uploadedBy: 'uploader-id',
