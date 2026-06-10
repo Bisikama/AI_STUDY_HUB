@@ -12,7 +12,7 @@ export class ExploreService {
 
     const documents = await this.prismaService.document.findMany({
       where: {
-        status: 'AVAILABLE',
+        status: 'APPROVED',
         ...(keyword
           ? {
               OR: [

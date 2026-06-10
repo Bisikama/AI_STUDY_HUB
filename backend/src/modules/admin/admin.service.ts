@@ -57,6 +57,8 @@ export class AdminService {
 
   async approveOrRejectDoc(docId: string, status: 'AVAILABLE' | 'FAILED') {
     try {
+      const dbStatus = status === 'AVAILABLE' ? 'APPROVED' : 'PRIVATE';
+
       const document = await this.prisma.document.findUnique({
         where: { id: docId },
       });
@@ -68,7 +70,7 @@ export class AdminService {
       const updatedDoc = await this.prisma.document.update({
         where: { id: docId },
         data: {
-          status,
+          status: dbStatus,
         },
       });
 

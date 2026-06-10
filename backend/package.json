@@ -91,8 +91,12 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1",
       "^(\\.\\.?\\/.+)\\.js$": "$1"
     },
+    "transformIgnorePatterns": [
+      "node_modules/(?!uuid)"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
