@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 import { DocumentsModule } from './modules/documents/documents.module';
@@ -12,6 +13,7 @@ import { HttpExceptionFilter } from './common/filters';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    AuthModule,
     DocumentsModule,
     AdminModule,
     ExploreModule,

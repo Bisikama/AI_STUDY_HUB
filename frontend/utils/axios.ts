@@ -69,6 +69,7 @@ import axios from "axios";
 // Tạo instance
 const axiosClient = axios.create({
   baseURL: "http://localhost:3000/api", // Địa chỉ Backend
+  withCredentials: true,
   headers: { "Content-Type": "application/json" }
 });
 
