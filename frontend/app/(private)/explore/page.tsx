@@ -275,10 +275,6 @@ function SearchExplore() {
     setActiveQuery(urlQuery);
   }
 
-  if (search.trim() === '' && activeQuery !== '') {
-    setActiveQuery('');
-  }
-
   const [sortBy, setSortBy] = useState<'recent' | 'viewed'>('recent');
   const [selectedUnis, setSelectedUnis] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -319,8 +315,30 @@ function SearchExplore() {
     router.replace(`/explore?${params.toString()}`);
   }, [activeQuery, router]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (activeQuery.trim()) {
+      params.set('search', activeQuery.trim());
+    } else {
+      params.delete('search');
+    }
+
+    router.replace(`/explore?${params.toString()}`);
+  }, [activeQuery, router]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setActiveQuery(search.trim());
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [search]);
+
   const handleSearchSubmit = () => {
-    setActiveQuery(search);
+    setActiveQuery(search.trim());
   };
 
   const exploreUrl = useMemo(() => {
