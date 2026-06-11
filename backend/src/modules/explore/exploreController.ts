@@ -3,7 +3,7 @@ import { GetExploreQueryDto } from './dto/getExploreQuery.dto';
 import { ExploreService } from './exploreService';
 import { ExploreDocumentItem } from './types/exploreDocumentItem.type';
 
-@Controller('api/explore')
+@Controller('explore')
 export class ExploreController {
   constructor(private readonly exploreService: ExploreService) {}
 
