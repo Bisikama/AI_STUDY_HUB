@@ -1,14 +1,19 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { GetExploreQueryDto } from './dto/getExploreQuery.dto';
 import { ExploreService } from './exploreService';
 import { ExploreDocumentItem } from './types/exploreDocumentItem.type';
 
-@Controller('api/explore')
+@Controller('explore')
 export class ExploreController {
   constructor(private readonly exploreService: ExploreService) {}
 
   @Get()
   async getExploreDocuments(@Query() query: GetExploreQueryDto): Promise<ExploreDocumentItem[]> {
     return this.exploreService.getExploreDocuments(query);
+  }
+
+  @Get(':id/ai-cache')
+  async getDocumentAiCache(@Param('id') id: string) {
+    return this.exploreService.getDocumentAiCache(id);
   }
 }
