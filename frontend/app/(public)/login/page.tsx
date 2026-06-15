@@ -145,6 +145,16 @@ export default function LoginPage() {
             Don&apos;t have an account? <a href="/register" className="font-semibold text-gray-900 hover:underline">Register here</a>
           </p>
 
+          <div className="mt-8 text-center border-t border-gray-100 pt-5">
+            <button
+              onClick={() => router.push('/')}
+              className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              Quay lại trang chủ
+            </button>
+          </div>
+
         </div>
       </div>
 

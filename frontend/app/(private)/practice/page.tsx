@@ -86,6 +86,88 @@ const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
   return result.data || result;
 };
 
+function PracticeSkeleton() {
+  return (
+    <div className="bg-background text-on-background min-h-screen flex font-sans animate-pulse w-full">
+      {/* Sidebar Skeleton */}
+      <div className="hidden md:flex flex-col p-4 border-r border-outline-variant bg-surface-container-lowest w-64 h-screen">
+        <div className="h-8 bg-surface-container-high rounded mb-8 w-3/4"></div>
+        <div className="h-10 bg-surface-container-high rounded mb-6"></div>
+        <div className="space-y-4">
+          <div className="h-6 bg-surface-container-low rounded w-1/2"></div>
+          <div className="h-6 bg-surface-container-low rounded w-2/3"></div>
+          <div className="h-6 bg-surface-container-low rounded w-1/3"></div>
+        </div>
+      </div>
+
+      {/* Content Skeleton */}
+      <div className="flex-grow flex flex-col h-screen">
+        {/* Header Skeleton */}
+        <div className="h-16 bg-surface-container-lowest border-b border-outline-variant px-6 flex items-center justify-between">
+          <div className="h-8 bg-surface-container-high rounded w-96 animate-pulse"></div>
+          <div className="h-8 bg-surface-container-high rounded-full w-8 animate-pulse"></div>
+        </div>
+        
+        {/* Body Skeleton */}
+        <div className="flex-1 p-6 md:p-8 space-y-8 overflow-y-auto">
+          {/* Header Title Skeleton */}
+          <div className="space-y-2">
+            <div className="h-10 bg-surface-container-high rounded w-1/2 animate-pulse"></div>
+            <div className="h-6 bg-surface-container-low rounded w-3/4 animate-pulse"></div>
+          </div>
+          
+          {/* Documents Grid Skeleton */}
+          <div className="space-y-4">
+            <div className="h-8 bg-surface-container-high rounded w-1/4 animate-pulse"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-40 bg-surface-container-lowest border border-outline-variant rounded-xl p-6 space-y-4 animate-pulse">
+                  <div className="h-6 bg-surface-container-high rounded w-1/3"></div>
+                  <div className="h-8 bg-surface-container-low rounded w-3/4"></div>
+                  <div className="h-6 bg-surface-container-high rounded w-1/2"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Bento Stats Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
+            <div className="h-32 bg-surface-container-low rounded-xl col-span-2"></div>
+            <div className="h-32 bg-surface-container-low rounded-xl"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FlashcardSkeleton() {
+  return (
+    <div className="flex flex-col items-center w-full max-w-[700px] animate-pulse mx-auto">
+      {/* Flashcard Box Skeleton */}
+      <div className="w-full h-[480px] bg-surface-container-lowest border border-outline-variant rounded-xl p-8 flex flex-col items-center justify-between">
+        <div className="h-6 bg-surface-container-high rounded w-1/4 self-start"></div>
+        <div className="h-8 bg-surface-container-low rounded w-3/4 my-auto"></div>
+        <div className="w-full max-w-md space-y-2.5 my-auto">
+          <div className="h-8 bg-surface-container-low rounded w-full"></div>
+          <div className="h-8 bg-surface-container-low rounded w-full"></div>
+          <div className="h-8 bg-surface-container-low rounded w-full"></div>
+        </div>
+        <div className="h-6 bg-surface-container-high rounded w-1/2"></div>
+      </div>
+      {/* Nav Controls Skeleton */}
+      <div className="mt-6 flex flex-col items-center gap-4 w-full">
+        <div className="flex items-center justify-between w-full">
+          <div className="h-10 w-10 bg-surface-container-high rounded-full"></div>
+          <div className="h-6 bg-surface-container-high rounded w-20"></div>
+          <div className="h-10 w-10 bg-surface-container-high rounded-full"></div>
+        </div>
+        <div className="h-12 bg-surface-container-high rounded-lg w-full"></div>
+      </div>
+    </div>
+  );
+}
+
 export default function PracticePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -201,6 +283,13 @@ export default function PracticePage() {
     return documents.find((doc) => doc.id === selectedDocId);
   }, [documents, selectedDocId]);
 
+  // Loading state cho danh sách tài liệu
+  const isLoadingDocs = documents.length === 0 && !docsError;
+
+  if (isLoadingDocs && !selectedDocId) {
+    return <PracticeSkeleton />;
+  }
+
   return (
     <div className="bg-background text-on-background min-h-screen flex font-sans">
       {/* Sidebar Nav */}
@@ -289,11 +378,22 @@ export default function PracticePage() {
               <span className="material-symbols-outlined">help</span> Help
             </button>
           </li>
+          <li>
+            <button
+              className="w-full flex items-center gap-3 text-error hover:bg-red-50 hover:text-rose-700 px-4 py-3 rounded-lg font-label-md text-label-md active:scale-95 transition-transform text-left cursor-pointer font-semibold"
+              onClick={() => {
+                localStorage.removeItem('token');
+                router.replace('/');
+              }}
+            >
+              <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
+            </button>
+          </li>
         </ul>
       </nav>
 
       {/* Main Content Area */}
-      <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
+      <div className="flex-grow md:ml-64 flex flex-col min-h-screen">
         {/* Top Header */}
         <header className="flex justify-between items-center w-full px-6 h-16 bg-surface-container-lowest shadow-sm border-b border-outline-variant">
           <div className="flex items-center gap-4 flex-grow max-w-xl">
@@ -333,14 +433,6 @@ export default function PracticePage() {
                DS TÀI LIỆU CẦN ÔN TẬP
                ======================================================= */
             <>
-              <section className="mb-8">
-                <h2 className="text-headline-md font-headline-md text-primary font-bold tracking-tight mb-2">
-                  Hệ thống Ôn tập & Kiểm tra
-                </h2>
-                <p className="text-on-surface-variant text-body-md">
-                  Lật thẻ ghi nhớ để học nhanh lý thuyết và kiểm tra ngay năng lực học tập bằng trắc nghiệm do AI tạo.
-                </p>
-              </section>
 
               <section className="mb-10">
                 <h3 className="text-lg font-bold text-primary mb-4">Tài liệu của bạn</h3>
@@ -434,12 +526,10 @@ export default function PracticePage() {
                 </div>
               )}
 
+              {/* Render Skeletons or Contents dynamically */}
               {!aiCache && !cacheError ? (
-                /* Loading State */
-                <div className="flex flex-col items-center justify-center py-16">
-                  <span className="material-symbols-outlined animate-spin text-4xl text-secondary mb-3">sync</span>
-                  <p className="text-secondary text-sm">Đang đồng bộ câu hỏi ôn tập...</p>
-                </div>
+                /* Flashcard loading skeleton instead of raw spinner */
+                <FlashcardSkeleton />
               ) : questions.length === 0 ? (
                 /* Tài liệu chưa phân tích AI (Chưa có quiz) */
                 <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 text-center flex flex-col items-center gap-4">
@@ -472,7 +562,7 @@ export default function PracticePage() {
                   </button>
                 </div>
               ) : (
-                /* Bắt đầu ôn tập (Bỏ Tab Switcher, chỉ hiển thị ôn thẻ ghi nhớ) */
+                /* Bắt đầu ôn thẻ ghi nhớ */
                 <div className="flex flex-col items-center">
                   <div
                     onClick={() => setIsFlipped((prev) => !prev)}

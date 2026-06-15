@@ -552,6 +552,16 @@ function SearchExplore() {
               >
                 settings
               </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  router.replace('/');
+                }}
+                className="material-symbols-outlined text-error hover:bg-red-50 cursor-pointer rounded-full p-2 transition-colors active:scale-95"
+                title="Đăng xuất"
+              >
+                logout
+              </button>
               <div className="border-outline-variant bg-surface-container-high h-10 w-10 overflow-hidden rounded-full border">
                 <img
                   alt="User Profile"
