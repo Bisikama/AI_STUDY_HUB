@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+/* 1. Thêm dòng này để Tailwind v4 nhận diện các component của HeroUI */
+@source "../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
+
+@theme {
+  --color-on-secondary-container: #5f6366;
+  --color-primary-container: #212529;
+  --color-tertiary: #091117;
+  --color-on-tertiary-fixed-variant: #40484e;
+  --color-error: #ba1a1a;
+  --color-surface-container-high: #e7e8e9;
+  --color-primary-fixed: #e0e3e8;
+  --color-on-primary-fixed-variant: #43474c;
+  --color-background: #f8f9fa;
+  --color-on-primary-container: #888c91;
+  --color-on-surface: #191c1d;
+  --color-surface-container-low: #f3f4f5;
+  --color-on-tertiary: #ffffff;
+  --color-inverse-surface: #2e3132;
+  --color-tertiary-fixed-dim: #bfc7d0;
+  --color-primary: #0c1014;
+  --color-surface-container: #edeeef;
+  --color-secondary-fixed: #e0e3e6;
+  --color-on-secondary-fixed-variant: #43474a;
+  --color-on-error-container: #93000a;
+  --color-secondary-fixed-dim: #c4c7ca;
+  --color-on-tertiary-container: #858d95;
+  --color-tertiary-fixed: #dbe3ec;
+  --color-surface-dim: #d9dadb;
+  --color-error-container: #ffdad6;
+  --color-primary-fixed-dim: #c3c7cc;
+  --color-on-primary: #ffffff;
+  --color-surface-tint: #5b5f63;
+  --color-on-primary-fixed: #181c20;
+  --color-secondary: #5b5f62;
+  --color-outline-variant: #c5c6ca;
+  --color-on-secondary-fixed: #181c1e;
+  --color-secondary-container: #dde0e3;
+  --color-surface-variant: #e1e3e4;
+  --color-on-surface-variant: #44474a;
+  --color-on-secondary: #ffffff;
+  --color-on-error: #ffffff;
+  --color-tertiary-container: #1e262c;
+  --color-inverse-on-surface: #f0f1f2;
+  --color-on-tertiary-fixed: #151c22;
+  --color-surface-bright: #f8f9fa;
+  --color-inverse-primary: #c3c7cc;
+  --color-outline: #75777b;
+  --color-surface: #f8f9fa;
+  --color-on-background: #191c1d;
+  --color-surface-container-highest: #e1e3e4;
+  --color-surface-container-lowest: #ffffff;
+
+  --radius-default: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+}
+
+@utility font-headline-xl { font-family: 'Inter', sans-serif; font-weight: 700; }
+@utility font-headline-xl-mobile { font-family: 'Inter', sans-serif; font-weight: 700; }
+@utility font-headline-lg { font-family: 'Inter', sans-serif; font-weight: 600; }
+@utility font-headline-lg-mobile { font-family: 'Inter', sans-serif; font-weight: 600; }
+@utility font-headline-md { font-family: 'Inter', sans-serif; font-weight: 600; }
+@utility font-body-lg { font-family: 'Inter', sans-serif; font-weight: 400; }
+@utility font-body-md { font-family: 'Inter', sans-serif; font-weight: 400; }
+@utility font-label-md { font-family: 'Inter', sans-serif; font-weight: 500; }
+@utility font-label-sm { font-family: 'Inter', sans-serif; font-weight: 600; }
+
+@utility text-headline-xl { font-size: 48px; line-height: 56px; letter-spacing: -0.02em; }
+@utility text-headline-xl-mobile { font-size: 32px; line-height: 40px; letter-spacing: -0.02em; }
+@utility text-headline-lg { font-size: 32px; line-height: 40px; letter-spacing: -0.01em; }
+@utility text-headline-lg-mobile { font-size: 24px; line-height: 32px; letter-spacing: -0.01em; }
+@utility text-headline-md { font-size: 24px; line-height: 32px; }
+@utility text-body-lg { font-size: 18px; line-height: 28px; }
+@utility text-body-md { font-size: 16px; line-height: 24px; }
+@utility text-label-md { font-size: 14px; line-height: 20px; letter-spacing: 0.01em; }
+@utility text-label-sm { font-size: 12px; line-height: 16px; }
+
+@utility px-container-margin-desktop {
+  padding-left: 32px;
+  padding-right: 32px;
+}
+@utility p-container-margin-mobile {
+  padding: 16px;
+}
+@utility p-container-margin-desktop {
+  padding: 32px;
+}
+@utility max-w-max-width {
+  max-width: 1280px;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f8f9fa;
+  color: #191c1d;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+.material-symbols-outlined.filled {
+  font-variation-settings: 'FILL' 1;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
