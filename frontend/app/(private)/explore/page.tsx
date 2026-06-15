@@ -512,10 +512,20 @@ function SearchExplore() {
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
-                  alert('My Documents clicked (Simulated)');
+                  router.push('/dashboard');
                 }}
               >
                 My Documents
+              </a>
+              <a
+                className="text-secondary font-label-md hover:text-primary transition-colors"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/practice');
+                }}
+              >
+                Practice Mode
               </a>
               <a
                 className="text-secondary font-label-md hover:text-primary transition-colors"
