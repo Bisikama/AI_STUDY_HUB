@@ -24,7 +24,7 @@ import type {
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
-  @Post(':id/analyze')
+  @Post('/analyze/:id')
   async analyze(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Optional()
@@ -39,7 +39,7 @@ export class DocumentsController {
     };
   }
 
-  @Post('upload')
+  @Post('/upload')
   @UseInterceptors(FileInterceptor('file'))
   async upload(
     @UploadedFile(new ValidateFilePipe()) file: Express.Multer.File,

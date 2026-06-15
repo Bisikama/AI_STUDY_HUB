@@ -512,10 +512,20 @@ function SearchExplore() {
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
-                  alert('My Documents clicked (Simulated)');
+                  router.push('/dashboard');
                 }}
               >
                 My Documents
+              </a>
+              <a
+                className="text-secondary font-label-md hover:text-primary transition-colors"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/practice');
+                }}
+              >
+                Practice Mode
               </a>
               <a
                 className="text-secondary font-label-md hover:text-primary transition-colors"
@@ -541,6 +551,16 @@ function SearchExplore() {
                 className="material-symbols-outlined text-secondary hover:bg-surface-container-low cursor-pointer rounded-full p-2 transition-colors active:scale-95"
               >
                 settings
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  router.replace('/');
+                }}
+                className="material-symbols-outlined text-error hover:bg-red-50 cursor-pointer rounded-full p-2 transition-colors active:scale-95"
+                title="Đăng xuất"
+              >
+                logout
               </button>
               <div className="border-outline-variant bg-surface-container-high h-10 w-10 overflow-hidden rounded-full border">
                 <img

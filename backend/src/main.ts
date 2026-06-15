@@ -3,9 +3,13 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { join } from 'path';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Enable cookie-parser
+  app.use(cookieParser());
 
   // Thiết lập tiền tố /api cho tất cả route
   app.setGlobalPrefix('api');
@@ -33,7 +37,9 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`Application is running on: http://localhost:${port}/api`);
 }
 
 bootstrap().catch((err) => {
