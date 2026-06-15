@@ -3,9 +3,13 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { join } from 'path';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Enable cookie-parser
+  app.use(cookieParser());
 
   // Thiết lập tiền tố /api cho tất cả route
   app.setGlobalPrefix('api');
