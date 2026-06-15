@@ -4,14 +4,18 @@ import { AuthController } from './auth.controller';
 import { PrismaModule } from '../../database/prisma.module';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
     PrismaModule,
-    JwtModule.register({
+    JwtModule.registerAsync({
       global: true,
-      secret: 'super-secret-key', // Trong dự án thật nên chuyển cái này vào file .env
-      signOptions: { expiresIn: '1d' }, // Token sống 1 ngày
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET') || 'super-secret-key',
+        signOptions: { expiresIn: '1d' }, // Token sống 1 ngày
+      }),
     }),
   ],
   controllers: [AuthController],

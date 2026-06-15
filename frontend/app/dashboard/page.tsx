@@ -253,7 +253,7 @@ function DashboardPage() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                alert('Practice Mode clicked (Simulated)');
+                router.push('/practice');
               }}
             >
               <span className="material-symbols-outlined">school</span> Practice Mode
@@ -607,6 +607,7 @@ function DashboardPage() {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -628,7 +629,8 @@ export default function HomePage() {
   }
 
   if (!isLoggedIn) {
-    return <LandingPage />;
+    router.replace('/login');
+    return null;
   }
 
   return <DashboardPage />;
