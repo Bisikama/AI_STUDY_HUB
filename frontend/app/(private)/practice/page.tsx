@@ -433,14 +433,6 @@ export default function PracticePage() {
                DS TÀI LIỆU CẦN ÔN TẬP
                ======================================================= */
             <>
-              <section className="mb-8">
-                <h2 className="text-headline-md font-headline-md text-primary font-bold tracking-tight mb-2 animate-fadeIn">
-                  Hệ thống Ôn tập & Kiểm tra
-                </h2>
-                <p className="text-on-surface-variant text-body-md">
-                  Lật thẻ ghi nhớ để học nhanh lý thuyết và kiểm tra ngay năng lực học tập bằng trắc nghiệm do AI tạo.
-                </p>
-              </section>
 
               <section className="mb-10">
                 <h3 className="text-lg font-bold text-primary mb-4">Tài liệu của bạn</h3>
