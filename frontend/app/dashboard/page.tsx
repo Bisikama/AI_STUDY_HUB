@@ -4,112 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import LandingPage from '@/components/LandingPage';
 
-type Subject = {
-  id: number;
-  name: string;
-  code: string;
-};
-
-type ExploreDocument = {
-  id: string;
-  title: string;
-  description: string | null;
-  subject: Subject | null;
-  fileUrl: string;
-  previewUrl: string | null;
-  fileType: string;
-  fileSize: string;
-  downloadCount: number;
-  viewCount: number;
-  quizCount: number;
-  hasSummary: boolean;
-  createdAt: string;
-};
-
-const MOCK_DOCUMENTS: ExploreDocument[] = [
-  {
-    id: 'mock-1',
-    title: 'Introduction to Data Structures & Algorithms - Midterm Notes',
-    description: 'A comprehensive study guide covering linked lists, trees, graphs, and basic sorting algorithms.',
-    subject: { id: 101, name: 'Stanford University', code: 'CS101' },
-    fileUrl: '#',
-    previewUrl: null,
-    fileType: 'application/pdf',
-    fileSize: '2457600',
-    downloadCount: 1200,
-    viewCount: 1200,
-    quizCount: 3,
-    hasSummary: true,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'mock-2',
-    title: 'Macroeconomics: Full Semester Study Guide',
-    description: 'Complete notes for ECON201 containing aggregate demand, supply, monetary policies, and inflation.',
-    subject: { id: 201, name: 'London School of Economics', code: 'ECON201' },
-    fileUrl: '#',
-    previewUrl: null,
-    fileType: 'application/pdf',
-    fileSize: '3584000',
-    downloadCount: 3400,
-    viewCount: 3400,
-    quizCount: 5,
-    hasSummary: true,
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'mock-3',
-    title: 'Calculus III: Vector Analysis Cheat Sheet',
-    description: 'Vector fields, line integrals, Green\'s theorem, Stokes\' theorem, and divergence theorem equations.',
-    subject: { id: 301, name: 'MIT', code: 'MATH202' },
-    fileUrl: '#',
-    previewUrl: null,
-    fileType: 'application/pdf',
-    fileSize: '1536000',
-    downloadCount: 850,
-    viewCount: 920,
-    quizCount: 2,
-    hasSummary: false,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'mock-4',
-    title: 'Organic Chemistry Reactions Summary',
-    description: 'Summary sheet of key organic chemistry mechanisms including nucleophilic substitutions and eliminations.',
-    subject: { id: 401, name: 'Harvard University', code: 'CHEM101' },
-    fileUrl: '#',
-    previewUrl: null,
-    fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    fileSize: '1843200',
-    downloadCount: 1900,
-    viewCount: 2100,
-    quizCount: 4,
-    hasSummary: true,
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'mock-5',
-    title: 'Machine Learning Past Exams (2018-2023)',
-    description: 'Compilation of midterm and final exams with detailed solutions for CS229.',
-    subject: { id: 501, name: 'UC Berkeley', code: 'CS229' },
-    fileUrl: '#',
-    previewUrl: null,
-    fileType: 'application/zip',
-    fileSize: '12582912',
-    downloadCount: 3100,
-    viewCount: 3400,
-    quizCount: 0,
-    hasSummary: false,
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-function getRating(docId: string, index: number): string {
-  if (docId === 'mock-1') return '98%';
-  if (docId === 'mock-2') return '95%';
-  const ratings = ['98%', '95%', '99%', '92%', '97%', '96%'];
-  return ratings[index % ratings.length];
-}
+import { dashboardApi, ExploreDocument } from '@/services/dashboardApi';
 
 function getFileTypeIconAndStyle(fileType: string) {
   const type = fileType.toLowerCase();
@@ -167,6 +62,39 @@ function DashboardPage() {
   const [search, setSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [savedDocIds, setSavedDocIds] = useState<string[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<ExploreDocument[]>([]);
+  const [publicDocuments, setPublicDocuments] = useState<ExploreDocument[]>([]);
+  const [trendingDocs, setTrendingDocs] = useState<ExploreDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userFullName, setUserFullName] = useState('User');
+
+  const loadDashboardData = async () => {
+    try {
+      const data = await dashboardApi.getDashboardData();
+      setRecentlyViewed(data.recentlyViewed || []);
+      setPublicDocuments(data.publicDocuments || []);
+      setTrendingDocs(data.trending || []);
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const userObj = JSON.parse(storedUser);
+        if (userObj && userObj.fullName) {
+          setUserFullName(userObj.fullName);
+        }
+      } catch (e) {
+        console.error('Error parsing user info:', e);
+      }
+    }
+    loadDashboardData();
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,8 +103,13 @@ function DashboardPage() {
     }
   };
 
-  const handleCardClick = () => {
-    alert('This is a simulated document view. Search or upload documents on the Explore page.');
+  const handleCardClick = async (docId: string, docTitle: string) => {
+    try {
+      await dashboardApi.recordView(docId);
+    } catch (err) {
+      console.error('Failed to record view:', err);
+    }
+    router.push(`/explore?search=${encodeURIComponent(docTitle)}`);
   };
 
   const toggleSaveDoc = (id: string, e: React.MouseEvent) => {
@@ -185,9 +118,6 @@ function DashboardPage() {
       prev.includes(id) ? prev.filter((dId) => dId !== id) : [...prev, id]
     );
   };
-
-  const recentlyViewed = MOCK_DOCUMENTS.slice(0, 2);
-  const trendingDocs = MOCK_DOCUMENTS.slice(2);
 
   return (
     <div className="bg-background text-on-background min-h-screen flex font-sans">
@@ -371,7 +301,7 @@ function DashboardPage() {
         <main className="flex-1 p-container-margin-mobile md:p-container-margin-desktop max-w-max-width mx-auto w-full">
           <section className="mb-12">
             <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
-              Welcome back, Alex
+              Welcome back, {userFullName}
             </h2>
             <p className="font-body-lg text-body-lg text-secondary">
               Here&apos;s what&apos;s happening in your academic world today.
@@ -412,48 +342,136 @@ function DashboardPage() {
                   </a>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {recentlyViewed.map((doc, idx) => (
-                    <div
-                      key={doc.id}
-                      onClick={handleCardClick}
-                      className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[160px]"
+                {loading ? (
+                  <div className="text-center py-8 text-secondary">Loading...</div>
+                ) : recentlyViewed.length === 0 ? (
+                  <div className="bg-surface-container-lowest rounded-xl p-8 text-center border border-dashed border-[#E9ECEF] shadow-[0px_4px_12px_rgba(0,0,0,0.03)] flex flex-col items-center">
+                    <span className="material-symbols-outlined text-secondary text-4xl mb-2">find_in_page</span>
+                    <p className="font-body-md text-body-md text-secondary">
+                      Chưa xem, hãy khám phá tài liệu mà bạn muốn.
+                    </p>
+                    <button
+                      onClick={() => router.push('/explore')}
+                      className="mt-4 bg-[#212529] text-white py-2 px-4 rounded-full font-label-sm text-label-sm hover:opacity-90 transition-opacity cursor-pointer"
                     >
-                      <div>
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="bg-[#E9ECEF] text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">
-                            {doc.subject?.code ?? 'GEN101'}
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              alert('Download clicked (Simulated)');
-                            }}
-                            className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined">download</span>
-                          </button>
+                      Khám phá tài liệu
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {recentlyViewed.map((doc) => (
+                      <div
+                        key={doc.id}
+                        onClick={() => handleCardClick(doc.id, doc.title)}
+                        className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[160px]"
+                      >
+                        <div>
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="bg-[#E9ECEF] text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">
+                              {doc.subject?.code ?? 'GEN101'}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(doc.fileUrl, '_blank');
+                              }}
+                              className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined">download</span>
+                            </button>
+                          </div>
+                          <h4 className="font-body-lg text-body-lg font-semibold text-on-surface mb-1 line-clamp-2">
+                            {doc.title}
+                          </h4>
+                          <p className="font-body-md text-body-md text-secondary line-clamp-1">
+                            {doc.subject?.name ?? 'General'}
+                          </p>
                         </div>
-                        <h4 className="font-body-lg text-body-lg font-semibold text-on-surface mb-1 line-clamp-2">
-                          {doc.title}
-                        </h4>
-                        <p className="font-body-md text-body-md text-secondary line-clamp-1">
-                          {doc.subject?.name ?? 'General'}
-                        </p>
+                        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#E9ECEF] text-secondary">
+                          <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                            <span className="material-symbols-outlined text-[16px]">visibility</span>{' '}
+                            {doc.viewCount}
+                          </span>
+                          <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                            <span className="material-symbols-outlined text-[16px]">thumb_up</span>{' '}
+                            {doc.rating ? Math.round((doc.rating / 5) * 100) + '%' : '0%'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#E9ECEF] text-secondary">
-                        <span className="flex items-center gap-1 font-label-sm text-label-sm">
-                          <span className="material-symbols-outlined text-[16px]">visibility</span>{' '}
-                          1.2k
-                        </span>
-                        <span className="flex items-center gap-1 font-label-sm text-label-sm">
-                          <span className="material-symbols-outlined text-[16px]">thumb_up</span>{' '}
-                          {getRating(doc.id, idx)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Public Documents (Uploaded by other users) */}
+              <section>
+                <div className="flex justify-between items-end mb-6">
+                  <h3 className="font-headline-md text-headline-md text-on-surface">
+                    Public Documents
+                  </h3>
+                  <a
+                    className="font-label-md text-label-md text-primary-container hover:underline cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/explore');
+                    }}
+                  >
+                    View all
+                  </a>
                 </div>
+
+                {loading ? (
+                  <div className="text-center py-8 text-secondary">Loading...</div>
+                ) : publicDocuments.length === 0 ? (
+                  <div className="bg-surface-container-lowest rounded-xl p-8 text-center border border-dashed border-[#E9ECEF] shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
+                    <p className="font-body-md text-body-md text-secondary">
+                      Chưa có tài liệu công khai nào khác từ cộng đồng.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {publicDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        onClick={() => handleCardClick(doc.id, doc.title)}
+                        className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[160px]"
+                      >
+                        <div>
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="bg-[#E9ECEF] text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">
+                              {doc.subject?.code ?? 'GEN101'}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(doc.fileUrl, '_blank');
+                              }}
+                              className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined">download</span>
+                            </button>
+                          </div>
+                          <h4 className="font-body-lg text-body-lg font-semibold text-on-surface mb-1 line-clamp-2">
+                            {doc.title}
+                          </h4>
+                          <p className="font-body-md text-body-md text-secondary line-clamp-1">
+                            {doc.subject?.name ?? 'General'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#E9ECEF] text-secondary">
+                          <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                            <span className="material-symbols-outlined text-[16px]">visibility</span>{' '}
+                            {doc.viewCount}
+                          </span>
+                          <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                            <span className="material-symbols-outlined text-[16px]">thumb_up</span>{' '}
+                            {doc.rating ? Math.round((doc.rating / 5) * 100) + '%' : '0%'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
 
               {/* Trending */}
@@ -462,48 +480,61 @@ function DashboardPage() {
                   Trending in your network
                 </h3>
                 <div className="bg-surface-container-lowest rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.03)] overflow-hidden">
-                  {trendingDocs.map((doc) => {
-                    const fileInfo = getFileTypeIconAndStyle(doc.fileType);
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={handleCardClick}
-                        className="flex items-center justify-between p-4 sm:p-6 border-b border-[#E9ECEF] last:border-b-0 hover:bg-surface-container-low transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-start gap-4">
-                          <div
-                            className={`w-12 h-12 rounded ${fileInfo.bgClass} flex items-center justify-center flex-shrink-0`}
-                          >
-                            <span className="material-symbols-outlined">{fileInfo.icon}</span>
-                          </div>
-                          <div>
-                            <h4 className="font-body-md text-body-md font-semibold text-on-surface line-clamp-1">
-                              {doc.title}
-                            </h4>
-                            <div className="flex flex-wrap items-center gap-2 mt-1 text-secondary font-label-sm text-label-sm">
-                              <span>{doc.subject?.name ?? 'General'}</span>
-                              <span>•</span>
-                              <span>{doc.subject?.code ?? 'GEN101'}</span>
-                              <span>•</span>
-                              <span className="text-[#212529]">
-                                Added {formatCreatedAt(doc.createdAt)}
-                              </span>
+                  {loading ? (
+                    <div className="text-center py-8 text-secondary">Loading...</div>
+                  ) : trendingDocs.length === 0 ? (
+                    <div className="p-8 text-center text-secondary">
+                      Chưa có tài liệu thịnh hành.
+                    </div>
+                  ) : (
+                    trendingDocs.map((doc) => {
+                      const fileInfo = getFileTypeIconAndStyle(doc.fileType);
+                      return (
+                        <div
+                          key={doc.id}
+                          onClick={() => handleCardClick(doc.id, doc.title)}
+                          className="flex items-center justify-between p-4 sm:p-6 border-b border-[#E9ECEF] last:border-b-0 hover:bg-surface-container-low transition-colors cursor-pointer group"
+                        >
+                          <div className="flex items-start gap-4">
+                            <div
+                              className={`w-12 h-12 rounded ${fileInfo.bgClass} flex items-center justify-center flex-shrink-0`}
+                            >
+                              <span className="material-symbols-outlined">{fileInfo.icon}</span>
+                            </div>
+                            <div>
+                              <h4 className="font-body-md text-body-md font-semibold text-on-surface line-clamp-1">
+                                {doc.title}
+                              </h4>
+                              <div className="flex flex-wrap items-center gap-2 mt-1 text-secondary font-label-sm text-label-sm">
+                                <span>{doc.subject?.name ?? 'General'}</span>
+                                <span>•</span>
+                                <span>{doc.subject?.code ?? 'GEN101'}</span>
+                                <span>•</span>
+                                <span className="text-[#212529] font-medium flex items-center gap-0.5 text-amber-600">
+                                  <span className="material-symbols-outlined text-[14px] fill-current">star</span>
+                                  {doc.rating ? doc.rating.toFixed(1) : '0.0'} ({doc.rating ? Math.round((doc.rating / 5) * 100) + '%' : '0%'})
+                                </span>
+                                <span>•</span>
+                                <span className="text-[#212529]">
+                                  Added {formatCreatedAt(doc.createdAt)}
+                                </span>
+                              </div>
                             </div>
                           </div>
+                          <button
+                            onClick={(e) => toggleSaveDoc(doc.id, e)}
+                            className={`hidden sm:block px-4 py-2 border rounded-full font-label-sm text-label-sm transition-colors cursor-pointer ${
+                              savedDocIds.includes(doc.id)
+                                ? 'bg-primary-container text-white border-primary-container'
+                                : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
+                            }`}
+                          >
+                            {savedDocIds.includes(doc.id) ? 'Saved' : 'Save'}
+                          </button>
                         </div>
-                        <button
-                          onClick={(e) => toggleSaveDoc(doc.id, e)}
-                          className={`hidden sm:block px-4 py-2 border rounded-full font-label-sm text-label-sm transition-colors cursor-pointer ${
-                            savedDocIds.includes(doc.id)
-                              ? 'bg-primary-container text-white border-primary-container'
-                              : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
-                          }`}
-                        >
-                          {savedDocIds.includes(doc.id) ? 'Saved' : 'Save'}
-                        </button>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </section>
             </div>
