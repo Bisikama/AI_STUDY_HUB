@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { DocumentStatus } from '../../../generated/prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SupabaseService } from '../../supabase/supabase.service';
-import { DocumentStatus } from '../../../generated/prisma';
 
 @Injectable()
 export class AdminService {
@@ -9,7 +9,6 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly supabaseService: SupabaseService,
   ) {}
-
   // Helper function để convert BigInt → Number
   private sanitizeData<T>(data: unknown): T {
     if (data === null || data === undefined) return data as unknown as T;

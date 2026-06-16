@@ -431,4 +431,44 @@ Quy định chặt chẽ:
 
     return this.sanitizeData<SanitizedDocumentDetails>(document);
   }
+
+  /**
+   * Records a user view event for a document and updates viewCount.
+   */
+  async recordView(documentId: string, userId: string): Promise<void> {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document with ID ${documentId} not found`);
+    }
+
+    // 1. Upsert UserDocumentView (lưu lịch sử xem gần đây)
+    await this.prisma.userDocumentView.upsert({
+      where: {
+        userId_documentId: {
+          userId,
+          documentId,
+        },
+      },
+      update: {
+        viewedAt: new Date(),
+      },
+      create: {
+        userId,
+        documentId,
+      },
+    });
+
+    // 2. Tăng số lượt xem global
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        viewCount: {
+          increment: 1,
+        },
+      },
+    });
+  }
 }

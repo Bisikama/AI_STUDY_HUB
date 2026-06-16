@@ -63,6 +63,7 @@ model User {
   uploadStatuses      UploadStatus[]
   quizzes             Quiz[]
   quizAttempts        UserQuizAttempt[]
+  documentViews       UserDocumentView[]
 
   @@map("users")
 }
@@ -112,6 +113,7 @@ model Document {
   status        DocumentStatus @default(PRIVATE)
   fullText      String?        @map("full_text") @db.Text
   isAIGenerated Boolean        @default(false) @map("is_ai_generated")
+  rating        Float          @default(0.0) @map("rating")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
@@ -119,6 +121,7 @@ model Document {
   summary        DocumentSummary?
   uploadStatuses UploadStatus[]
   quizzes        Quiz[]
+  documentViews  UserDocumentView[]
 
   @@index([subjectId, status])
   @@map("documents")
@@ -215,4 +218,20 @@ model UserQuizAttempt {
 
   @@index([userId, completedAt(sort: Desc)])
   @@map("user_quiz_attempts")
+}
+
+/// Nhật ký/Lịch sử xem tài liệu của người dùng
+model UserDocumentView {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  viewedAt   DateTime @default(now()) @map("viewed_at")
+
+  // Quan hệ
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@index([userId, viewedAt(sort: Desc)])
+  @@map("user_document_views")
 }

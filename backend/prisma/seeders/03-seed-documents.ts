@@ -88,6 +88,9 @@ export async function seedDocuments(
         fileSize: fileSize,
         fileType: 'application/pdf',
         status: randomStatus, // Đã fix đúng chuẩn Schema mới
+        rating: parseFloat(faker.number.float({ min: 3.5, max: 5.0 }).toFixed(1)),
+        viewCount: faker.number.int({ min: 50, max: 2000 }),
+        downloadCount: faker.number.int({ min: 10, max: 800 }),
 
         // [QUAN TRỌNG] Thêm text giả để lát nữa làm Task AI có cái cho Gemini đọc
         fullText: `Đây là nội dung học thuật giả lập cho môn học ${subject.code}. ${faker.lorem.paragraphs(3)}`,
