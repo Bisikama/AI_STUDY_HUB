@@ -106,4 +106,36 @@ export class SupabaseService {
 
     return publicUrlData.publicUrl;
   }
+
+  /**
+   * Xóa một file khỏi Supabase Storage dựa vào public URL của nó.
+   *
+   * @param publicUrl - Public URL của file (lấy từ cột fileUrl trong DB)
+   */
+  async deleteFromSupabase(publicUrl: string): Promise<void> {
+    // Parse filePath từ URL dạng:
+    // https://<project>.supabase.co/storage/v1/object/public/<bucket>/documents/xxx_file.pdf
+    // → ta cần lấy phần: "documents/xxx_file.pdf"
+    const urlObj = new URL(publicUrl);
+    const pathParts = urlObj.pathname.split(`/object/public/${this.bucketName}/`);
+
+    if (pathParts.length < 2 || !pathParts[1]) {
+      throw new Error(`Không thể parse file path từ URL: ${publicUrl}`);
+    }
+
+    const filePath = pathParts[1];
+
+    this.logger.log(`Đang xóa file trên Supabase Storage: ${filePath}`);
+
+    const { error } = await this.supabase.storage
+      .from(this.bucketName)
+      .remove([filePath]);
+
+    if (error) {
+      this.logger.error(`Xóa file thất bại: ${error.message}`, error);
+      throw new Error(`Supabase Storage xóa thất bại: ${error.message}`);
+    }
+
+    this.logger.log(`Đã xóa thành công file: ${filePath}`);
+  }
 }
