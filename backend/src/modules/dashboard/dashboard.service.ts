@@ -36,7 +36,7 @@ export class DashboardService {
     const recentlyViewedRecords = await this.prisma.userDocumentView.findMany({
       where: { userId },
       orderBy: { viewedAt: 'desc' },
-      take: 4,
+      take: 12,
       include: {
         document: {
           include: {
@@ -94,10 +94,46 @@ export class DashboardService {
 
     const trending = trendingDocs.map((d) => this.mapDocument(d));
 
+    // 4. Top Contributors: Những người đăng tải tài liệu APPROVED nhiều nhất
+    const contributors = await this.prisma.user.findMany({
+      where: {
+        documents: {
+          some: {
+            status: 'APPROVED',
+          },
+        },
+      },
+      select: {
+        id: true,
+        fullName: true,
+        avatarUrl: true,
+        _count: {
+          select: {
+            documents: {
+              where: {
+                status: 'APPROVED',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const topContributors = contributors
+      .map((c) => ({
+        id: c.id,
+        fullName: c.fullName,
+        avatarUrl: c.avatarUrl,
+        uploadedCount: c._count.documents,
+      }))
+      .sort((a, b) => b.uploadedCount - a.uploadedCount)
+      .slice(0, 10);
+
     return {
       recentlyViewed,
       publicDocuments,
       trending,
+      topContributors,
     };
   }
 }

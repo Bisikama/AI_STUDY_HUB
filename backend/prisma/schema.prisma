@@ -51,6 +51,8 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   fullName     String   @map("full_name")
+  username     String?  @unique
+  phoneNumber  String?  @map("phone_number")
   avatarUrl    String?  @map("avatar_url")
   role         UserRole @default(STUDENT)
   isActive     Boolean  @default(true) @map("is_active")

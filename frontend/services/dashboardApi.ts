@@ -23,10 +23,18 @@ export interface ExploreDocument {
   createdAt: string;
 }
 
+export interface Contributor {
+  id: string;
+  fullName: string;
+  avatarUrl: string | null;
+  uploadedCount: number;
+}
+
 export interface DashboardData {
   recentlyViewed: ExploreDocument[];
   publicDocuments: ExploreDocument[];
   trending: ExploreDocument[];
+  topContributors: Contributor[];
 }
 
 export const dashboardApi = {

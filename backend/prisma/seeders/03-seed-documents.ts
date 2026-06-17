@@ -62,6 +62,56 @@ export async function seedDocuments(
       title: 'Cryptography and Data Encryption',
       description: 'Understanding encryption algorithms and secure data transmission methods',
     },
+    {
+      subjectCode: 'SWE102',
+      title: 'Microservices Architecture with NestJS',
+      description: 'Implementing event-driven microservices using NestJS and Redis',
+    },
+    {
+      subjectCode: 'DBI202',
+      title: 'Database Sharding and Replication',
+      description: 'Strategies for scaling relational databases horizontally using sharding',
+    },
+    {
+      subjectCode: 'PRJ301',
+      title: 'Docker Containerization Guide',
+      description: 'How to containerize multi-container applications using Docker Compose',
+    },
+    {
+      subjectCode: 'AI101',
+      title: 'Natural Language Processing with Transformers',
+      description: 'Intro to BERT, GPT models, and self-attention mechanisms in NLP',
+    },
+    {
+      subjectCode: 'WEB101',
+      title: 'JavaScript Async Programming: Promises & Async/Await',
+      description: 'Mastering asynchronous flows, event loop, and error handling in JavaScript',
+    },
+    {
+      subjectCode: 'SEC101',
+      title: 'OWASP Top 10 Web Vulnerabilities',
+      description: 'A detailed breakdown of common web vulnerabilities like XSS, SQLi, and CSRF',
+    },
+    {
+      subjectCode: 'SWE102',
+      title: 'GraphQL API Implementation with NestJS',
+      description: 'Building scalable GraphQL endpoints with resolvers, queries, and mutations',
+    },
+    {
+      subjectCode: 'DBI202',
+      title: 'NoSQL Databases Comparison',
+      description: 'Understanding the differences between MongoDB, Redis, and Cassandra for varied workloads',
+    },
+    {
+      subjectCode: 'PRJ301',
+      title: 'Kubernetes Orchestration Basics',
+      description: 'Deploying, scaling, and managing containerized applications with Kubernetes',
+    },
+    {
+      subjectCode: 'AI101',
+      title: 'Computer Vision with Convolutional Neural Networks',
+      description: 'Deep learning techniques for image classification and object detection',
+    },
   ];
 
   const documents: any[] = [];

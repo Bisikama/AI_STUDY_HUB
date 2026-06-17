@@ -3,8 +3,85 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import LandingPage from '@/components/LandingPage';
+import { dashboardApi, ExploreDocument, Contributor } from '@/services/dashboardApi';
+import useSWR from 'swr';
+import axiosClient from '@/utils/axios';
 
-import { dashboardApi, ExploreDocument } from '@/services/dashboardApi';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+
+type DocumentSummary = {
+  id: string;
+  documentId: string;
+  summaryText: string;
+  keyPoints: string | null;
+  status: string;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type QuizOption = {
+  id: string;
+  questionId: string;
+  optionText: string;
+  isCorrect: boolean;
+  createdAt: string;
+};
+
+type QuizQuestion = {
+  id: string;
+  quizId: string;
+  questionText: string;
+  createdAt: string;
+  options: QuizOption[];
+};
+
+type Quiz = {
+  id: string;
+  documentId: string;
+  createdBy: string | null;
+  title: string;
+  createdAt: string;
+  questions: QuizQuestion[];
+};
+
+type ExploreAiCache = {
+  document: Omit<ExploreDocument, 'quizCount' | 'hasSummary'>;
+  summaries: DocumentSummary[];
+  quizzes: Quiz[];
+};
+
+type ApiResponse<T> =
+  | T
+  | {
+      statusCode: number;
+      message: string;
+      data: T;
+    };
+
+const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch AI cache');
+  }
+
+  const result = (await response.json()) as ApiResponse<ExploreAiCache>;
+
+  if ('data' in result) {
+    return result.data;
+  }
+
+  return result;
+};
+
+function getDocumentUrl(fileUrl: string): string {
+  if (fileUrl.startsWith('http')) {
+    return fileUrl;
+  }
+
+  return `${API_BASE_URL}${fileUrl}`;
+}
 
 function getFileTypeIconAndStyle(fileType: string) {
   const type = fileType.toLowerCase();
@@ -65,8 +142,43 @@ function DashboardPage() {
   const [recentlyViewed, setRecentlyViewed] = useState<ExploreDocument[]>([]);
   const [publicDocuments, setPublicDocuments] = useState<ExploreDocument[]>([]);
   const [trendingDocs, setTrendingDocs] = useState<ExploreDocument[]>([]);
+  const [topContributors, setTopContributors] = useState<Contributor[]>([]);
   const [loading, setLoading] = useState(true);
   const [userFullName, setUserFullName] = useState('User');
+  const [showRecentlyViewedModal, setShowRecentlyViewedModal] = useState(false);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
+  const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
+  const [showEditAccountModal, setShowEditAccountModal] = useState(false);
+  const [editFullName, setEditFullName] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  const [editError, setEditError] = useState('');
+  const [editSuccess, setEditSuccess] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+
+  const aiCacheUrl = selectedDocumentId
+    ? `${API_BASE_URL}/api/explore/${selectedDocumentId}/ai-cache`
+    : null;
+
+  const {
+    data: aiCache,
+    error: aiCacheError,
+    isLoading: isAiCacheLoading,
+  } = useSWR(aiCacheUrl, aiCacheFetcher);
+
+  const handleSelectOption = (questionId: string, optionId: string) => {
+    setSelectedOptionIds((prev) => {
+      if (prev[questionId]) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [questionId]: optionId,
+      };
+    });
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -74,6 +186,7 @@ function DashboardPage() {
       setRecentlyViewed(data.recentlyViewed || []);
       setPublicDocuments(data.publicDocuments || []);
       setTrendingDocs(data.trending || []);
+      setTopContributors(data.topContributors || []);
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -83,11 +196,14 @@ function DashboardPage() {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    if (storedUser && storedUser !== 'undefined') {
       try {
         const userObj = JSON.parse(storedUser);
-        if (userObj && userObj.fullName) {
-          setUserFullName(userObj.fullName);
+        if (userObj) {
+          if (userObj.fullName) setUserFullName(userObj.fullName);
+          setEditFullName(userObj.fullName || '');
+          setEditUsername(userObj.username || '');
+          setEditPhoneNumber(userObj.phoneNumber || '');
         }
       } catch (e) {
         console.error('Error parsing user info:', e);
@@ -104,12 +220,15 @@ function DashboardPage() {
   };
 
   const handleCardClick = async (docId: string, docTitle: string) => {
+    setSelectedOptionIds({});
+    setSelectedDocumentId(docId);
     try {
       await dashboardApi.recordView(docId);
+      const data = await dashboardApi.getDashboardData();
+      setRecentlyViewed(data.recentlyViewed || []);
     } catch (err) {
       console.error('Failed to record view:', err);
     }
-    router.push(`/explore?search=${encodeURIComponent(docTitle)}`);
   };
 
   const toggleSaveDoc = (id: string, e: React.MouseEvent) => {
@@ -117,6 +236,43 @@ function DashboardPage() {
     setSavedDocIds((prev) =>
       prev.includes(id) ? prev.filter((dId) => dId !== id) : [...prev, id]
     );
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.reload();
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditError('');
+    setEditSuccess('');
+    setEditLoading(true);
+
+    try {
+      const response = await axiosClient.put('/auth/profile', {
+        fullName: editFullName,
+        username: editUsername || undefined,
+        phoneNumber: editPhoneNumber || undefined,
+      });
+
+      const updatedUser = response.data.data?.user || response.data.user;
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUserFullName(updatedUser.fullName);
+      
+      setEditSuccess('Cập nhật thông tin tài khoản thành công!');
+      setTimeout(() => {
+        setShowEditAccountModal(false);
+        setEditSuccess('');
+      }, 1500);
+    } catch (err: any) {
+      console.error('Failed to update profile:', err);
+      const errMsg = err.response?.data?.message || 'Cập nhật tài khoản thất bại!';
+      setEditError(Array.isArray(errMsg) ? errMsg[0] : errMsg);
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   return (
@@ -159,7 +315,7 @@ function DashboardPage() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                router.push('/explore');
+                router.push('/dashboard');
               }}
             >
               <span className="material-symbols-outlined">explore</span> Discover
@@ -286,13 +442,45 @@ function DashboardPage() {
                 <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
               </button>
 
-              <button className="w-10 h-10 rounded-full overflow-hidden border border-outline-variant hover:border-primary transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-2">
-                <img
-                  alt="User profile avatar"
-                  className="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYqSMGF3Z3oHdYhn5TKuHMKRLqgbBxxxtoRNxnakx4QY5gEAylvvaC7DqnO-6wRdWbBIdm8lN9SEhMxCbp8hakT47O6vbJLl91-97D8pkJXLj50c3nW8qB-8avFTT50YGPsF-9s6SN75_vCxKk31GsSz7WxQH4X-qlX6XGkFSqpq9alyYCX-ZxYLwHMCljNf0kwH5AertyqfjrTSYFBaxqzh-1604Hz7HFbNugFP3ndIVAs_2OpIbQSJgwvDs5Kcf11UWU6_PEEOQ"
-                />
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setShowAvatarDropdown(!showAvatarDropdown)}
+                  className="w-10 h-10 rounded-full overflow-hidden border border-outline-variant hover:border-primary transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer flex items-center justify-center"
+                >
+                  <img
+                    alt="User profile avatar"
+                    className="w-full h-full object-cover"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYqSMGF3Z3oHdYhn5TKuHMKRLqgbBxxxtoRNxnakx4QY5gEAylvvaC7DqnO-6wRdWbBIdm8lN9SEhMxCbp8hakT47O6vbJLl91-97D8pkJXLj50c3nW8qB-8avFTT50YGPsF-9s6SN75_vCxKk31GsSz7WxQH4X-qlX6XGkFSqpq9alyYCX-ZxYLwHMCljNf0kwH5AertyqfjrTSYFBaxqzh-1604Hz7HFbNugFP3ndIVAs_2OpIbQSJgwvDs5Kcf11UWU6_PEEOQ"
+                  />
+                </button>
+
+                {showAvatarDropdown && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-30" 
+                      onClick={() => setShowAvatarDropdown(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg py-2 z-40">
+                      <button
+                        onClick={() => {
+                          setShowAvatarDropdown(false);
+                          setShowEditAccountModal(true);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-surface-container-low text-on-surface font-label-md text-label-md transition-colors cursor-pointer flex items-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">manage_accounts</span> Edit Account
+                      </button>
+                      <hr className="border-outline-variant my-1" />
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-2 hover:bg-error-container/10 text-error font-label-md text-label-md transition-colors cursor-pointer flex items-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">logout</span> Logout
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -335,7 +523,7 @@ function DashboardPage() {
                     className="font-label-md text-label-md text-primary-container hover:underline cursor-pointer"
                     onClick={(e) => {
                       e.preventDefault();
-                      router.push('/explore');
+                      setShowRecentlyViewedModal(true);
                     }}
                   >
                     View all
@@ -358,12 +546,12 @@ function DashboardPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {recentlyViewed.map((doc) => (
+                  <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-outline-variant snap-x snap-mandatory">
+                    {recentlyViewed.slice(0, 8).map((doc) => (
                       <div
                         key={doc.id}
                         onClick={() => handleCardClick(doc.id, doc.title)}
-                        className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[160px]"
+                        className="flex-shrink-0 w-[280px] sm:w-[320px] bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[160px] snap-start"
                       >
                         <div>
                           <div className="flex justify-between items-start mb-2">
@@ -546,92 +734,466 @@ function DashboardPage() {
                   Top Contributors
                 </h3>
                 <div className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        alt="Sarah J. avatar profile picture"
-                        className="w-10 h-10 rounded-full object-cover"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCbKnnE9P8WplUJMxgDKRUPtxvrITGrpi-hIFPFfkPJz6oIZBQQwhURIyhGnsxfdGzugqzkbfErVWvEXVDQj40Z8jZPgGOqIZxv-iQyguS7fnYjLa36ZJQnXbCk_lBFV7OxsVwQ3nvdhn0hnYgs75Q3OEbKjYauRURKkxAFUml8OZhtI9RB61neoZvyycGXvBcD6FfN7pEdKb-2n0h7XV1Hm6YScxugLFyu6R1-OspAxktJA0roF_6UUt98S76BVyaYvqEqcy1khE"
-                      />
-                      <div>
-                        <p className="font-label-md text-label-md text-on-surface">Sarah J.</p>
-                        <p className="font-label-sm text-label-sm text-secondary">
-                          42 docs uploaded
-                        </p>
+                  {topContributors.length === 0 ? (
+                    <p className="font-label-sm text-label-sm text-secondary text-center py-4">
+                      Chưa có contributor nào.
+                    </p>
+                  ) : (
+                    topContributors.slice(0, 3).map((c, idx) => (
+                      <div key={c.id} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <img
+                            alt={`${c.fullName}'s avatar`}
+                            className="w-10 h-10 rounded-full object-cover"
+                            src={c.avatarUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuDCbKnnE9P8WplUJMxgDKRUPtxvrITGrpi-hIFPFfkPJz6oIZBQQwhURIyhGnsxfdGzugqzkbfErVWvEXVDQj40Z8jZPgGOqIZxv-iQyguS7fnYjLa36ZJQnXbCk_lBFV7OxsVwQ3nvdhn0hnYgs75Q3OEbKjYauRURKkxAFUml8OZhtI9RB61neoZvyycGXvBcD6FfN7pEdKb-2n0h7XV1Hm6YScxugLFyu6R1-OspAxktJA0roF_6UUt98S76BVyaYvqEqcy1khE"}
+                          />
+                          <div>
+                            <p className="font-label-md text-label-md text-on-surface">{c.fullName}</p>
+                            <p className="font-label-sm text-label-sm text-secondary">
+                              {c.uploadedCount} docs uploaded
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${
+                          idx === 0
+                            ? 'bg-primary-fixed-dim text-on-primary-fixed'
+                            : 'bg-surface-variant text-on-surface-variant'
+                        }`}>
+                          #{idx + 1}
+                        </span>
                       </div>
-                    </div>
-                    <span className="bg-primary-fixed-dim text-on-primary-fixed px-2 py-1 rounded text-xs font-bold">
-                      #1
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        alt="Michael T. avatar profile picture"
-                        className="w-10 h-10 rounded-full object-cover"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9oEKKeSTGWU2aMKR3uIJjXccVa_ApxQ96iHoa3ZIY_fK-Eru2ODGjVBSM-Ot3QYwTQcFovUpYv4p5hMugpW95zvu2FNrnu3sH_LKPJ795Unfp_WkNm3NETpHEXztHgptc2Z-2V3S53oBbYbFIlDgVyVpK7FrWYJvZTMMTnqYIB1Qlxaz0cUXnQ3dMgjx53S_Yf4L92SgHMKhkrvovBy94za6Va35s-KRjK8N-g5R9XuupjLW1RdU1r9yHas58uqAX1SO3WeThAIc"
-                      />
-                      <div>
-                        <p className="font-label-md text-label-md text-on-surface">Michael T.</p>
-                        <p className="font-label-sm text-label-sm text-secondary">
-                          38 docs uploaded
-                        </p>
-                      </div>
-                    </div>
-                    <span className="bg-surface-variant text-on-surface-variant px-2 py-1 rounded text-xs font-bold">
-                      #2
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        alt="Emily R. avatar profile picture"
-                        className="w-10 h-10 rounded-full object-cover"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuCLzW5NgJtFtUnPROHmp5OiPtOFcLRfXICeEm2wazxYt8sTF4aiFaYMAnUfN6PiBeRqLd1h726ph7PBxyMUbQa4gWQdGtEeygAUQzhJE803Il3X4CT5-2kL_rYsz3_tXaR5twW4iQ_jhERXGtG-yOnfVvnjlorL3eK42Xlae2OarbZR_vsqeIBqrE-AdpY66fFBzLMY6DkDeuTdaBTBjUsh-tMTohgJCQ7CguJFWsTp_-0xYLtlniFiS7b8CLz6eZ-s7OCixOs3-2M"
-                      />
-                      <div>
-                        <p className="font-label-md text-label-md text-on-surface">Emily R.</p>
-                        <p className="font-label-sm text-label-sm text-secondary">
-                          29 docs uploaded
-                        </p>
-                      </div>
-                    </div>
-                    <span className="bg-surface-variant text-on-surface-variant px-2 py-1 rounded text-xs font-bold">
-                      #3
-                    </span>
-                  </div>
+                    ))
+                  )}
                 </div>
                 <button
-                  onClick={() => alert('Leaderboard clicked (Simulated)')}
+                  onClick={() => setShowLeaderboardModal(true)}
                   className="w-full mt-6 py-2 border border-[#E9ECEF] text-on-surface rounded-lg font-label-md text-label-md hover:bg-surface-container-low transition-colors cursor-pointer"
                 >
                   View Leaderboard
                 </button>
               </section>
 
-              <section className="bg-primary-container text-on-primary-container rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] relative overflow-hidden group">
-                <div className="relative z-10">
-                  <span className="material-symbols-outlined text-4xl mb-4 text-[#e0e3e8]">
-                    workspace_premium
-                  </span>
-                  <h3 className="font-headline-md text-headline-md text-white mb-2 font-semibold">
-                    Unlock Premium
-                  </h3>
-                  <p className="font-body-md text-body-md text-[#bfc7d0] mb-6">
-                    Get unlimited access to millions of documents, practice tests, and expert answers.
-                  </p>
-                  <button
-                    onClick={() => alert('Subscription flow initiated (Simulated)')}
-                    className="bg-white text-[#212529] px-6 py-3 rounded-full font-label-md text-label-md font-semibold hover:bg-[#e0e3e6] transition-colors w-full text-center cursor-pointer"
-                  >
-                    Start Free Trial
-                  </button>
-                </div>
-                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white opacity-5 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500"></div>
-              </section>
+              
             </div>
           </div>
         </main>
+
+        {/* Recently Viewed Modal */}
+        {showRecentlyViewedModal && (
+          <div className="fixed inset-0 bg-[#00000080] backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
+            <div className="bg-surface-container-lowest rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl border border-outline-variant overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-outline-variant">
+                <h3 className="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">history</span> Recently Viewed
+                </h3>
+                <button 
+                  onClick={() => setShowRecentlyViewedModal(false)}
+                  className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors cursor-pointer text-secondary"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              
+              {/* Content */}
+              <div className="p-6 overflow-y-auto flex-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {recentlyViewed.map((doc) => (
+                    <div
+                      key={doc.id}
+                      onClick={() => {
+                        setShowRecentlyViewedModal(false);
+                        handleCardClick(doc.id, doc.title);
+                      }}
+                      className="bg-surface-container-low rounded-xl p-5 hover:bg-surface-container-high transition-all cursor-pointer group flex flex-col justify-between min-h-[140px] border border-outline-variant"
+                    >
+                      <div>
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="bg-[#E9ECEF] text-on-secondary-container px-2.5 py-0.5 rounded-full font-label-sm text-label-sm font-semibold">
+                            {doc.subject?.code ?? 'GEN101'}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(doc.fileUrl, '_blank');
+                            }}
+                            className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined">download</span>
+                          </button>
+                        </div>
+                        <h4 className="font-body-md text-body-md font-semibold text-on-surface mb-1 line-clamp-2 group-hover:text-primary transition-colors">
+                          {doc.title}
+                        </h4>
+                        <p className="font-label-sm text-label-sm text-secondary line-clamp-1">
+                          {doc.subject?.name ?? 'General'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-outline-variant text-secondary">
+                        <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                          <span className="material-symbols-outlined text-[16px]">visibility</span>{' '}
+                          {doc.viewCount}
+                        </span>
+                        <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                          <span className="material-symbols-outlined text-[16px]">thumb_up</span>{' '}
+                          {doc.rating ? Math.round((doc.rating / 5) * 100) + '%' : '0%'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Leaderboard Modal */}
+        {showLeaderboardModal && (
+          <div className="fixed inset-0 bg-[#00000080] backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
+            <div className="bg-surface-container-lowest rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl border border-outline-variant overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-outline-variant">
+                <h3 className="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#FFD700]">workspace_premium</span> Leaderboard
+                </h3>
+                <button 
+                  onClick={() => setShowLeaderboardModal(false)}
+                  className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors cursor-pointer text-secondary"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              
+              {/* Content */}
+              <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-4">
+                {topContributors.map((c, idx) => {
+                  let rankBadgeClass = 'bg-surface-variant text-on-surface-variant';
+                  let rankColor = '';
+                  if (idx === 0) {
+                    rankBadgeClass = 'bg-[#FFD700] text-black font-bold';
+                    rankColor = 'border-[#FFD700] bg-[#FFD700]/5';
+                  } else if (idx === 1) {
+                    rankBadgeClass = 'bg-[#C0C0C0] text-black font-bold';
+                    rankColor = 'border-[#C0C0C0] bg-[#C0C0C0]/5';
+                  } else if (idx === 2) {
+                    rankBadgeClass = 'bg-[#CD7F32] text-white font-bold';
+                    rankColor = 'border-[#CD7F32] bg-[#CD7F32]/5';
+                  }
+
+                  return (
+                    <div 
+                      key={c.id} 
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                        rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <img
+                            alt={`${c.fullName}'s avatar`}
+                            className="w-11 h-11 rounded-full object-cover border border-outline-variant"
+                            src={c.avatarUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuDCbKnnE9P8WplUJMxgDKRUPtxvrITGrpi-hIFPFfkPJz6oIZBQQwhURIyhGnsxfdGzugqzkbfErVWvEXVDQj40Z8jZPgGOqIZxv-iQyguS7fnYjLa36ZJQnXbCk_lBFV7OxsVwQ3nvdhn0hnYgs75Q3OEbKjYauRURKkxAFUml8OZhtI9RB61neoZvyycGXvBcD6FfN7pEdKb-2n0h7XV1Hm6YScxugLFyu6R1-OspAxktJA0roF_6UUt98S76BVyaYvqEqcy1khE"}
+                          />
+                          {idx < 3 && (
+                            <span className="absolute -top-1 -right-1 text-xs">
+                              {idx === 0 ? '👑' : idx === 1 ? '⭐' : '✨'}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-label-md text-label-md text-on-surface font-semibold">{c.fullName}</p>
+                          <p className="font-label-sm text-label-sm text-secondary">
+                            {c.uploadedCount} docs uploaded
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${rankBadgeClass}`}>
+                        #{idx + 1}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* AI Cache Preview Modal */}
+        {selectedDocumentId && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00000080] backdrop-blur-sm px-4"
+            onClick={() => setSelectedDocumentId(null)}
+          >
+            <div
+              className="bg-surface border-outline-variant max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-2xl border p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-label-sm text-secondary mb-2 tracking-widest uppercase font-semibold">
+                    AI Cache Preview
+                  </p>
+                  <h2 className="text-headline-md text-primary font-bold">
+                    {aiCache?.document.title ?? 'Loading document...'}
+                  </h2>
+                  {aiCache?.document.subject && (
+                    <p className="text-secondary mt-1">
+                      {aiCache.document.subject.name} • {aiCache.document.subject.code}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setSelectedDocumentId(null)}
+                  className="material-symbols-outlined text-secondary hover:text-primary hover:bg-surface-container-low rounded-full p-2 transition-colors cursor-pointer"
+                >
+                  close
+                </button>
+              </div>
+
+              {isAiCacheLoading && (
+                <div className="text-secondary flex items-center gap-3 py-8">
+                  <span className="material-symbols-outlined animate-spin">sync</span>
+                  Loading summary and quizzes...
+                </div>
+              )}
+
+              {aiCacheError && (
+                <div className="bg-error-container text-on-error-container mb-4 rounded-xl p-4">
+                  Failed to load AI cache. Please make sure the backend is running.
+                </div>
+              )}
+
+              {aiCache && (
+                <div className="space-y-6">
+                  {/* AI Summary Section */}
+                  <section className="bg-surface-container-lowest border-outline-variant rounded-xl border p-5">
+                    <div className="mb-3 flex items-center justify-between gap-4">
+                      <h3 className="text-primary text-lg font-bold">AI Summary</h3>
+                      <span className="bg-surface-container-high text-secondary rounded-full px-3 py-1 text-xs">
+                        {aiCache.summaries[0]?.status ?? 'NO SUMMARY'}
+                      </span>
+                    </div>
+
+                    {aiCache.summaries.length > 0 ? (
+                      <div className="space-y-4">
+                        <p className="text-on-surface-variant leading-relaxed">
+                          {aiCache.summaries[0].summaryText}
+                        </p>
+
+                        {aiCache.summaries[0].keyPoints && (
+                          <div>
+                            <h4 className="text-primary mb-2 font-semibold">Key Points</h4>
+                            <ul className="text-on-surface-variant space-y-2">
+                              {aiCache.summaries[0].keyPoints
+                                .split('\n')
+                                .filter(Boolean)
+                                .map((point) => (
+                                  <li key={point} className="flex gap-2">
+                                    <span className="text-primary">•</span>
+                                    <span>{point.replace(/^•\s*/, '')}</span>
+                                  </li>
+                                ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-secondary">No summary available for this document.</p>
+                    )}
+                  </section>
+
+                  {/* Quiz Section */}
+                  <section className="bg-surface-container-lowest border-outline-variant rounded-xl border p-5">
+                    <h3 className="text-primary mb-4 text-lg font-bold">
+                      Quiz Questions ({aiCache.quizzes[0]?.questions.length ?? 0})
+                    </h3>
+
+                    {aiCache.quizzes.length > 0 ? (
+                      <div className="space-y-5">
+                        {aiCache.quizzes[0].questions.map((question, questionIndex) => (
+                          <div
+                            key={question.id}
+                            className="border-outline-variant bg-surface rounded-xl border p-4"
+                          >
+                            <p className="text-primary mb-3 font-semibold">
+                              {questionIndex + 1}. {question.questionText}
+                            </p>
+
+                            <div className="grid gap-2">
+                              {question.options.map((option) => {
+                                const selectedOptionId = selectedOptionIds[question.id];
+                                const hasAnswered = Boolean(selectedOptionId);
+                                const isSelected = selectedOptionId === option.id;
+                                const isCorrectAnswer = option.isCorrect;
+
+                                let optionClass =
+                                  'border-outline-variant text-on-surface-variant hover:border-primary hover:bg-surface-container-low';
+
+                                if (hasAnswered && isCorrectAnswer) {
+                                  optionClass = 'border-primary bg-primary-container/20 text-primary';
+                                }
+
+                                if (hasAnswered && isSelected && !isCorrectAnswer) {
+                                  optionClass =
+                                    'border-error bg-error-container text-on-error-container';
+                                }
+
+                                return (
+                                  <button
+                                    key={option.id}
+                                    type="button"
+                                    disabled={hasAnswered}
+                                    onClick={() => handleSelectOption(question.id, option.id)}
+                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
+                                      hasAnswered ? 'cursor-default' : 'cursor-pointer'
+                                    }`}
+                                  >
+                                    {option.optionText}
+
+                                    {hasAnswered && isCorrectAnswer && (
+                                      <span className="ml-2 text-xs font-bold">(Correct)</span>
+                                    )}
+
+                                    {hasAnswered && isSelected && !isCorrectAnswer && (
+                                      <span className="ml-2 text-xs font-bold">(Your answer)</span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-secondary">No quiz available for this document.</p>
+                    )}
+                  </section>
+
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => setSelectedDocumentId(null)}
+                      className="border-outline-variant text-primary hover:bg-surface-container-low rounded-lg border px-5 py-2 transition-colors cursor-pointer"
+                    >
+                      Close
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        window.open(
+                          getDocumentUrl(aiCache.document.fileUrl),
+                          '_blank',
+                          'noopener,noreferrer',
+                        )
+                      }
+                      className="bg-primary text-on-primary rounded-lg px-5 py-2 transition-all hover:shadow-md cursor-pointer"
+                    >
+                      Open File
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Edit Account Modal */}
+        {showEditAccountModal && (
+          <div className="fixed inset-0 bg-[#00000080] backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
+            <div className="bg-surface-container-lowest rounded-2xl w-full max-w-md shadow-2xl border border-outline-variant overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-outline-variant">
+                <h3 className="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">manage_accounts</span> Edit Account
+                </h3>
+                <button 
+                  onClick={() => setShowEditAccountModal(false)}
+                  className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors cursor-pointer text-secondary"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleSaveProfile} className="p-6 flex flex-col gap-4">
+                {editError && (
+                  <div className="bg-error-container text-on-error-container text-sm rounded-lg p-3">
+                    {editError}
+                  </div>
+                )}
+                {editSuccess && (
+                  <div className="bg-green-100 text-green-800 border border-green-200 text-sm rounded-lg p-3">
+                    {editSuccess}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="fullName" className="font-label-md text-label-md text-on-surface font-semibold">
+                    Full Name (Họ và Tên)
+                  </label>
+                  <input
+                    id="fullName"
+                    type="text"
+                    required
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:border-primary font-body-md text-body-md"
+                    placeholder="Enter your full name"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="username" className="font-label-md text-label-md text-on-surface font-semibold">
+                    Username (Tên Đăng Nhập)
+                  </label>
+                  <input
+                    id="username"
+                    type="text"
+                    value={editUsername}
+                    onChange={(e) => setEditUsername(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:border-primary font-body-md text-body-md"
+                    placeholder="Enter a username"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="phoneNumber" className="font-label-md text-label-md text-on-surface font-semibold">
+                    Phone Number (Số Điện Thoại)
+                  </label>
+                  <input
+                    id="phoneNumber"
+                    type="tel"
+                    value={editPhoneNumber}
+                    onChange={(e) => setEditPhoneNumber(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:border-primary font-body-md text-body-md"
+                    placeholder="Enter your phone number"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditAccountModal(false)}
+                    className="border border-outline-variant text-on-surface hover:bg-surface-container-low rounded-lg px-4 py-2 transition-colors font-label-md text-label-md cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editLoading}
+                    className="bg-primary text-on-primary hover:opacity-90 rounded-lg px-5 py-2 transition-all font-label-md text-label-md cursor-pointer flex items-center justify-center min-w-[80px]"
+                  >
+                    {editLoading ? (
+                      <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                    ) : (
+                      'Save'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -685,19 +1247,16 @@ export default function HomePage() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const timer = setTimeout(() => {
-      setIsLoggedIn(!!token);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+    if (!token) {
+      router.replace('/login');
+      setIsLoggedIn(false);
+    } else {
+      setIsLoggedIn(true);
+    }
+  }, [router]);
 
-  if (isLoggedIn === null) {
+  if (isLoggedIn === null || isLoggedIn === false) {
     return <DashboardSkeleton />;
-  }
-
-  if (!isLoggedIn) {
-    router.replace('/login');
-    return null;
   }
 
   return <DashboardPage />;

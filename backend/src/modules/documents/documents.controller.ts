@@ -23,7 +23,7 @@ import type {
   AnalyzeResult,
 } from './types/document.types';
 
-@Controller('api/documents')
+@Controller('documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 

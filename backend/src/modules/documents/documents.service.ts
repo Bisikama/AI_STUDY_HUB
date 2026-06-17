@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
@@ -436,6 +437,15 @@ Quy định chặt chẽ:
    * Records a user view event for a document and updates viewCount.
    */
   async recordView(documentId: string, userId: string): Promise<void> {
+    // 1. Kiểm tra User tồn tại trong DB để tránh lỗi Foreign Key khi token bị stale (sau khi reset DB)
+    const userExists = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!userExists) {
+      throw new UnauthorizedException('User not found in database. Please log out and log in again.');
+    }
+
+    // 2. Kiểm tra Document tồn tại
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
     });
