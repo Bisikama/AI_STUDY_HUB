@@ -59,6 +59,35 @@ export class AdminService {
   }
 
   /**
+   * Lấy danh sách toàn bộ người dùng trong hệ thống
+   * Dùng cho bảng User Management trong Admin Overview
+   */
+  async getAllUsers() {
+    try {
+      const users = await this.prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          username: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          _count: {
+            select: { documents: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return users;
+    } catch (error) {
+      console.error('Lỗi khi lấy danh sách user:', error);
+      throw new InternalServerErrorException('Không thể lấy danh sách người dùng');
+    }
+  }
+
+  /**
    * Lấy danh sách tài liệu đang chờ duyệt (status = PENDING)
    * Dùng cho bảng hàng đợi phê duyệt trong Admin Dashboard
    */
@@ -66,7 +95,16 @@ export class AdminService {
     try {
       const documents = await this.prisma.document.findMany({
         where: { status: DocumentStatus.PENDING },
-        include: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          fileUrl: true,
+          fileSize: true,
+          fileType: true,
+          status: true,
+          fullText: true,        // nội dung text đầy đủ để admin review
+          createdAt: true,
           subject: {
             select: { id: true, name: true, code: true },
           },

@@ -54,10 +54,10 @@ type ExploreAiCache = {
 type ApiResponse<T> =
   | T
   | {
-      statusCode: number;
-      message: string;
-      data: T;
-    };
+    statusCode: number;
+    message: string;
+    data: T;
+  };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
   const response = await fetch(url);
@@ -260,7 +260,7 @@ function DashboardPage() {
       const updatedUser = response.data.data?.user || response.data.user;
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUserFullName(updatedUser.fullName);
-      
+
       setEditSuccess('Cập nhật thông tin tài khoản thành công!');
       setTimeout(() => {
         setShowEditAccountModal(false);
@@ -279,9 +279,8 @@ function DashboardPage() {
     <div className="bg-background text-on-background min-h-screen flex font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${
-          mobileMenuOpen ? 'flex' : 'hidden'
-        } md:flex fixed left-0 top-0 h-full flex-col p-4 border-r border-outline-variant bg-surface-container-lowest shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-64 z-20 transition-all`}
+        className={`${mobileMenuOpen ? 'flex' : 'hidden'
+          } md:flex fixed left-0 top-0 h-full flex-col p-4 border-r border-outline-variant bg-surface-container-lowest shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-64 z-20 transition-all`}
       >
         <div className="flex items-center justify-between mb-8 px-4">
           <div className="flex items-center gap-3">
@@ -443,7 +442,7 @@ function DashboardPage() {
               </button>
 
               <div className="relative">
-                <button 
+                <button
                   onClick={() => setShowAvatarDropdown(!showAvatarDropdown)}
                   className="w-10 h-10 rounded-full overflow-hidden border border-outline-variant hover:border-primary transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer flex items-center justify-center"
                 >
@@ -456,8 +455,8 @@ function DashboardPage() {
 
                 {showAvatarDropdown && (
                   <>
-                    <div 
-                      className="fixed inset-0 z-30" 
+                    <div
+                      className="fixed inset-0 z-30"
                       onClick={() => setShowAvatarDropdown(false)}
                     />
                     <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg py-2 z-40">
@@ -711,11 +710,10 @@ function DashboardPage() {
                           </div>
                           <button
                             onClick={(e) => toggleSaveDoc(doc.id, e)}
-                            className={`hidden sm:block px-4 py-2 border rounded-full font-label-sm text-label-sm transition-colors cursor-pointer ${
-                              savedDocIds.includes(doc.id)
+                            className={`hidden sm:block px-4 py-2 border rounded-full font-label-sm text-label-sm transition-colors cursor-pointer ${savedDocIds.includes(doc.id)
                                 ? 'bg-primary-container text-white border-primary-container'
                                 : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
-                            }`}
+                              }`}
                           >
                             {savedDocIds.includes(doc.id) ? 'Saved' : 'Save'}
                           </button>
@@ -754,11 +752,10 @@ function DashboardPage() {
                             </p>
                           </div>
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                          idx === 0
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${idx === 0
                             ? 'bg-primary-fixed-dim text-on-primary-fixed'
                             : 'bg-surface-variant text-on-surface-variant'
-                        }`}>
+                          }`}>
                           #{idx + 1}
                         </span>
                       </div>
@@ -773,7 +770,7 @@ function DashboardPage() {
                 </button>
               </section>
 
-              
+
             </div>
           </div>
         </main>
@@ -787,14 +784,14 @@ function DashboardPage() {
                 <h3 className="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">history</span> Recently Viewed
                 </h3>
-                <button 
+                <button
                   onClick={() => setShowRecentlyViewedModal(false)}
                   className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors cursor-pointer text-secondary"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
-              
+
               {/* Content */}
               <div className="p-6 overflow-y-auto flex-1">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -856,14 +853,14 @@ function DashboardPage() {
                 <h3 className="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#FFD700]">workspace_premium</span> Leaderboard
                 </h3>
-                <button 
+                <button
                   onClick={() => setShowLeaderboardModal(false)}
                   className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors cursor-pointer text-secondary"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
-              
+
               {/* Content */}
               <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-4">
                 {topContributors.map((c, idx) => {
@@ -881,11 +878,10 @@ function DashboardPage() {
                   }
 
                   return (
-                    <div 
-                      key={c.id} 
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                        rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
-                      }`}
+                    <div
+                      key={c.id}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-all ${rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -1045,9 +1041,8 @@ function DashboardPage() {
                                     type="button"
                                     disabled={hasAnswered}
                                     onClick={() => handleSelectOption(question.id, option.id)}
-                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
-                                      hasAnswered ? 'cursor-default' : 'cursor-pointer'
-                                    }`}
+                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${hasAnswered ? 'cursor-default' : 'cursor-pointer'
+                                      }`}
                                   >
                                     {option.optionText}
 
@@ -1106,7 +1101,7 @@ function DashboardPage() {
                 <h3 className="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">manage_accounts</span> Edit Account
                 </h3>
-                <button 
+                <button
                   onClick={() => setShowEditAccountModal(false)}
                   className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors cursor-pointer text-secondary"
                 >
@@ -1220,7 +1215,7 @@ function DashboardSkeleton() {
           <div className="h-8 bg-surface-container-high rounded w-96 animate-pulse"></div>
           <div className="h-8 bg-surface-container-high rounded-full w-8 animate-pulse"></div>
         </div>
-        
+
         {/* Body Skeleton */}
         <div className="flex-1 p-6 md:p-8 space-y-8 overflow-y-auto">
           <div className="h-12 bg-surface-container-high rounded w-1/2 animate-pulse"></div>

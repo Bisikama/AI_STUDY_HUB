@@ -17,6 +17,15 @@ export class AdminController {
   }
 
   /**
+   * Lấy danh sách toàn bộ người dùng
+   * GET /api/admin/users
+   */
+  @Get('users')
+  async getAllUsers() {
+    return this.adminService.getAllUsers();
+  }
+
+  /**
    * Lấy danh sách tài liệu đang chờ duyệt
    * GET /api/admin/documents/pending
    */
