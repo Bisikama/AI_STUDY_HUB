@@ -72,3 +72,4 @@ src/documents/VALIDATION_EXAMPLES.ts
 SETUP_DB_LOCAL.md
 #local docker db
 docker-compose.yml
+*.tsbuildinfo

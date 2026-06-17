@@ -327,7 +327,7 @@ export default function PracticePage() {
           <li>
             <button
               className="w-full flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform text-left cursor-pointer"
-              onClick={() => router.push('/explore')}
+              onClick={() => router.push('/dashboard')}
             >
               <span className="material-symbols-outlined">explore</span> Discover
             </button>

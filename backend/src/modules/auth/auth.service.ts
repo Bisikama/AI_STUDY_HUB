@@ -56,8 +56,50 @@ export class AuthService {
     const token = this.jwtService.sign(payload);
 
     return {
-      user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role },
+      user: { 
+        id: user.id, 
+        email: user.email, 
+        fullName: user.fullName, 
+        username: user.username,
+        phoneNumber: user.phoneNumber,
+        role: user.role 
+      },
       token,
+    };
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: { fullName: string; username?: string; phoneNumber?: string },
+  ) {
+    if (dto.username) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { username: dto.username },
+      });
+      if (existingUser && existingUser.id !== userId) {
+        throw new BadRequestException('Tên đăng nhập này đã được sử dụng!');
+      }
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        fullName: dto.fullName,
+        username: dto.username || null,
+        phoneNumber: dto.phoneNumber || null,
+      },
+    });
+
+    return {
+      message: 'Cập nhật thông tin tài khoản thành công!',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        fullName: updatedUser.fullName,
+        username: updatedUser.username,
+        phoneNumber: updatedUser.phoneNumber,
+        role: updatedUser.role,
+      },
     };
   }
 }

@@ -36,6 +36,26 @@ async function main() {
     // Bước 6: Seed Quizzes (phụ thuộc Documents)
     await seedQuizzes(prisma, documents);
 
+    // Bước 7: Seed User Document Views (Lịch sử xem)
+    console.log('👀 Seeding document views history...');
+    const approvedDocs = documents.filter((doc) => doc.status === 'APPROVED');
+    if (approvedDocs.length > 0) {
+      const student = users.find((u) => u.email.startsWith('student.phạm'));
+      if (student) {
+        // Cho student xem 3 tài liệu gần nhất
+        const docsToView = approvedDocs.slice(0, 3);
+        for (let j = 0; j < docsToView.length; j++) {
+          await prisma.userDocumentView.create({
+            data: {
+              userId: student.id,
+              documentId: docsToView[j].id,
+              viewedAt: new Date(Date.now() - j * 60 * 60 * 1000), // Xem cách nhau 1 giờ
+            },
+          });
+        }
+      }
+    }
+
     console.log('🎉 Database seeding completed successfully!\n');
   } catch (error) {
     console.error('❌ Error during seeding:', error);

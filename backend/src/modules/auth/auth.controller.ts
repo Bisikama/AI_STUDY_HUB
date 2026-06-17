@@ -1,7 +1,8 @@
-import { Controller, Post, Body, Res } from '@nestjs/common';
+import { Controller, Post, Body, Res, Put, UseGuards, Req } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { JwtAuthGuard } from './guards/jwt.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -30,5 +31,15 @@ export class AuthController {
 
     // 3. Trả về thông tin user cho Frontend dùng (như hiển thị tên, avatar...)
     return result;
+  }
+
+  @Put('profile')
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(
+    @Req() req: any,
+    @Body() dto: { fullName: string; username?: string; phoneNumber?: string },
+  ) {
+    const userId = req.user.id;
+    return this.authService.updateProfile(userId, dto);
   }
 }
