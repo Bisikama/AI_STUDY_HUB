@@ -442,7 +442,9 @@ Quy định chặt chẽ:
       where: { id: userId },
     });
     if (!userExists) {
-      throw new UnauthorizedException('User not found in database. Please log out and log in again.');
+      throw new UnauthorizedException(
+        'User not found in database. Please log out and log in again.',
+      );
     }
 
     // 2. Kiểm tra Document tồn tại

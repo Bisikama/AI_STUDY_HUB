@@ -564,7 +564,7 @@ function SearchExplore() {
                   localStorage.removeItem('token');
                   router.replace('/');
                 }}
-                className="material-symbols-outlined text-error hover:bg-red-50 cursor-pointer rounded-full p-2 transition-colors active:scale-95"
+                className="material-symbols-outlined text-error cursor-pointer rounded-full p-2 transition-colors hover:bg-red-50 active:scale-95"
                 title="Đăng xuất"
               >
                 logout

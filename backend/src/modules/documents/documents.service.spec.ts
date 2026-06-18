@@ -19,7 +19,11 @@ interface ServiceWithPrivateMethods {
 }
 
 jest.mock('./utils/documentParser', () => ({
-  parseDocument: jest.fn().mockResolvedValue('Extracted plain text contents for test. This content must be longer than fifty characters to pass validation.'),
+  parseDocument: jest
+    .fn()
+    .mockResolvedValue(
+      'Extracted plain text contents for test. This content must be longer than fifty characters to pass validation.',
+    ),
 }));
 
 jest.mock('fs', () => ({
@@ -186,7 +190,7 @@ describe('DocumentsService', () => {
       mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, name: 'Subject 1' });
       mockPrisma.user.findFirst.mockResolvedValue({
         id: 'fallback-user-id',
-        fullName: 'First User',
+        name: 'First User',
       });
       mockPrisma.document.create.mockResolvedValue({
         id: 'doc-id',

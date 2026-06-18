@@ -1,4 +1,5 @@
-import { PrismaClient, UserRole } from '../../generated/prisma/client';
+import { PrismaClient } from '../../generated/prisma/client';
+import { UserRole } from '../../generated/prisma/enums';
 import bcrypt from 'bcrypt';
 
 export async function seedUsers(prisma: PrismaClient) {
@@ -43,7 +44,7 @@ export async function seedUsers(prisma: PrismaClient) {
     // Students
     prisma.user.create({
       data: {
-        email: 'student.phạm@example.com',
+        email: 'student.pham@example.com',
         passwordHash: hashedPassword,
         fullName: 'Phạm Thị D',
         role: UserRole.STUDENT,
@@ -52,7 +53,7 @@ export async function seedUsers(prisma: PrismaClient) {
     }),
     prisma.user.create({
       data: {
-        email: 'student.hoàng@example.com',
+        email: 'student.hoang@example.com',
         passwordHash: hashedPassword,
         fullName: 'Hoàng Văn E',
         role: UserRole.STUDENT,
@@ -61,7 +62,7 @@ export async function seedUsers(prisma: PrismaClient) {
     }),
     prisma.user.create({
       data: {
-        email: 'student.vũ@example.com',
+        email: 'student.vu@example.com',
         passwordHash: hashedPassword,
         fullName: 'Vũ Thị F',
         role: UserRole.STUDENT,

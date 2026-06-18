@@ -127,9 +127,7 @@ export class SupabaseService {
 
     this.logger.log(`Đang xóa file trên Supabase Storage: ${filePath}`);
 
-    const { error } = await this.supabase.storage
-      .from(this.bucketName)
-      .remove([filePath]);
+    const { error } = await this.supabase.storage.from(this.bucketName).remove([filePath]);
 
     if (error) {
       this.logger.error(`Xóa file thất bại: ${error.message}`, error);

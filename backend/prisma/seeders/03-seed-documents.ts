@@ -100,7 +100,8 @@ export async function seedDocuments(
     {
       subjectCode: 'DBI202',
       title: 'NoSQL Databases Comparison',
-      description: 'Understanding the differences between MongoDB, Redis, and Cassandra for varied workloads',
+      description:
+        'Understanding the differences between MongoDB, Redis, and Cassandra for varied workloads',
     },
     {
       subjectCode: 'PRJ301',

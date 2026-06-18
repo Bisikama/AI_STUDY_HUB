@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  UseGuards,
+} from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -43,9 +52,7 @@ export class AdminController {
    * DELETE /api/admin/documents/:id
    */
   @Delete('documents/:id')
-  async forceDeleteDocument(
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-  ) {
+  async forceDeleteDocument(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.adminService.forceDeleteDocument(id);
   }
 }
