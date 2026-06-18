@@ -10,10 +10,11 @@ import {
   ParseUUIDPipe,
   Optional,
   UseGuards,
+  Req,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentsService } from './documents.service';
-import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ValidateFilePipe } from './pipes';
@@ -91,6 +92,20 @@ export class DocumentsController {
       statusCode: 200,
       message: 'Get document details successfully',
       data: document,
+    };
+  }
+
+  @Post('/:id/view')
+  @UseGuards(JwtAuthGuard)
+  async recordView(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() req: any,
+  ): Promise<{ statusCode: number; message: string }> {
+    const userId = req.user.id;
+    await this.documentsService.recordView(id, userId);
+    return {
+      statusCode: 200,
+      message: 'Document view recorded successfully',
     };
   }
 }

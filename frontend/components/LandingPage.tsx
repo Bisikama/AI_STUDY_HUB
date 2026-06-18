@@ -41,7 +41,12 @@ export default function LandingPage() {
 
   const handleStartBuilding = (e: React.MouseEvent) => {
     e.preventDefault();
-    router.push('/login');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (token) {
+      router.push('/dashboard');
+    } else {
+      router.push('/login');
+    }
   };
 
   const gridBackground = {

@@ -3,6 +3,7 @@
 import useSWR from 'swr';
 import { useEffect, useMemo, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import axiosClient from '@/utils/axios';
 
 type Subject = {
   id: number;
@@ -429,7 +430,7 @@ function SearchExplore() {
     );
   };
 
-  const handleCardClick = (doc: ExploreDocument) => {
+  const handleCardClick = async (doc: ExploreDocument) => {
     if (doc.id.startsWith('mock-')) {
       alert('This is a simulated document view.');
       return;
@@ -437,6 +438,12 @@ function SearchExplore() {
 
     setSelectedOptionIds({});
     setSelectedDocumentId(doc.id);
+
+    try {
+      await axiosClient.post(`/documents/${doc.id}/view`);
+    } catch (err) {
+      console.error('Failed to record document view:', err);
+    }
   };
 
   const handleSelectOption = (questionId: string, optionId: string) => {
@@ -512,10 +519,20 @@ function SearchExplore() {
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
-                  alert('My Documents clicked (Simulated)');
+                  router.push('/dashboard');
                 }}
               >
                 My Documents
+              </a>
+              <a
+                className="text-secondary font-label-md hover:text-primary transition-colors"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/practice');
+                }}
+              >
+                Practice Mode
               </a>
               <a
                 className="text-secondary font-label-md hover:text-primary transition-colors"
@@ -541,6 +558,16 @@ function SearchExplore() {
                 className="material-symbols-outlined text-secondary hover:bg-surface-container-low cursor-pointer rounded-full p-2 transition-colors active:scale-95"
               >
                 settings
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  router.replace('/');
+                }}
+                className="material-symbols-outlined text-error hover:bg-red-50 cursor-pointer rounded-full p-2 transition-colors active:scale-95"
+                title="Đăng xuất"
+              >
+                logout
               </button>
               <div className="border-outline-variant bg-surface-container-high h-10 w-10 overflow-hidden rounded-full border">
                 <img

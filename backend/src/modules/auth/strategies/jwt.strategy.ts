@@ -2,10 +2,11 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
     super({
       // Hỗ trợ trích xuất JWT Token từ Cookie (access_token) hoặc Header (Bearer Token)
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -15,7 +16,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
-      secretOrKey: 'super-secret-key', // Phải khớp với secret key trong auth.module.ts
+      secretOrKey: configService.get<string>('JWT_SECRET') || 'super-secret-key', // Phải khớp với secret key trong auth.module.ts
     });
   }
 

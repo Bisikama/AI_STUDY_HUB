@@ -5,6 +5,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
   ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
@@ -449,5 +450,56 @@ Quy định chặt chẽ:
       orderBy: { createdAt: 'desc' },
     });
     return this.sanitizeData<SanitizedDocument[]>(documents);
+  }
+
+  /**
+   * Records a user view event for a document and updates viewCount.
+   */
+  async recordView(documentId: string, userId: string): Promise<void> {
+    // 1. Kiểm tra User tồn tại trong DB để tránh lỗi Foreign Key khi token bị stale (sau khi reset DB)
+    const userExists = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!userExists) {
+      throw new UnauthorizedException(
+        'User not found in database. Please log out and log in again.',
+      );
+    }
+
+    // 2. Kiểm tra Document tồn tại
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document with ID ${documentId} not found`);
+    }
+
+    // 1. Upsert UserDocumentView (lưu lịch sử xem gần đây)
+    await this.prisma.userDocumentView.upsert({
+      where: {
+        userId_documentId: {
+          userId,
+          documentId,
+        },
+      },
+      update: {
+        viewedAt: new Date(),
+      },
+      create: {
+        userId,
+        documentId,
+      },
+    });
+
+    // 2. Tăng số lượt xem global
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        viewCount: {
+          increment: 1,
+        },
+      },
+    });
   }
 }
