@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import LandingPage from '@/components/LandingPage';
+import { useAuth } from '@/hooks/useAuth';
 
 type Subject = {
   id: number;
@@ -167,6 +168,29 @@ function DashboardPage() {
   const [search, setSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [savedDocIds, setSavedDocIds] = useState<string[]>([]);
+  const [user, setUser] = useState<{ name: string; role: string; email: string } | null>(null);
+  const { getProfile } = useAuth();
+
+  useEffect(() => {
+    // 1. Load nhanh từ localStorage trước để UX mượt
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        setUser(JSON.parse(userStr));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // 2. Fetch từ API để đồng bộ dữ liệu mới nhất từ database
+    getProfile()
+      .then((updatedUser) => {
+        setUser(updatedUser);
+      })
+      .catch((err) => {
+        console.error('Failed to sync profile:', err);
+      });
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,6 +295,20 @@ function DashboardPage() {
               <span className="material-symbols-outlined">psychology</span> AI Assistant
             </a>
           </li>
+          {user?.role === 'ADMIN' && (
+            <li>
+              <a
+                className="flex items-center gap-3 text-red-600 px-4 py-3 hover:bg-rose-50 rounded-lg font-label-md text-label-md active:scale-95 transition-transform font-bold"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/admin');
+                }}
+              >
+                <span className="material-symbols-outlined text-red-600">admin_panel_settings</span> Admin Panel
+              </a>
+            </li>
+          )}
         </ul>
 
         <ul className="flex flex-col gap-2 mt-auto border-t border-outline-variant pt-4">
@@ -305,6 +343,7 @@ function DashboardPage() {
               onClick={(e) => {
                 e.preventDefault();
                 localStorage.removeItem("token");
+                localStorage.removeItem("user");
                 router.replace("/");
               }}
             >
@@ -371,7 +410,7 @@ function DashboardPage() {
         <main className="flex-1 p-container-margin-mobile md:p-container-margin-desktop max-w-max-width mx-auto w-full">
           <section className="mb-12">
             <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
-              Welcome back, Alex
+              Welcome back, {user?.name || 'Alex'}
             </h2>
             <p className="font-body-lg text-body-lg text-secondary">
               Here&apos;s what&apos;s happening in your academic world today.

@@ -1,12 +1,13 @@
 'use client';
 
 import { authApi } from '@/services/authApi';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from "../../../hooks/useAuth";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import Script from 'next/script';
 
 // 1. ĐỊNH NGHĨA ZOD SCHEMA CHO LOGIN
 const loginSchema = z.object({
@@ -20,7 +21,7 @@ export default function LoginPage() {
   const router = useRouter();
   
   // Lấy hàm login và state báo lỗi từ custom hook
-  const { login, isLoading, error: apiError } = useAuth();
+  const { login, isLoading, error: apiError, loginWithGoogle } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
 
   // 2. KHỞI TẠO REACT-HOOK-FORM
@@ -37,11 +38,40 @@ export default function LoginPage() {
     try {
       await login({ email: data.email, password: data.password });
       // Đăng nhập thành công thì đá thẳng vô dashboard
-      router.push('/');
+      router.push('/dashboard');
     } catch (err) {
       // Lỗi API (sai email, sai pass) sẽ tự hiện ở biến apiError
     }
   };
+
+  const handleGoogleResponse = async (response: any) => {
+    try {
+      await loginWithGoogle(response.credential);
+      router.push('/dashboard');
+    } catch (err) {
+      console.error("Google login failed", err);
+    }
+  };
+
+  const handleGoogleScriptLoad = () => {
+    const google = (window as any).google;
+    if (google) {
+      google.accounts.id.initialize({
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '1047712398436-yourclientidplaceholder.apps.googleusercontent.com',
+        callback: handleGoogleResponse,
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('google-signin-btn'),
+        { theme: 'outline', size: 'large', width: 340 }
+      );
+    }
+  };
+
+  useEffect(() => {
+    if ((window as any).google) {
+      handleGoogleScriptLoad();
+    }
+  }, []);
 
   return (
     <div className="flex min-h-screen w-full bg-white font-sans text-gray-900">
@@ -133,6 +163,17 @@ export default function LoginPage() {
               {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
+
+          {/* Google Login Button */}
+          <div className="mt-4 flex flex-col items-center justify-center">
+            <div id="google-signin-btn" className="w-full max-w-[340px]"></div>
+          </div>
+
+          <Script
+            src="https://accounts.google.com/gsi/client"
+            onLoad={handleGoogleScriptLoad}
+            strategy="afterInteractive"
+          />
 
           {/* Divider */}
           <div className="my-6 flex items-center justify-center gap-3">

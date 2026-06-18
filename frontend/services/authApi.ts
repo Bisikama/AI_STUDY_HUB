@@ -16,7 +16,7 @@ export interface RegisterData {
 export interface UserProfile {
   id: string;
   email: string;
-  fullName: string;
+  name: string;
   role: string;
 }
 
@@ -43,5 +43,17 @@ export const authApi = {
 
   checkPassword: async (email: string, password: string) => {
     return axiosClient.post("/auth/check-password", { email, password });
+  },
+
+  loginWithGoogle: async (idToken: string) => {
+    return axiosClient.post("/auth/google", { idToken });
+  },
+
+  forgotPassword: async (email: string) => {
+    return axiosClient.post("/auth/forgot-password", { email });
+  },
+
+  resetPassword: async (data: any) => {
+    return axiosClient.post("/auth/reset-password", data);
   }
 };

@@ -6,7 +6,7 @@ import { authApi, LoginCredentials, RegisterData } from "@/services/authApi";
 export interface User {
   id: string;
   email: string;
-  fullName: string;
+  name: string;
   role: string;
 }
 
@@ -91,5 +91,38 @@ export const useAuth = () => {
     }
   };
 
-  return { login, register, logout, isLoading, error, checkEmail, checkPassword };
+  const loginWithGoogle = async (idToken: string): Promise<User> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await authApi.loginWithGoogle(idToken);
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+      return res.data.user;
+    } catch (err: unknown) {
+      const errorMsg = handleError(err);
+      setError(errorMsg);
+      throw errorMsg;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getProfile = async (): Promise<User> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const profile = await authApi.getProfile();
+      localStorage.setItem("user", JSON.stringify(profile));
+      return profile;
+    } catch (err: unknown) {
+      const errorMsg = handleError(err);
+      setError(errorMsg);
+      throw errorMsg;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return { login, register, logout, isLoading, error, checkEmail, checkPassword, loginWithGoogle, getProfile };
 };

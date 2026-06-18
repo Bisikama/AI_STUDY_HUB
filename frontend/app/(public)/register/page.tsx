@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from "../../../hooks/useAuth";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import Script from 'next/script';
 
 // 1. SCHEMA ZOD (Bắt lỗi khi bấm Submit)
 const registerSchema = z.object({
@@ -22,8 +23,37 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register: registerUser, isLoading, error: apiError } = useAuth();
+  const { register: registerUser, isLoading, error: apiError, loginWithGoogle } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+
+  const handleGoogleResponse = async (response: any) => {
+    try {
+      await loginWithGoogle(response.credential);
+      router.push('/dashboard');
+    } catch (err) {
+      console.error("Google login failed", err);
+    }
+  };
+
+  const handleGoogleScriptLoad = () => {
+    const google = (window as any).google;
+    if (google) {
+      google.accounts.id.initialize({
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '1047712398436-yourclientidplaceholder.apps.googleusercontent.com',
+        callback: handleGoogleResponse,
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('google-signin-btn'),
+        { theme: 'outline', size: 'large', width: 340 }
+      );
+    }
+  };
+
+  useEffect(() => {
+    if ((window as any).google) {
+      handleGoogleScriptLoad();
+    }
+  }, []);
 
   // 2. KHỞI TẠO REACT-HOOK-FORM
   const { 
@@ -153,6 +183,24 @@ export default function RegisterPage() {
               {isLoading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="my-6 flex items-center justify-center gap-3">
+            <div className="h-px flex-1 bg-gray-100"></div>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">OR</span>
+            <div className="h-px flex-1 bg-gray-100"></div>
+          </div>
+
+          {/* Google Login Button */}
+          <div className="mt-4 flex flex-col items-center justify-center">
+            <div id="google-signin-btn" className="w-full max-w-[340px]"></div>
+          </div>
+
+          <Script
+            src="https://accounts.google.com/gsi/client"
+            onLoad={handleGoogleScriptLoad}
+            strategy="afterInteractive"
+          />
 
           <p className="mt-6 text-center text-[12px] text-gray-500">
             Already have an account? <a href="/login" className="font-semibold text-gray-900 hover:underline">Login here</a>
