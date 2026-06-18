@@ -19,7 +19,11 @@ interface ServiceWithPrivateMethods {
 }
 
 jest.mock('./utils/documentParser', () => ({
-  parseDocument: jest.fn().mockResolvedValue('Extracted plain text contents for test. This content must be longer than fifty characters to pass validation.'),
+  parseDocument: jest
+    .fn()
+    .mockResolvedValue(
+      'Extracted plain text contents for test. This content must be longer than fifty characters to pass validation.',
+    ),
 }));
 
 jest.mock('fs', () => ({

@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
@@ -408,7 +409,7 @@ Quy định chặt chẽ:
   /**
    * Retrieves document metadata along with its AI summary and quizzes.
    */
-  async getDetails(documentId: string): Promise<SanitizedDocumentDetails> {
+  async getDetails(documentId: string, userId?: string): Promise<SanitizedDocumentDetails> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
       include: {
@@ -429,6 +430,24 @@ Quy định chặt chẽ:
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
+    if (document.uploadedBy !== userId && document.status !== 'APPROVED') {
+      throw new ForbiddenException('You do not have permission to view this document');
+    }
+
     return this.sanitizeData<SanitizedDocumentDetails>(document);
+  }
+
+  /**
+   * Get all documents uploaded by a specific user.
+   */
+  async getDocumentsByUser(userId: string): Promise<SanitizedDocument[]> {
+    const documents = await this.prisma.document.findMany({
+      where: { uploadedBy: userId },
+      include: {
+        subject: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return this.sanitizeData<SanitizedDocument[]>(documents);
   }
 }

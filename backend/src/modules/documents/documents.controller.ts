@@ -9,9 +9,13 @@ import {
   Get,
   ParseUUIDPipe,
   Optional,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentsService } from './documents.service';
+import { JwtAuthGuard } from '../auth/guards/jwt.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ValidateFilePipe } from './pipes';
 import { UploadDocumentDto } from './dto';
 import type {
@@ -20,7 +24,7 @@ import type {
   AnalyzeResult,
 } from './types/document.types';
 
-@Controller('api/documents')
+@Controller('documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
@@ -63,11 +67,26 @@ export class DocumentsController {
     };
   }
 
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getMyDocuments(
+    @CurrentUser('id') userId: string,
+  ): Promise<{ statusCode: number; message: string; data: SanitizedDocument[] }> {
+    const documents = await this.documentsService.getDocumentsByUser(userId);
+    return {
+      statusCode: 200,
+      message: 'Get user documents successfully',
+      data: documents,
+    };
+  }
+
   @Get(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   async getDetails(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId?: string,
   ): Promise<{ statusCode: number; message: string; data: SanitizedDocumentDetails }> {
-    const document = await this.documentsService.getDetails(id);
+    const document = await this.documentsService.getDetails(id, userId);
     return {
       statusCode: 200,
       message: 'Get document details successfully',
