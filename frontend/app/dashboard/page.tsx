@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import LandingPage from '@/components/LandingPage';
+import { useAuth, User } from '@/hooks/useAuth';
 import { dashboardApi, ExploreDocument, Contributor } from '@/services/dashboardApi';
 import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
@@ -144,19 +144,86 @@ function DashboardPage() {
   const [trendingDocs, setTrendingDocs] = useState<ExploreDocument[]>([]);
   const [topContributors, setTopContributors] = useState<Contributor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userFullName, setUserFullName] = useState('User');
+  const [userFullName, setUserFullName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined') {
+        try {
+          const userObj = JSON.parse(userStr);
+          return userObj?.fullName || 'User';
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    return 'User';
+  });
   const [showRecentlyViewedModal, setShowRecentlyViewedModal] = useState(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
   const [showEditAccountModal, setShowEditAccountModal] = useState(false);
-  const [editFullName, setEditFullName] = useState('');
-  const [editUsername, setEditUsername] = useState('');
-  const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  const [editFullName, setEditFullName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined') {
+        try {
+          const userObj = JSON.parse(userStr);
+          return userObj?.fullName || '';
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    return '';
+  });
+  const [editUsername, setEditUsername] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined') {
+        try {
+          const userObj = JSON.parse(userStr);
+          return userObj?.username || '';
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    return '';
+  });
+  const [editPhoneNumber, setEditPhoneNumber] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined') {
+        try {
+          const userObj = JSON.parse(userStr);
+          return userObj?.phoneNumber || '';
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    return '';
+  });
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
   const [editLoading, setEditLoading] = useState(false);
+
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          return JSON.parse(userStr);
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    return null;
+  });
+  const { getProfile } = useAuth();
 
   const aiCacheUrl = selectedDocumentId
     ? `${API_BASE_URL}/api/explore/${selectedDocumentId}/ai-cache`
@@ -195,21 +262,25 @@ function DashboardPage() {
   };
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser && storedUser !== 'undefined') {
-      try {
-        const userObj = JSON.parse(storedUser);
-        if (userObj) {
-          if (userObj.fullName) setUserFullName(userObj.fullName);
-          setEditFullName(userObj.fullName || '');
-          setEditUsername(userObj.username || '');
-          setEditPhoneNumber(userObj.phoneNumber || '');
-        }
-      } catch (e) {
-        console.error('Error parsing user info:', e);
-      }
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDashboardData();
+
+    // Fetch từ API để đồng bộ dữ liệu mới nhất từ database
+    getProfile()
+      .then((updatedUser) => {
+        if (updatedUser) {
+          setUser(updatedUser);
+          setUserFullName(updatedUser.fullName || 'User');
+          setEditFullName(updatedUser.fullName || '');
+          setEditUsername(updatedUser.username || '');
+          setEditPhoneNumber(updatedUser.phoneNumber || '');
+        }
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to sync profile:', err);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -259,6 +330,7 @@ function DashboardPage() {
 
       const updatedUser = response.data.data?.user || response.data.user;
       localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
       setUserFullName(updatedUser.fullName);
 
       setEditSuccess('Cập nhật thông tin tài khoản thành công!');
@@ -266,9 +338,10 @@ function DashboardPage() {
         setShowEditAccountModal(false);
         setEditSuccess('');
       }, 1500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update profile:', err);
-      const errMsg = err.response?.data?.message || 'Cập nhật tài khoản thất bại!';
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      const errMsg = axiosError.response?.data?.message || 'Cập nhật tài khoản thất bại!';
       setEditError(Array.isArray(errMsg) ? errMsg[0] : errMsg);
     } finally {
       setEditLoading(false);
@@ -357,6 +430,21 @@ function DashboardPage() {
               <span className="material-symbols-outlined">psychology</span> AI Assistant
             </a>
           </li>
+          {user?.role === 'ADMIN' && (
+            <li>
+              <a
+                className="font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 font-bold text-red-600 transition-transform hover:bg-rose-50 active:scale-95"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/admin');
+                }}
+              >
+                <span className="material-symbols-outlined text-red-600">admin_panel_settings</span>{' '}
+                Admin Panel
+              </a>
+            </li>
+          )}
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
@@ -1287,17 +1375,19 @@ function DashboardSkeleton() {
 
 export default function HomePage() {
   const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem('token');
+    }
+    return null;
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       router.replace('/login');
-      setIsLoggedIn(false);
-    } else {
-      setIsLoggedIn(true);
     }
-  }, [router]);
+  }, [isLoggedIn, router]);
 
   if (isLoggedIn === null || isLoggedIn === false) {
     return <DashboardSkeleton />;

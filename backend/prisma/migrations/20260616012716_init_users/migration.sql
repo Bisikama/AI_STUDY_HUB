@@ -1,54 +1,14 @@
-/*
-  Warnings:
-
-  - You are about to drop the `Course` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `Document` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `Quiz` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `Summary` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `User` table. If the table is not empty, all the data it contains will be lost.
-
-*/
 -- CreateEnum
-CREATE TYPE "UserRole" AS ENUM ('STUDENT', 'TEACHER', 'ADMIN');
+CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
 
 -- CreateEnum
-CREATE TYPE "DocumentStatus" AS ENUM ('PROCESSING', 'AVAILABLE', 'FAILED', 'DELETED');
+CREATE TYPE "DocumentStatus" AS ENUM ('PRIVATE', 'PENDING', 'APPROVED');
 
 -- CreateEnum
 CREATE TYPE "UploadProgressStatus" AS ENUM ('UPLOADING', 'COMPLETED', 'FAILED');
 
 -- CreateEnum
 CREATE TYPE "SummaryStatus" AS ENUM ('PROCESSING', 'COMPLETED', 'FAILED');
-
--- DropForeignKey
-ALTER TABLE "Document" DROP CONSTRAINT "Document_courseId_fkey";
-
--- DropForeignKey
-ALTER TABLE "Document" DROP CONSTRAINT "Document_userId_fkey";
-
--- DropForeignKey
-ALTER TABLE "Quiz" DROP CONSTRAINT "Quiz_documentId_fkey";
-
--- DropForeignKey
-ALTER TABLE "Summary" DROP CONSTRAINT "Summary_documentId_fkey";
-
--- DropTable
-DROP TABLE "Course";
-
--- DropTable
-DROP TABLE "Document";
-
--- DropTable
-DROP TABLE "Quiz";
-
--- DropTable
-DROP TABLE "Summary";
-
--- DropTable
-DROP TABLE "User";
-
--- DropEnum
-DROP TYPE "Role";
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -57,7 +17,7 @@ CREATE TABLE "users" (
     "password_hash" TEXT NOT NULL,
     "full_name" TEXT NOT NULL,
     "avatar_url" TEXT,
-    "role" "UserRole" NOT NULL DEFAULT 'STUDENT',
+    "role" "Role" NOT NULL DEFAULT 'USER',
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -101,7 +61,7 @@ CREATE TABLE "documents" (
     "file_type" TEXT NOT NULL,
     "download_count" INTEGER NOT NULL DEFAULT 0,
     "view_count" INTEGER NOT NULL DEFAULT 0,
-    "status" "DocumentStatus" NOT NULL DEFAULT 'PROCESSING',
+    "status" "DocumentStatus" NOT NULL DEFAULT 'PRIVATE',
     "full_text" TEXT,
     "is_ai_generated" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -1,106 +1,66 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '../../../hooks/useAuth';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import Script from 'next/script';
+import { authApi } from '@/services/authApi';
 
-interface CustomWindow extends Window {
-  google?: {
-    accounts: {
-      id: {
-        initialize: (config: {
-          client_id: string;
-          callback: (response: { credential: string }) => void;
-        }) => void;
-        renderButton: (
-          element: HTMLElement | null,
-          options: { theme: string; size: string; width: number },
-        ) => void;
-      };
-    };
-  };
-}
-
-// 1. SCHEMA ZOD (Bắt lỗi khi bấm Submit)
-const registerSchema = z
+const resetPasswordSchema = z
   .object({
-    name: z.string().min(1, 'Vui lòng nhập họ tên'),
     email: z.string().min(1, 'Email không được để trống').email('Email không đúng định dạng'),
-    password: z.string().min(6, 'Mật khẩu phải từ 6 ký tự trở lên'),
-    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
+    otp: z.string().length(6, 'Mã OTP phải có đúng 6 chữ số'),
+    password: z.string().min(6, 'Mật khẩu mới phải từ 6 ký tự trở lên'),
+    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu mới'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Mật khẩu xác nhận không khớp!',
     path: ['confirmPassword'],
   });
 
-type RegisterFormValues = z.infer<typeof registerSchema>;
+type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
-export default function RegisterPage() {
+function ResetPasswordForm() {
   const router = useRouter();
-  const { register: registerUser, isLoading, error: apiError, loginWithGoogle } = useAuth();
-  const [showPassword] = useState(false);
+  const searchParams = useSearchParams();
+  const emailParam = searchParams.get('email') || '';
 
-  const handleGoogleResponse = async (response: { credential: string }) => {
-    try {
-      await loginWithGoogle(response.credential);
-      router.push('/dashboard');
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Google login failed', err);
-    }
-  };
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleGoogleScriptLoad = () => {
-    const google = (window as unknown as CustomWindow).google;
-    if (google) {
-      google.accounts.id.initialize({
-        client_id:
-          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-          '1047712398436-yourclientidplaceholder.apps.googleusercontent.com',
-        callback: handleGoogleResponse,
-      });
-      google.accounts.id.renderButton(document.getElementById('google-signin-btn'), {
-        theme: 'outline',
-        size: 'large',
-        width: 340,
-      });
-    }
-  };
-
-  useEffect(() => {
-    if ((window as unknown as CustomWindow).google) {
-      handleGoogleScriptLoad();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 2. KHỞI TẠO REACT-HOOK-FORM
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
+  } = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      email: emailParam,
+      otp: '',
+      password: '',
+      confirmPassword: '',
+    },
   });
 
-  // 3. HÀM SUBMIT
-  const onSubmit = async (data: RegisterFormValues) => {
+  const onSubmit = async (data: ResetPasswordFormValues) => {
+    setIsLoading(true);
+    setApiError(null);
     try {
-      await registerUser({
-        name: data.name,
+      await authApi.resetPassword({
         email: data.email,
+        otp: data.otp,
         password: data.password,
       });
-      alert('Đăng ký thành công! Hãy đăng nhập.');
+      alert('Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.');
       router.push('/login');
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(err);
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      const errorMsg = axiosError.response?.data?.message || 'Đã có lỗi xảy ra!';
+      setApiError(errorMsg);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -109,6 +69,7 @@ export default function RegisterPage() {
       {/* ================= CỘT TRÁI: FORM ================= */}
       <div className="flex w-full flex-col justify-center px-6 sm:px-12 lg:w-1/2">
         <div className="mx-auto w-full max-w-[340px]">
+          {/* Logo */}
           <div className="mb-10 flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded bg-[#0F172A] text-white">
               <svg
@@ -125,15 +86,17 @@ export default function RegisterPage() {
             <span className="text-lg font-bold tracking-tight text-gray-950">ScholarHub</span>
           </div>
 
+          {/* Tiêu đề */}
           <div className="mb-8">
             <h1 className="mb-1.5 text-2xl font-bold tracking-tight text-gray-950">
-              Join ScholarHub
+              Reset Password
             </h1>
             <p className="text-[13px] leading-relaxed text-gray-500">
-              Start your academic journey and manage research like a pro.
+              Enter the 6-digit OTP code sent to your email and set your new password.
             </p>
           </div>
 
+          {/* Lỗi API */}
           {apiError && (
             <div className="mb-5 flex items-center gap-2 rounded-md border border-red-100 bg-red-50 p-3 text-[12px] font-medium text-red-600">
               <svg
@@ -153,34 +116,6 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Input Full Name */}
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-semibold text-gray-700">Full Name</label>
-              <div className="relative flex items-center">
-                <div className="absolute left-3 text-gray-400">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  >
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                </div>
-                <input
-                  {...register('name')}
-                  className={`w-full rounded-lg border bg-[#F5F6F8] py-2.5 pr-3 pl-9 text-[13px] text-gray-900 placeholder-gray-400 transition-all outline-none focus:bg-white ${errors.name ? 'border-red-400 focus:border-red-400' : 'border-transparent focus:border-gray-200'}`}
-                  placeholder="Full Name"
-                />
-              </div>
-              {errors.name && (
-                <p className="pl-1 text-[10px] text-red-500">{errors.name.message}</p>
-              )}
-            </div>
-
             {/* Input Email */}
             <div className="space-y-1.5">
               <label className="text-[12px] font-semibold text-gray-700">Email Address</label>
@@ -201,7 +136,7 @@ export default function RegisterPage() {
                 <input
                   {...register('email')}
                   className={`w-full rounded-lg border bg-[#F5F6F8] py-2.5 pr-3 pl-9 text-[13px] text-gray-900 placeholder-gray-400 transition-all outline-none focus:bg-white ${errors.email ? 'border-red-400 focus:border-red-400' : 'border-transparent focus:border-gray-200'}`}
-                  placeholder="Email Address"
+                  placeholder="name@university.edu"
                 />
               </div>
               {errors.email && (
@@ -209,9 +144,36 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Input Password */}
+            {/* Input OTP */}
             <div className="space-y-1.5">
-              <label className="text-[12px] font-semibold text-gray-700">Password</label>
+              <label className="text-[12px] font-semibold text-gray-700">OTP Code (6 digits)</label>
+              <div className="relative flex items-center">
+                <div className="absolute left-3 text-gray-400">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <input
+                  {...register('otp')}
+                  maxLength={6}
+                  className={`w-full rounded-lg border bg-[#F5F6F8] py-2.5 pr-3 pl-9 text-[13px] text-gray-900 placeholder-gray-400 transition-all outline-none focus:bg-white ${errors.otp ? 'border-red-400 focus:border-red-400' : 'border-transparent focus:border-gray-200'}`}
+                  placeholder="123456"
+                />
+              </div>
+              {errors.otp && <p className="pl-1 text-[10px] text-red-500">{errors.otp.message}</p>}
+            </div>
+
+            {/* Input New Password */}
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-semibold text-gray-700">New Password</label>
               <div className="relative flex items-center">
                 <div className="absolute left-3 text-gray-400">
                   <svg
@@ -229,18 +191,47 @@ export default function RegisterPage() {
                 <input
                   {...register('password')}
                   type={showPassword ? 'text' : 'password'}
-                  className={`w-full rounded-lg border bg-[#F5F6F8] py-2.5 pr-9 pl-9 text-[13px] text-gray-900 transition-all outline-none focus:bg-white ${errors.password ? 'border-red-400 focus:border-red-400' : 'border-transparent focus:border-gray-200'}`}
+                  className={`w-full rounded-lg border bg-[#F5F6F8] py-2.5 pr-9 pl-9 text-[13px] text-gray-900 placeholder-gray-400 transition-all outline-none focus:bg-white ${errors.password ? 'border-red-400 focus:border-red-400' : 'border-transparent focus:border-gray-200'}`}
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 text-gray-400 hover:text-gray-600"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    {showPassword ? (
+                      <>
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="m3 3 18 18" />
+                      </>
+                    ) : (
+                      <>
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </>
+                    )}
+                  </svg>
+                </button>
               </div>
               {errors.password && (
                 <p className="pl-1 text-[10px] text-red-500">{errors.password.message}</p>
               )}
             </div>
 
-            {/* Confirm Password */}
+            {/* Confirm New Password */}
             <div className="space-y-1.5">
-              <label className="text-[12px] font-semibold text-gray-700">Confirm Password</label>
+              <label className="text-[12px] font-semibold text-gray-700">
+                Confirm New Password
+              </label>
               <div className="relative flex items-center">
                 <div className="absolute left-3 text-gray-400">
                   <svg
@@ -258,7 +249,7 @@ export default function RegisterPage() {
                 <input
                   {...register('confirmPassword')}
                   type={showPassword ? 'text' : 'password'}
-                  className={`w-full rounded-lg border bg-[#F5F6F8] py-2.5 pr-3 pl-9 text-[13px] text-gray-900 transition-all outline-none focus:bg-white ${errors.confirmPassword ? 'border-red-400 focus:border-red-400' : 'border-transparent focus:border-gray-200'}`}
+                  className={`w-full rounded-lg border bg-[#F5F6F8] py-2.5 pr-3 pl-9 text-[13px] text-gray-900 placeholder-gray-400 transition-all outline-none focus:bg-white ${errors.confirmPassword ? 'border-red-400 focus:border-red-400' : 'border-transparent focus:border-gray-200'}`}
                   placeholder="••••••••"
                 />
               </div>
@@ -267,37 +258,18 @@ export default function RegisterPage() {
               )}
             </div>
 
+            {/* Nút Submit */}
             <button
               disabled={isLoading}
               type="submit"
               className="mt-6 w-full rounded-lg bg-[#111827] py-2.5 text-[13px] font-medium text-white transition-all hover:bg-black disabled:opacity-40"
             >
-              {isLoading ? 'Creating Account...' : 'Create Account'}
+              {isLoading ? 'Resetting...' : 'Reset Password'}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="my-6 flex items-center justify-center gap-3">
-            <div className="h-px flex-1 bg-gray-100"></div>
-            <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
-              OR
-            </span>
-            <div className="h-px flex-1 bg-gray-100"></div>
-          </div>
-
-          {/* Google Login Button */}
-          <div className="mt-4 flex flex-col items-center justify-center">
-            <div id="google-signin-btn" className="w-full max-w-[340px]"></div>
-          </div>
-
-          <Script
-            src="https://accounts.google.com/gsi/client"
-            onLoad={handleGoogleScriptLoad}
-            strategy="afterInteractive"
-          />
-
-          <p className="mt-6 text-center text-[12px] text-gray-500">
-            Already have an account?{' '}
+          <p className="mt-8 text-center text-[12px] text-gray-500">
+            Remembered your password?{' '}
             <a href="/login" className="font-semibold text-gray-900 hover:underline">
               Login here
             </a>
@@ -337,10 +309,26 @@ export default function RegisterPage() {
             </svg>
           </div>
           <p className="text-[9px] font-bold tracking-[0.2em] text-gray-400 uppercase">
-            Join the Research Community
+            Recover Access to ScholarHub
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-white">
+          <span className="material-symbols-outlined animate-spin text-3xl text-gray-500">
+            sync
+          </span>
+        </div>
+      }
+    >
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

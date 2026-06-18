@@ -88,52 +88,55 @@ const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
 
 function PracticeSkeleton() {
   return (
-    <div className="bg-background text-on-background min-h-screen flex font-sans animate-pulse w-full">
+    <div className="bg-background text-on-background flex min-h-screen w-full animate-pulse font-sans">
       {/* Sidebar Skeleton */}
-      <div className="hidden md:flex flex-col p-4 border-r border-outline-variant bg-surface-container-lowest w-64 h-screen">
-        <div className="h-8 bg-surface-container-high rounded mb-8 w-3/4"></div>
-        <div className="h-10 bg-surface-container-high rounded mb-6"></div>
+      <div className="border-outline-variant bg-surface-container-lowest hidden h-screen w-64 flex-col border-r p-4 md:flex">
+        <div className="bg-surface-container-high mb-8 h-8 w-3/4 rounded"></div>
+        <div className="bg-surface-container-high mb-6 h-10 rounded"></div>
         <div className="space-y-4">
-          <div className="h-6 bg-surface-container-low rounded w-1/2"></div>
-          <div className="h-6 bg-surface-container-low rounded w-2/3"></div>
-          <div className="h-6 bg-surface-container-low rounded w-1/3"></div>
+          <div className="bg-surface-container-low h-6 w-1/2 rounded"></div>
+          <div className="bg-surface-container-low h-6 w-2/3 rounded"></div>
+          <div className="bg-surface-container-low h-6 w-1/3 rounded"></div>
         </div>
       </div>
 
       {/* Content Skeleton */}
-      <div className="flex-grow flex flex-col h-screen">
+      <div className="flex h-screen flex-grow flex-col">
         {/* Header Skeleton */}
-        <div className="h-16 bg-surface-container-lowest border-b border-outline-variant px-6 flex items-center justify-between">
-          <div className="h-8 bg-surface-container-high rounded w-96 animate-pulse"></div>
-          <div className="h-8 bg-surface-container-high rounded-full w-8 animate-pulse"></div>
+        <div className="bg-surface-container-lowest border-outline-variant flex h-16 items-center justify-between border-b px-6">
+          <div className="bg-surface-container-high h-8 w-96 animate-pulse rounded"></div>
+          <div className="bg-surface-container-high h-8 w-8 animate-pulse rounded-full"></div>
         </div>
-        
+
         {/* Body Skeleton */}
-        <div className="flex-1 p-6 md:p-8 space-y-8 overflow-y-auto">
+        <div className="flex-1 space-y-8 overflow-y-auto p-6 md:p-8">
           {/* Header Title Skeleton */}
           <div className="space-y-2">
-            <div className="h-10 bg-surface-container-high rounded w-1/2 animate-pulse"></div>
-            <div className="h-6 bg-surface-container-low rounded w-3/4 animate-pulse"></div>
+            <div className="bg-surface-container-high h-10 w-1/2 animate-pulse rounded"></div>
+            <div className="bg-surface-container-low h-6 w-3/4 animate-pulse rounded"></div>
           </div>
-          
+
           {/* Documents Grid Skeleton */}
           <div className="space-y-4">
-            <div className="h-8 bg-surface-container-high rounded w-1/4 animate-pulse"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-surface-container-high h-8 w-1/4 animate-pulse rounded"></div>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-40 bg-surface-container-lowest border border-outline-variant rounded-xl p-6 space-y-4 animate-pulse">
-                  <div className="h-6 bg-surface-container-high rounded w-1/3"></div>
-                  <div className="h-8 bg-surface-container-low rounded w-3/4"></div>
-                  <div className="h-6 bg-surface-container-high rounded w-1/2"></div>
+                <div
+                  key={i}
+                  className="bg-surface-container-lowest border-outline-variant h-40 animate-pulse space-y-4 rounded-xl border p-6"
+                >
+                  <div className="bg-surface-container-high h-6 w-1/3 rounded"></div>
+                  <div className="bg-surface-container-low h-8 w-3/4 rounded"></div>
+                  <div className="bg-surface-container-high h-6 w-1/2 rounded"></div>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Bento Stats Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
-            <div className="h-32 bg-surface-container-low rounded-xl col-span-2"></div>
-            <div className="h-32 bg-surface-container-low rounded-xl"></div>
+          <div className="grid animate-pulse grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="bg-surface-container-low col-span-2 h-32 rounded-xl"></div>
+            <div className="bg-surface-container-low h-32 rounded-xl"></div>
           </div>
         </div>
       </div>
@@ -143,26 +146,26 @@ function PracticeSkeleton() {
 
 function FlashcardSkeleton() {
   return (
-    <div className="flex flex-col items-center w-full max-w-[700px] animate-pulse mx-auto">
+    <div className="mx-auto flex w-full max-w-[700px] animate-pulse flex-col items-center">
       {/* Flashcard Box Skeleton */}
-      <div className="w-full h-[480px] bg-surface-container-lowest border border-outline-variant rounded-xl p-8 flex flex-col items-center justify-between">
-        <div className="h-6 bg-surface-container-high rounded w-1/4 self-start"></div>
-        <div className="h-8 bg-surface-container-low rounded w-3/4 my-auto"></div>
-        <div className="w-full max-w-md space-y-2.5 my-auto">
-          <div className="h-8 bg-surface-container-low rounded w-full"></div>
-          <div className="h-8 bg-surface-container-low rounded w-full"></div>
-          <div className="h-8 bg-surface-container-low rounded w-full"></div>
+      <div className="bg-surface-container-lowest border-outline-variant flex h-[480px] w-full flex-col items-center justify-between rounded-xl border p-8">
+        <div className="bg-surface-container-high h-6 w-1/4 self-start rounded"></div>
+        <div className="bg-surface-container-low my-auto h-8 w-3/4 rounded"></div>
+        <div className="my-auto w-full max-w-md space-y-2.5">
+          <div className="bg-surface-container-low h-8 w-full rounded"></div>
+          <div className="bg-surface-container-low h-8 w-full rounded"></div>
+          <div className="bg-surface-container-low h-8 w-full rounded"></div>
         </div>
-        <div className="h-6 bg-surface-container-high rounded w-1/2"></div>
+        <div className="bg-surface-container-high h-6 w-1/2 rounded"></div>
       </div>
       {/* Nav Controls Skeleton */}
-      <div className="mt-6 flex flex-col items-center gap-4 w-full">
-        <div className="flex items-center justify-between w-full">
-          <div className="h-10 w-10 bg-surface-container-high rounded-full"></div>
-          <div className="h-6 bg-surface-container-high rounded w-20"></div>
-          <div className="h-10 w-10 bg-surface-container-high rounded-full"></div>
+      <div className="mt-6 flex w-full flex-col items-center gap-4">
+        <div className="flex w-full items-center justify-between">
+          <div className="bg-surface-container-high h-10 w-10 rounded-full"></div>
+          <div className="bg-surface-container-high h-6 w-20 rounded"></div>
+          <div className="bg-surface-container-high h-10 w-10 rounded-full"></div>
         </div>
-        <div className="h-12 bg-surface-container-high rounded-lg w-full"></div>
+        <div className="bg-surface-container-high h-12 w-full rounded-lg"></div>
       </div>
     </div>
   );
@@ -195,12 +198,13 @@ export default function PracticePage() {
     mutate: reloadAiCache,
   } = useSWR(
     selectedDocId ? `${API_BASE_URL}/api/explore/${selectedDocId}/ai-cache` : null,
-    aiCacheFetcher
+    aiCacheFetcher,
   );
 
   // Đồng bộ param URL
   useEffect(() => {
     if (docParam) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedDocId(docParam);
     }
   }, [docParam]);
@@ -212,6 +216,16 @@ export default function PracticePage() {
     }
     return [];
   }, [aiCache]);
+
+  const handlePrevCard = () => {
+    setIsFlipped(false);
+    setCurrentCardIndex((prev) => (prev > 0 ? prev - 1 : questions.length - 1));
+  };
+
+  const handleNextCard = () => {
+    setIsFlipped(false);
+    setCurrentCardIndex((prev) => (prev < questions.length - 1 ? prev + 1 : 0));
+  };
 
   // Điều hướng bàn phím để lật thẻ
   useEffect(() => {
@@ -231,16 +245,6 @@ export default function PracticePage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [questions, currentCardIndex]);
-
-  const handlePrevCard = () => {
-    setIsFlipped(false);
-    setCurrentCardIndex((prev) => (prev > 0 ? prev - 1 : questions.length - 1));
-  };
-
-  const handleNextCard = () => {
-    setIsFlipped(false);
-    setCurrentCardIndex((prev) => (prev < questions.length - 1 ? prev + 1 : 0));
-  };
 
   // Gọi API kích hoạt AI tạo summary và quiz
   const handleGenerateQuiz = async () => {
@@ -272,10 +276,11 @@ export default function PracticePage() {
 
   // Lọc tài liệu theo tìm kiếm
   const filteredDocuments = useMemo(() => {
-    return documents.filter((doc) =>
-      doc.title.toLowerCase().includes(search.toLowerCase()) ||
-      doc.subject?.name.toLowerCase().includes(search.toLowerCase()) ||
-      doc.subject?.code.toLowerCase().includes(search.toLowerCase())
+    return documents.filter(
+      (doc) =>
+        doc.title.toLowerCase().includes(search.toLowerCase()) ||
+        doc.subject?.name.toLowerCase().includes(search.toLowerCase()) ||
+        doc.subject?.code.toLowerCase().includes(search.toLowerCase()),
     );
   }, [documents, search]);
 
@@ -291,24 +296,26 @@ export default function PracticePage() {
   }
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex font-sans">
+    <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
         className={`${
           mobileMenuOpen ? 'flex' : 'hidden'
-        } md:flex fixed left-0 top-0 h-full flex-col p-4 border-r border-outline-variant bg-surface-container-lowest shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-64 z-20 transition-all`}
+        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
-        <div className="flex items-center justify-between mb-8 px-4">
+        <div className="mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
-              <h1 className="font-headline-md text-headline-md text-primary font-bold">ScholarHub</h1>
+              <h1 className="font-headline-md text-headline-md text-primary font-bold">
+                ScholarHub
+              </h1>
               <p className="font-label-sm text-label-sm text-secondary">Academic Excellence</p>
             </div>
           </div>
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden text-secondary p-1 hover:text-primary"
+            className="text-secondary hover:text-primary p-1 md:hidden"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
@@ -317,16 +324,16 @@ export default function PracticePage() {
         <div className="mb-6 px-4">
           <button
             onClick={() => router.push('/explore')}
-            className="w-full bg-primary-container text-on-primary py-3 px-4 rounded-lg font-label-md text-label-md flex justify-center items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer font-semibold"
+            className="bg-primary-container text-on-primary font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold transition-opacity hover:opacity-90"
           >
             <span className="material-symbols-outlined">add</span> New Research
           </button>
         </div>
 
-        <ul className="flex flex-col gap-2 flex-grow">
+        <ul className="flex flex-grow flex-col gap-2">
           <li>
             <button
-              className="w-full flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform text-left cursor-pointer"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
               onClick={() => router.push('/dashboard')}
             >
               <span className="material-symbols-outlined">explore</span> Discover
@@ -334,7 +341,7 @@ export default function PracticePage() {
           </li>
           <li>
             <button
-              className="w-full flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform text-left cursor-pointer"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
               onClick={() => router.push('/dashboard')}
             >
               <span className="material-symbols-outlined">description</span> My Documents
@@ -342,7 +349,7 @@ export default function PracticePage() {
           </li>
           <li>
             <button
-              className="w-full flex items-center gap-3 text-primary bg-secondary-container text-on-secondary-container px-4 py-3 rounded-lg font-label-md text-label-md active:scale-95 transition-transform text-left font-semibold"
+              className="text-primary bg-secondary-container text-on-secondary-container font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold transition-transform active:scale-95"
               onClick={() => {
                 setSelectedDocId(null);
                 router.push('/practice');
@@ -353,7 +360,7 @@ export default function PracticePage() {
           </li>
           <li>
             <button
-              className="w-full flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform text-left cursor-pointer"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
               onClick={() => alert('AI Assistant clicked (Simulated)')}
             >
               <span className="material-symbols-outlined">psychology</span> AI Assistant
@@ -361,10 +368,10 @@ export default function PracticePage() {
           </li>
         </ul>
 
-        <ul className="flex flex-col gap-2 mt-auto border-t border-outline-variant pt-4">
+        <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
           <li>
             <button
-              className="w-full flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform text-left cursor-pointer"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
               onClick={() => alert('Settings clicked (Simulated)')}
             >
               <span className="material-symbols-outlined">settings</span> Settings
@@ -372,7 +379,7 @@ export default function PracticePage() {
           </li>
           <li>
             <button
-              className="w-full flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform text-left cursor-pointer"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
               onClick={() => alert('Help clicked (Simulated)')}
             >
               <span className="material-symbols-outlined">help</span> Help
@@ -380,7 +387,7 @@ export default function PracticePage() {
           </li>
           <li>
             <button
-              className="w-full flex items-center gap-3 text-error hover:bg-red-50 hover:text-rose-700 px-4 py-3 rounded-lg font-label-md text-label-md active:scale-95 transition-transform text-left cursor-pointer font-semibold"
+              className="text-error font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
               onClick={() => {
                 localStorage.removeItem('token');
                 router.replace('/');
@@ -393,20 +400,22 @@ export default function PracticePage() {
       </nav>
 
       {/* Main Content Area */}
-      <div className="flex-grow md:ml-64 flex flex-col min-h-screen">
+      <div className="flex min-h-screen flex-grow flex-col md:ml-64">
         {/* Top Header */}
-        <header className="flex justify-between items-center w-full px-6 h-16 bg-surface-container-lowest shadow-sm border-b border-outline-variant">
-          <div className="flex items-center gap-4 flex-grow max-w-xl">
+        <header className="bg-surface-container-lowest border-outline-variant flex h-16 w-full items-center justify-between border-b px-6 shadow-sm">
+          <div className="flex max-w-xl flex-grow items-center gap-4">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden text-secondary p-1 hover:text-primary"
+              className="text-secondary hover:text-primary p-1 md:hidden"
             >
               <span className="material-symbols-outlined">menu</span>
             </button>
             <div className="relative w-full">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+              <span className="material-symbols-outlined text-on-surface-variant absolute top-1/2 left-3 -translate-y-1/2">
+                search
+              </span>
               <input
-                className="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 focus:ring-1 focus:ring-primary text-body-md"
+                className="bg-surface-container-low focus:ring-primary text-body-md w-full rounded-lg border-none py-2 pr-4 pl-10 focus:ring-1"
                 placeholder="Tìm kiếm tài liệu học tập..."
                 type="text"
                 value={search}
@@ -415,11 +424,13 @@ export default function PracticePage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="material-symbols-outlined cursor-pointer hover:bg-surface-container rounded-full p-2 transition-colors">notifications</span>
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-outline bg-surface-variant">
+            <span className="material-symbols-outlined hover:bg-surface-container cursor-pointer rounded-full p-2 transition-colors">
+              notifications
+            </span>
+            <div className="border-outline bg-surface-variant h-8 w-8 overflow-hidden rounded-full border">
               <img
                 alt="User profile"
-                className="w-full h-full object-cover"
+                className="h-full w-full object-cover"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmRIQIc6LO9lV5rVtojZ7Vh-4aAm0za_O0i5ayKA2xj5hmmtTyNfQvFCZNPhEfrXG_1djLfBLkYl-oRMknt4VMjwDxAHTLWyqk3U8mvXoulTPKmZi_lPoDe5yP9DJa1_HnZhUWZF8pI3XxjStB2JqRcoeuyOfo7DSOd9-q8HaWShAn_Rqgu1w26jKT2gX7DqpcPd3kC4Uam3KP7ywqZsOefPY_o9YIMdPmCJHLvDhiQBVe4ou63D8uVWKJY3uShYdVn9kYtYeSsJg"
               />
             </div>
@@ -427,43 +438,47 @@ export default function PracticePage() {
         </header>
 
         {/* Content Body */}
-        <main className="flex-grow p-6 md:p-8 max-w-5xl w-full mx-auto">
+        <main className="mx-auto w-full max-w-5xl flex-grow p-6 md:p-8">
           {!selectedDocId ? (
             /* =======================================================
                DS TÀI LIỆU CẦN ÔN TẬP
                ======================================================= */
             <>
-
               <section className="mb-10">
-                <h3 className="text-lg font-bold text-primary mb-4">Tài liệu của bạn</h3>
+                <h3 className="text-primary mb-4 text-lg font-bold">Tài liệu của bạn</h3>
                 {filteredDocuments.length === 0 ? (
-                  <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 text-center">
-                    <span className="material-symbols-outlined text-4xl text-secondary mb-2">library_books</span>
+                  <div className="bg-surface-container-lowest border-outline-variant rounded-xl border p-8 text-center">
+                    <span className="material-symbols-outlined text-secondary mb-2 text-4xl">
+                      library_books
+                    </span>
                     <p className="text-secondary font-body-md">Không tìm thấy tài liệu phù hợp.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     {filteredDocuments.map((doc) => (
                       <div
                         key={doc.id}
                         onClick={() => setSelectedDocId(doc.id)}
-                        className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-[0px_4px_12px_rgba(0,0,0,0.02)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] transition-all cursor-pointer flex flex-col gap-4 group"
+                        className="bg-surface-container-lowest border-outline-variant group flex cursor-pointer flex-col gap-4 rounded-xl border p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.02)] transition-all hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)]"
                       >
-                        <div className="flex justify-between items-start">
-                          <span className="px-2.5 py-1 bg-secondary-container text-on-secondary-container text-xs font-semibold rounded">
-                            {doc.subject?.code || 'Chung'} - {doc.subject?.name || 'Tài liệu học tập'}
+                        <div className="flex items-start justify-between">
+                          <span className="bg-secondary-container text-on-secondary-container rounded px-2.5 py-1 text-xs font-semibold">
+                            {doc.subject?.code || 'Chung'} -{' '}
+                            {doc.subject?.name || 'Tài liệu học tập'}
                           </span>
-                          <span className="material-symbols-outlined text-secondary opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+                          <span className="material-symbols-outlined text-secondary opacity-0 transition-opacity group-hover:opacity-100">
+                            arrow_forward
+                          </span>
                         </div>
-                        <h4 className="text-base font-bold text-primary group-hover:text-black transition-colors line-clamp-2">
+                        <h4 className="text-primary line-clamp-2 text-base font-bold transition-colors group-hover:text-black">
                           {doc.title}
                         </h4>
-                        <div className="flex items-center gap-4 text-xs text-on-surface-variant mt-auto pt-2 border-t border-outline-variant/30">
+                        <div className="text-on-surface-variant border-outline-variant/30 mt-auto flex items-center gap-4 border-t pt-2 text-xs">
                           <span className="flex items-center gap-1">
                             <span className="material-symbols-outlined text-sm">quiz</span>
                             {doc.quizCount > 0 ? `${doc.quizCount} câu hỏi` : 'Chưa có câu hỏi'}
                           </span>
-                          <span className="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+                          <span className="bg-outline-variant h-1.5 w-1.5 rounded-full"></span>
                           <span className="flex items-center gap-1">
                             <span className="material-symbols-outlined text-sm">assignment</span>
                             {doc.hasSummary ? 'Đã tóm tắt' : 'Chưa tóm tắt'}
@@ -476,20 +491,30 @@ export default function PracticePage() {
               </section>
 
               {/* Bento Row giống giao diện mẫu */}
-              <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                <div className="col-span-1 md:col-span-2 bg-primary text-on-primary p-6 rounded-xl flex items-center justify-between">
+              <section className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
+                <div className="bg-primary text-on-primary col-span-1 flex items-center justify-between rounded-xl p-6 md:col-span-2">
                   <div>
-                    <h5 className="font-headline-md text-lg font-bold mb-1">Chuỗi ôn tập: 12 ngày</h5>
-                    <p className="font-body-md text-sm opacity-80">Bạn đang nằm trong top 5% học viên tích cực tuần này. Hãy tiếp tục nhé!</p>
+                    <h5 className="font-headline-md mb-1 text-lg font-bold">
+                      Chuỗi ôn tập: 12 ngày
+                    </h5>
+                    <p className="font-body-md text-sm opacity-80">
+                      Bạn đang nằm trong top 5% học viên tích cực tuần này. Hãy tiếp tục nhé!
+                    </p>
                   </div>
-                  <div className="hidden sm:flex items-center justify-center w-16 h-16 rounded-full border-4 border-on-primary/20 bg-on-primary/10">
-                    <span className="material-symbols-outlined text-3xl filled text-on-primary">local_fire_department</span>
+                  <div className="border-on-primary/20 bg-on-primary/10 hidden h-16 w-16 items-center justify-center rounded-full border-4 sm:flex">
+                    <span className="material-symbols-outlined filled text-on-primary text-3xl">
+                      local_fire_department
+                    </span>
                   </div>
                 </div>
-                <div className="bg-surface-container-highest p-6 rounded-xl border border-outline-variant flex flex-col justify-between">
-                  <h5 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Thời gian học hôm nay</h5>
-                  <span className="text-3xl font-bold text-primary">42 phút</span>
-                  <p className="text-xs text-on-surface-variant">Còn 18 phút nữa để đạt mục tiêu ngày</p>
+                <div className="bg-surface-container-highest border-outline-variant flex flex-col justify-between rounded-xl border p-6">
+                  <h5 className="text-on-surface-variant text-xs font-semibold tracking-wider uppercase">
+                    Thời gian học hôm nay
+                  </h5>
+                  <span className="text-primary text-3xl font-bold">42 phút</span>
+                  <p className="text-on-surface-variant text-xs">
+                    Còn 18 phút nữa để đạt mục tiêu ngày
+                  </p>
                 </div>
               </section>
             </>
@@ -504,7 +529,7 @@ export default function PracticePage() {
                   setSelectedDocId(null);
                   router.push('/practice');
                 }}
-                className="flex items-center gap-1.5 text-secondary hover:text-primary mb-6 text-sm font-semibold transition-colors cursor-pointer"
+                className="text-secondary hover:text-primary mb-6 flex cursor-pointer items-center gap-1.5 text-sm font-semibold transition-colors"
               >
                 <span className="material-symbols-outlined text-lg">arrow_back</span>
                 Quay lại danh sách tài liệu
@@ -512,16 +537,17 @@ export default function PracticePage() {
 
               {/* Header Info */}
               <div className="mb-6">
-                <span className="px-2.5 py-1 bg-secondary-container text-on-secondary-container text-xs font-semibold rounded mb-2 inline-block">
-                  {currentDoc?.subject?.code || 'Chung'} - {currentDoc?.subject?.name || 'Tài liệu học tập'}
+                <span className="bg-secondary-container text-on-secondary-container mb-2 inline-block rounded px-2.5 py-1 text-xs font-semibold">
+                  {currentDoc?.subject?.code || 'Chung'} -{' '}
+                  {currentDoc?.subject?.name || 'Tài liệu học tập'}
                 </span>
-                <h1 className="text-xl md:text-2xl font-bold text-primary leading-tight">
+                <h1 className="text-primary text-xl leading-tight font-bold md:text-2xl">
                   {currentDoc?.title || 'Đang tải tài liệu...'}
                 </h1>
               </div>
 
               {cacheError && (
-                <div className="bg-error-container text-on-error-container p-4 rounded-xl border border-error/20 mb-6 text-sm">
+                <div className="bg-error-container text-on-error-container border-error/20 mb-6 rounded-xl border p-4 text-sm">
                   Không thể tải nội dung câu hỏi. Vui lòng kiểm tra lại.
                 </div>
               )}
@@ -532,21 +558,24 @@ export default function PracticePage() {
                 <FlashcardSkeleton />
               ) : questions.length === 0 ? (
                 /* Tài liệu chưa phân tích AI (Chưa có quiz) */
-                <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 text-center flex flex-col items-center gap-4">
-                  <span className="material-symbols-outlined text-5xl text-secondary">psychology</span>
-                  <h3 className="text-lg font-bold text-primary">Chưa có câu hỏi ôn tập</h3>
-                  <p className="text-on-surface-variant text-sm max-w-md">
-                    Tài liệu này chưa được phân tích nội dung để tạo câu hỏi trắc nghiệm & thẻ ghi nhớ. Bạn có muốn kích hoạt AI xử lý ngay không? (Mất khoảng 15-30 giây)
+                <div className="bg-surface-container-lowest border-outline-variant flex flex-col items-center gap-4 rounded-xl border p-8 text-center">
+                  <span className="material-symbols-outlined text-secondary text-5xl">
+                    psychology
+                  </span>
+                  <h3 className="text-primary text-lg font-bold">Chưa có câu hỏi ôn tập</h3>
+                  <p className="text-on-surface-variant max-w-md text-sm">
+                    Tài liệu này chưa được phân tích nội dung để tạo câu hỏi trắc nghiệm & thẻ ghi
+                    nhớ. Bạn có muốn kích hoạt AI xử lý ngay không? (Mất khoảng 15-30 giây)
                   </p>
                   {analyzeError && (
-                    <p className="text-error text-xs bg-error-container p-2 rounded max-w-md border border-error/10">
+                    <p className="text-error bg-error-container border-error/10 max-w-md rounded border p-2 text-xs">
                       Lỗi: {analyzeError}
                     </p>
                   )}
                   <button
                     onClick={handleGenerateQuiz}
                     disabled={isAnalyzing}
-                    className="bg-primary text-on-primary font-semibold px-6 py-3 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
+                    className="bg-primary text-on-primary flex cursor-pointer items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
                   >
                     {isAnalyzing ? (
                       <>
@@ -566,18 +595,18 @@ export default function PracticePage() {
                 <div className="flex flex-col items-center">
                   <div
                     onClick={() => setIsFlipped((prev) => !prev)}
-                    className={`relative w-full max-w-[700px] h-[480px] cursor-pointer group perspective-1000 ${
+                    className={`group perspective-1000 relative h-[480px] w-full max-w-[700px] cursor-pointer ${
                       isFlipped ? 'flashcard-flipped' : ''
                     }`}
                   >
-                    <div className="flashcard-inner relative w-full h-full text-center shadow-[0px_4px_16px_rgba(0,0,0,0.06)] rounded-xl border border-outline-variant">
+                    <div className="flashcard-inner border-outline-variant relative h-full w-full rounded-xl border text-center shadow-[0px_4px_16px_rgba(0,0,0,0.06)]">
                       {/* Mặt Trước (Front Side): Câu hỏi + 4 đáp án A, B, C, D */}
-                      <div className="flashcard-front absolute inset-0 bg-surface-container-lowest flex flex-col items-center justify-center p-6 md:p-8 rounded-xl overflow-y-auto">
-                        <span className="absolute top-4 left-4 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
+                      <div className="flashcard-front bg-surface-container-lowest absolute inset-0 flex flex-col items-center justify-center overflow-y-auto rounded-xl p-6 md:p-8">
+                        <span className="text-on-surface-variant absolute top-4 left-4 text-xs font-semibold tracking-wider uppercase">
                           Câu hỏi ôn tập ({currentCardIndex + 1}/{questions.length})
                         </span>
-                        
-                        <h2 className="text-base md:text-lg font-bold text-primary text-center max-w-xl leading-relaxed mb-6 mt-4">
+
+                        <h2 className="text-primary mt-4 mb-6 max-w-xl text-center text-base leading-relaxed font-bold md:text-lg">
                           {questions[currentCardIndex].questionText}
                         </h2>
 
@@ -588,9 +617,9 @@ export default function PracticePage() {
                             return (
                               <div
                                 key={opt.id}
-                                className="text-left w-full text-xs md:text-sm border border-outline-variant bg-surface-container-low px-4 py-2.5 rounded-lg text-on-surface-variant flex items-center gap-3"
+                                className="border-outline-variant bg-surface-container-low text-on-surface-variant flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left text-xs md:text-sm"
                               >
-                                <span className="font-extrabold text-primary min-w-[1.5rem] h-6 w-6 rounded bg-surface flex items-center justify-center border border-outline-variant/60">
+                                <span className="text-primary bg-surface border-outline-variant/60 flex h-6 w-6 min-w-[1.5rem] items-center justify-center rounded border font-extrabold">
                                   {label}
                                 </span>
                                 <span className="flex-1">{opt.optionText}</span>
@@ -599,42 +628,44 @@ export default function PracticePage() {
                           })}
                         </div>
 
-                        <div className="mt-6 flex items-center gap-1.5 text-xs text-on-surface-variant animate-pulse">
+                        <div className="text-on-surface-variant mt-6 flex animate-pulse items-center gap-1.5 text-xs">
                           <span className="material-symbols-outlined text-sm">touch_app</span>
                           Nhấn để lật thẻ xem đáp án đúng (hoặc phím cách Space)
                         </div>
                       </div>
 
                       {/* Mặt Sau (Back Side): Chỉ hiển thị đáp án đúng kèm nhãn A, B, C, D */}
-                      <div className="flashcard-back absolute inset-0 bg-surface-container flex flex-col items-center justify-center p-8 rounded-xl">
-                        <span className="absolute top-4 left-4 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
+                      <div className="flashcard-back bg-surface-container absolute inset-0 flex flex-col items-center justify-center rounded-xl p-8">
+                        <span className="text-on-surface-variant absolute top-4 left-4 text-xs font-semibold tracking-wider uppercase">
                           Đáp án đúng của thẻ ghi nhớ
                         </span>
-                        
-                        <div className="text-center max-w-xl">
+
+                        <div className="max-w-xl text-center">
                           {(() => {
-                            const correctIndex = questions[currentCardIndex].options.findIndex((opt) => opt.isCorrect);
+                            const correctIndex = questions[currentCardIndex].options.findIndex(
+                              (opt) => opt.isCorrect,
+                            );
                             const correctLabel = ['A', 'B', 'C', 'D'][correctIndex] || 'A';
                             const correctOpt = questions[currentCardIndex].options[correctIndex];
 
                             return (
                               <div className="flex flex-col items-center gap-4">
-                                <span className="text-4xl font-extrabold text-emerald-600 bg-emerald-100/50 border border-emerald-200 h-16 w-16 rounded-full flex items-center justify-center shadow-inner">
+                                <span className="flex h-16 w-16 items-center justify-center rounded-full border border-emerald-200 bg-emerald-100/50 text-4xl font-extrabold text-emerald-600 shadow-inner">
                                   {correctLabel}
                                 </span>
-                                <h3 className="text-lg md:text-xl font-extrabold text-primary leading-snug">
+                                <h3 className="text-primary text-lg leading-snug font-extrabold md:text-xl">
                                   {correctOpt?.optionText || 'Không có đáp án'}
                                 </h3>
                               </div>
                             );
                           })()}
 
-                          <div className="mt-6 inline-block px-3 py-1.5 bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-lg">
+                          <div className="mt-6 inline-block rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800">
                             Đáp án chuẩn xác từ hệ thống
                           </div>
                         </div>
 
-                        <div className="absolute bottom-6 flex items-center gap-1.5 text-xs text-on-surface-variant">
+                        <div className="text-on-surface-variant absolute bottom-6 flex items-center gap-1.5 text-xs">
                           <span className="material-symbols-outlined text-sm">touch_app</span>
                           Nhấn để lật lại mặt trước câu hỏi
                         </div>
@@ -643,28 +674,29 @@ export default function PracticePage() {
                   </div>
 
                   {/* Card Navigations & Action Button */}
-                  <div className="mt-6 flex flex-col items-center gap-4 w-full max-w-[700px]">
-                    <div className="flex items-center justify-between w-full">
+                  <div className="mt-6 flex w-full max-w-[700px] flex-col items-center gap-4">
+                    <div className="flex w-full items-center justify-between">
                       <button
                         onClick={handlePrevCard}
-                        className="p-2.5 rounded-full hover:bg-surface-container-high transition-colors border border-outline-variant cursor-pointer"
+                        className="hover:bg-surface-container-high border-outline-variant cursor-pointer rounded-full border p-2.5 transition-colors"
                       >
                         <span className="material-symbols-outlined">chevron_left</span>
                       </button>
-                      <span className="font-semibold text-sm tracking-wider text-on-surface-variant">
-                        {String(currentCardIndex + 1).padStart(2, '0')} / {String(questions.length).padStart(2, '0')}
+                      <span className="text-on-surface-variant text-sm font-semibold tracking-wider">
+                        {String(currentCardIndex + 1).padStart(2, '0')} /{' '}
+                        {String(questions.length).padStart(2, '0')}
                       </span>
                       <button
                         onClick={handleNextCard}
-                        className="p-2.5 rounded-full hover:bg-surface-container-high transition-colors border border-outline-variant cursor-pointer"
+                        className="hover:bg-surface-container-high border-outline-variant cursor-pointer rounded-full border p-2.5 transition-colors"
                       >
                         <span className="material-symbols-outlined">chevron_right</span>
                       </button>
                     </div>
-                    
+
                     <button
                       onClick={() => router.push(`/practice/doTest?documentId=${selectedDocId}`)}
-                      className="w-full bg-primary-container text-on-primary font-bold py-3.5 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-[0.99] cursor-pointer"
+                      className="bg-primary-container text-on-primary flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg py-3.5 font-bold transition-opacity hover:opacity-90 active:scale-[0.99]"
                     >
                       <span className="material-symbols-outlined">assignment_turned_in</span>
                       Bắt đầu bài kiểm tra trắc nghiệm

@@ -190,7 +190,7 @@ describe('DocumentsService', () => {
       mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, name: 'Subject 1' });
       mockPrisma.user.findFirst.mockResolvedValue({
         id: 'fallback-user-id',
-        fullName: 'First User',
+        name: 'First User',
       });
       mockPrisma.document.create.mockResolvedValue({
         id: 'doc-id',
