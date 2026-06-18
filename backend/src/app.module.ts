@@ -7,6 +7,8 @@ import { AdminModule } from './modules/admin/admin.module';
 import { PrismaModule } from './database/prisma.module';
 import { ExploreModule } from './modules/explore/exploreModule';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { SubjectsModule } from './modules/subjects/subjects.module';
+import { TagsModule } from './modules/tags/tags.module';
 import { ApiResponseInterceptor } from './common/interceptors';
 import { HttpExceptionFilter } from './common/filters';
 
@@ -19,6 +21,8 @@ import { HttpExceptionFilter } from './common/filters';
     AdminModule,
     ExploreModule,
     DashboardModule,
+    SubjectsModule,
+    TagsModule,
   ],
   controllers: [],
   providers: [

@@ -1,33 +1,37 @@
 import {
   IsString,
-  IsNotEmpty,
   IsNumber,
   IsOptional,
   MinLength,
   MaxLength,
   IsPositive,
+  IsInt,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
- * DTO for uploading and parsing documents
+ * DTO for updating document metadata
  */
-export class UploadDocumentDto {
+export class UpdateDocumentDto {
   @IsString()
-  @IsNotEmpty({ message: 'Title is required' })
+  @IsOptional()
   @MinLength(1, { message: 'Title must not be empty' })
   @MaxLength(255, { message: 'Title must not exceed 255 characters' })
-  title!: string;
+  title?: string;
 
   @IsString()
   @IsOptional()
   @MaxLength(1000, { message: 'Description must not exceed 1000 characters' })
   description?: string;
 
-  @IsNumber({}, { message: 'Subject ID must be a valid number' })
+  @IsInt({ message: 'Subject ID must be an integer' })
   @IsPositive({ message: 'Subject ID must be a positive number' })
-  subjectId!: number;
+  @IsOptional()
+  @Type(() => Number)
+  subjectId?: number;
 
   @IsString()
   @IsOptional()
   tags?: string; // JSON string of tag names
 }
+

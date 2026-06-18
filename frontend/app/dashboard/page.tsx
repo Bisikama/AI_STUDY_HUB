@@ -397,10 +397,10 @@ function DashboardPage() {
           <li>
             <a
               className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
-              href="#"
+              href="/dashboard/documents"
               onClick={(e) => {
                 e.preventDefault();
-                alert('My Documents clicked (Simulated)');
+                router.push('/dashboard/documents');
               }}
             >
               <span className="material-symbols-outlined">description</span> My Documents
@@ -479,7 +479,6 @@ function DashboardPage() {
               onClick={(e) => {
                 e.preventDefault();
                 localStorage.removeItem('token');
-                localStorage.removeItem('user');
                 router.replace('/');
               }}
             >
@@ -523,7 +522,7 @@ function DashboardPage() {
 
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push('/explore')}
+                onClick={() => router.push('/upload')}
                 className="font-label-md text-label-md hidden h-10 cursor-pointer items-center gap-2 rounded-full bg-[#212529] px-4 py-2 text-white transition-opacity hover:opacity-90 md:flex"
               >
                 <span className="material-symbols-outlined text-[20px]">upload</span> Upload
@@ -643,7 +642,7 @@ function DashboardPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="scrollbar-thumb-rounded scrollbar-thumb-outline-variant -mx-4 flex snap-x snap-mandatory scrollbar-thin gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
+                  <div className="scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-outline-variant -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
                     {recentlyViewed.slice(0, 8).map((doc) => (
                       <div
                         key={doc.id}
@@ -1384,7 +1383,8 @@ export default function HomePage() {
   });
 
   useEffect(() => {
-    if (isLoggedIn === false) {
+    const token = localStorage.getItem('token');
+    if (!token) {
       router.replace('/login');
     }
   }, [isLoggedIn, router]);

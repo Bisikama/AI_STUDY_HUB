@@ -519,7 +519,7 @@ function SearchExplore() {
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
-                  router.push('/dashboard');
+                  router.push('/');
                 }}
               >
                 My Documents
