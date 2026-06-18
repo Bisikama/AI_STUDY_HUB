@@ -3,7 +3,7 @@ import { PrismaClient } from '../../generated/prisma/client';
 
 interface User {
   id: string;
-  fullName: string;
+  name: string;
 }
 
 interface Subject {
@@ -96,9 +96,7 @@ export async function seedDocuments(
 
     documents.push(document);
 
-    console.log(
-      `   ✓ Document: "${document.title}" (by ${user.fullName}, status: ${randomStatus})`,
-    );
+    console.log(`   ✓ Document: "${document.title}" (by ${user.name}, status: ${randomStatus})`);
   }
 
   console.log(`✅ Created ${documents.length} documents\n`);

@@ -33,8 +33,9 @@ export default function ForgotPasswordPage() {
       await authApi.forgotPassword(data.email);
       alert('Yêu cầu thành công! Vui lòng kiểm tra mã OTP.');
       router.push(`/reset-password?email=${encodeURIComponent(data.email)}`);
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || 'Đã có lỗi xảy ra!';
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      const errorMsg = axiosError.response?.data?.message || 'Đã có lỗi xảy ra!';
       setApiError(errorMsg);
     } finally {
       setIsLoading(false);
@@ -49,14 +50,25 @@ export default function ForgotPasswordPage() {
           {/* Logo */}
           <div className="mb-10 flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded bg-[#0F172A] text-white">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+              </svg>
             </div>
             <span className="text-lg font-bold tracking-tight text-gray-950">ScholarHub</span>
           </div>
 
           {/* Tiêu đề */}
           <div className="mb-8">
-            <h1 className="mb-1.5 text-2xl font-bold tracking-tight text-gray-950">Forgot Password</h1>
+            <h1 className="mb-1.5 text-2xl font-bold tracking-tight text-gray-950">
+              Forgot Password
+            </h1>
             <p className="text-[13px] leading-relaxed text-gray-500">
               Enter your email address to receive a 6-digit OTP code to reset your password.
             </p>
@@ -64,8 +76,19 @@ export default function ForgotPasswordPage() {
 
           {/* Lỗi API */}
           {apiError && (
-            <div className="mb-5 rounded-md bg-red-50 p-3 text-[12px] font-medium text-red-600 border border-red-100 flex items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div className="mb-5 flex items-center gap-2 rounded-md border border-red-100 bg-red-50 p-3 text-[12px] font-medium text-red-600">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
               {apiError}
             </div>
           )}
@@ -76,16 +99,28 @@ export default function ForgotPasswordPage() {
               <label className="text-[12px] font-semibold text-gray-700">Email Address</label>
               <div className="relative flex items-center">
                 <div className="absolute left-3 text-gray-400">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <rect width="20" height="16" x="2" y="4" rx="2" />
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                  </svg>
                 </div>
                 <input
                   {...register('email')}
                   autoFocus
-                  className={`w-full rounded-lg bg-[#F5F6F8] py-2.5 pl-9 pr-3 text-[13px] text-gray-900 placeholder-gray-400 outline-none focus:bg-white border transition-all ${errors.email ? 'border-red-400 focus:border-red-400' : 'border-transparent focus:border-gray-200'}`}
+                  className={`w-full rounded-lg border bg-[#F5F6F8] py-2.5 pr-3 pl-9 text-[13px] text-gray-900 placeholder-gray-400 transition-all outline-none focus:bg-white ${errors.email ? 'border-red-400 focus:border-red-400' : 'border-transparent focus:border-gray-200'}`}
                   placeholder="name@university.edu"
                 />
               </div>
-              {errors.email && <p className="text-[10px] text-red-500 pl-1">{errors.email.message}</p>}
+              {errors.email && (
+                <p className="pl-1 text-[10px] text-red-500">{errors.email.message}</p>
+              )}
             </div>
 
             {/* Nút Submit */}
@@ -99,20 +134,43 @@ export default function ForgotPasswordPage() {
           </form>
 
           <p className="mt-8 text-center text-[12px] text-gray-500">
-            Remembered your password? <a href="/login" className="font-semibold text-gray-900 hover:underline">Login here</a>
+            Remembered your password?{' '}
+            <a href="/login" className="font-semibold text-gray-900 hover:underline">
+              Login here
+            </a>
           </p>
         </div>
       </div>
 
       {/* ================= CỘT PHẢI: ILLUSTRATION ================= */}
       <div className="hidden w-1/2 flex-col items-center justify-center bg-[#F8F9FA] lg:flex">
-        <div className="relative flex w-full max-w-[460px] flex-col items-center justify-center rounded-[24px] bg-white p-14 shadow-sm border border-gray-100">
-          <div className="mb-8 w-full h-[180px] flex justify-center opacity-80">
-            <svg className="h-full text-slate-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8">
-              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H12v20H6.5a2.5 2.5 0 0 1-2.5-2.5z" fill="#fff" strokeWidth="1"/>
-              <path d="M20 19.5v-15A2.5 2.5 0 0 0 17.5 2H12v20h5.5a2.5 2.5 0 0 0 2.5-2.5z" fill="#fff" strokeWidth="1"/>
-              <path d="M12 2v20 M14 6h4 M14 10h4 M14 14h2 M18 10h.01 M20 8h.01 M22 12h.01" strokeWidth="1" strokeLinecap="round"/>
-              <circle cx="18" cy="6" r="1"/><circle cx="21" cy="10" r="1"/><circle cx="19" cy="14" r="1"/>
+        <div className="relative flex w-full max-w-[460px] flex-col items-center justify-center rounded-[24px] border border-gray-100 bg-white p-14 shadow-sm">
+          <div className="mb-8 flex h-[180px] w-full justify-center opacity-80">
+            <svg
+              className="h-full text-slate-800"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="0.8"
+            >
+              <path
+                d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H12v20H6.5a2.5 2.5 0 0 1-2.5-2.5z"
+                fill="#fff"
+                strokeWidth="1"
+              />
+              <path
+                d="M20 19.5v-15A2.5 2.5 0 0 0 17.5 2H12v20h5.5a2.5 2.5 0 0 0 2.5-2.5z"
+                fill="#fff"
+                strokeWidth="1"
+              />
+              <path
+                d="M12 2v20 M14 6h4 M14 10h4 M14 14h2 M18 10h.01 M20 8h.01 M22 12h.01"
+                strokeWidth="1"
+                strokeLinecap="round"
+              />
+              <circle cx="18" cy="6" r="1" />
+              <circle cx="21" cy="10" r="1" />
+              <circle cx="19" cy="14" r="1" />
             </svg>
           </div>
           <p className="text-[9px] font-bold tracking-[0.2em] text-gray-400 uppercase">

@@ -1,4 +1,5 @@
-import { PrismaClient, UserRole } from '../../generated/prisma/client';
+import { PrismaClient } from '../../generated/prisma/client';
+import { Role } from '../../generated/prisma/enums';
 import bcrypt from 'bcrypt';
 
 export async function seedUsers(prisma: PrismaClient) {
@@ -8,24 +9,24 @@ export async function seedUsers(prisma: PrismaClient) {
   const hashedPassword = await bcrypt.hash('password123', 10);
 
   const users = await Promise.all([
-    // Teachers
+    // Teachers (will be mapped to USER)
     prisma.user.create({
       data: {
         email: 'teacher.nguyen@example.com',
-        passwordHash: hashedPassword,
-        fullName: 'Nguyễn Văn A',
+        password: hashedPassword,
+        name: 'Nguyễn Văn A',
         avatarUrl: 'https://api.example.com/avatars/teacher1.jpg',
-        role: UserRole.TEACHER,
+        role: Role.USER,
         isActive: true,
       },
     }),
     prisma.user.create({
       data: {
         email: 'teacher.tran@example.com',
-        passwordHash: hashedPassword,
-        fullName: 'Trần Thị B',
+        password: hashedPassword,
+        name: 'Trần Thị B',
         avatarUrl: 'https://api.example.com/avatars/teacher2.jpg',
-        role: UserRole.TEACHER,
+        role: Role.USER,
         isActive: true,
       },
     }),
@@ -33,38 +34,38 @@ export async function seedUsers(prisma: PrismaClient) {
     prisma.user.create({
       data: {
         email: 'admin@example.com',
-        passwordHash: hashedPassword,
-        fullName: 'Lê Văn Admin',
+        password: hashedPassword,
+        name: 'Lê Văn Admin',
         avatarUrl: 'https://api.example.com/avatars/admin.jpg',
-        role: UserRole.ADMIN,
+        role: Role.ADMIN,
         isActive: true,
       },
     }),
-    // Students
+    // Students (will be mapped to USER)
     prisma.user.create({
       data: {
-        email: 'student.phạm@example.com',
-        passwordHash: hashedPassword,
-        fullName: 'Phạm Thị D',
-        role: UserRole.STUDENT,
-        isActive: true,
-      },
-    }),
-    prisma.user.create({
-      data: {
-        email: 'student.hoàng@example.com',
-        passwordHash: hashedPassword,
-        fullName: 'Hoàng Văn E',
-        role: UserRole.STUDENT,
+        email: 'student.pham@example.com',
+        password: hashedPassword,
+        name: 'Phạm Thị D',
+        role: Role.USER,
         isActive: true,
       },
     }),
     prisma.user.create({
       data: {
-        email: 'student.vũ@example.com',
-        passwordHash: hashedPassword,
-        fullName: 'Vũ Thị F',
-        role: UserRole.STUDENT,
+        email: 'student.hoang@example.com',
+        password: hashedPassword,
+        name: 'Hoàng Văn E',
+        role: Role.USER,
+        isActive: true,
+      },
+    }),
+    prisma.user.create({
+      data: {
+        email: 'student.vu@example.com',
+        password: hashedPassword,
+        name: 'Vũ Thị F',
+        role: Role.USER,
         isActive: true,
       },
     }),
