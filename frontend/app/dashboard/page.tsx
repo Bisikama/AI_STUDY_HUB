@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, User } from '@/hooks/useAuth';
 import { dashboardApi, ExploreDocument, Contributor } from '@/services/dashboardApi';
 import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
@@ -210,14 +210,7 @@ function DashboardPage() {
   const [editSuccess, setEditSuccess] = useState('');
   const [editLoading, setEditLoading] = useState(false);
 
-  const [user, setUser] = useState<{
-    id: string;
-    email: string;
-    fullName: string;
-    role: string;
-    username?: string | null;
-    phoneNumber?: string | null;
-  } | null>(() => {
+  const [user, setUser] = useState<User | null>(() => {
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem('user');
       if (userStr) {

@@ -45,38 +45,39 @@ export default function RegisterPage() {
   const { register: registerUser, isLoading, error: apiError, loginWithGoogle } = useAuth();
   const [showPassword] = useState(false);
 
+  const handleGoogleResponse = async (response: { credential: string }) => {
+    try {
+      await loginWithGoogle(response.credential);
+      router.push('/dashboard');
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Google login failed', err);
+    }
+  };
+
+  const handleGoogleScriptLoad = () => {
+    const google = (window as unknown as CustomWindow).google;
+    if (google) {
+      google.accounts.id.initialize({
+        client_id:
+          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+          '1047712398436-yourclientidplaceholder.apps.googleusercontent.com',
+        callback: handleGoogleResponse,
+      });
+      google.accounts.id.renderButton(document.getElementById('google-signin-btn'), {
+        theme: 'outline',
+        size: 'large',
+        width: 340,
+      });
+    }
+  };
+
   useEffect(() => {
-    const handleGoogleResponse = async (response: { credential: string }) => {
-      try {
-        await loginWithGoogle(response.credential);
-        router.push('/dashboard');
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('Google login failed', err);
-      }
-    };
-
-    const handleGoogleScriptLoad = () => {
-      const google = (window as unknown as CustomWindow).google;
-      if (google) {
-        google.accounts.id.initialize({
-          client_id:
-            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-            '1047712398436-yourclientidplaceholder.apps.googleusercontent.com',
-          callback: handleGoogleResponse,
-        });
-        google.accounts.id.renderButton(document.getElementById('google-signin-btn'), {
-          theme: 'outline',
-          size: 'large',
-          width: 340,
-        });
-      }
-    };
-
     if ((window as unknown as CustomWindow).google) {
       handleGoogleScriptLoad();
     }
-  }, [loginWithGoogle, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 2. KHỞI TẠO REACT-HOOK-FORM
   const {
