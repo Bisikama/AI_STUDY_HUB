@@ -1,13 +1,17 @@
 'use client';
 
-import { useState } from "react";
-import { authApi, LoginCredentials, RegisterData } from "@/services/authApi";
+import { useState } from 'react';
+import { authApi, LoginCredentials, RegisterData } from '@/services/authApi';
 
 export interface User {
   id: string;
   email: string;
-  name: string;
+  name?: string;
+  fullName?: string;
+  username?: string | null;
+  phoneNumber?: string | null;
   role: string;
+  avatarUrl?: string | null;
 }
 
 export const useAuth = () => {
@@ -18,7 +22,7 @@ export const useAuth = () => {
   const handleError = (err: unknown): string => {
     // Ép kiểu err để lấy message từ axios response
     const axiosError = err as { response?: { data?: { message?: string } } };
-    return axiosError.response?.data?.message || "Đã có lỗi xảy ra!";
+    return axiosError.response?.data?.message || 'Đã có lỗi xảy ra!';
   };
 
   const login = async (credentials: LoginCredentials): Promise<User> => {
@@ -26,13 +30,13 @@ export const useAuth = () => {
     setError(null);
     try {
       const res = await authApi.login(credentials);
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.user));
-      return res.data.user; 
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      return res.data.user;
     } catch (err: unknown) {
       const errorMsg = handleError(err);
       setError(errorMsg);
-      throw errorMsg; 
+      throw errorMsg;
     } finally {
       setIsLoading(false);
     }
@@ -45,7 +49,7 @@ export const useAuth = () => {
     try {
       const res = await authApi.register(userData);
       // Giả sử API trả về user sau khi đăng ký thành công
-      return res.data; 
+      return res.data;
     } catch (err: unknown) {
       const errorMsg = handleError(err);
       setError(errorMsg);
@@ -56,9 +60,9 @@ export const useAuth = () => {
   };
 
   const logout = (): void => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/login";
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
   };
 
   const checkEmail = async (email: string): Promise<boolean> => {
@@ -66,11 +70,11 @@ export const useAuth = () => {
     setError(null);
     try {
       await authApi.checkEmail(email);
-      return true; 
+      return true;
     } catch (err: unknown) {
       const errorMsg = handleError(err);
       setError(errorMsg);
-      throw errorMsg; 
+      throw errorMsg;
     } finally {
       setIsLoading(false);
     }
@@ -96,8 +100,8 @@ export const useAuth = () => {
     setError(null);
     try {
       const res = await authApi.loginWithGoogle(idToken);
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.user));
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
       return res.data.user;
     } catch (err: unknown) {
       const errorMsg = handleError(err);
@@ -113,7 +117,7 @@ export const useAuth = () => {
     setError(null);
     try {
       const profile = await authApi.getProfile();
-      localStorage.setItem("user", JSON.stringify(profile));
+      localStorage.setItem('user', JSON.stringify(profile));
       return profile;
     } catch (err: unknown) {
       const errorMsg = handleError(err);
@@ -124,5 +128,15 @@ export const useAuth = () => {
     }
   };
 
-  return { login, register, logout, isLoading, error, checkEmail, checkPassword, loginWithGoogle, getProfile };
+  return {
+    login,
+    register,
+    logout,
+    isLoading,
+    error,
+    checkEmail,
+    checkPassword,
+    loginWithGoogle,
+    getProfile,
+  };
 };

@@ -3,6 +3,7 @@
 import useSWR from 'swr';
 import { useEffect, useMemo, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import axiosClient from '@/utils/axios';
 
 type Subject = {
   id: number;
@@ -429,7 +430,7 @@ function SearchExplore() {
     );
   };
 
-  const handleCardClick = (doc: ExploreDocument) => {
+  const handleCardClick = async (doc: ExploreDocument) => {
     if (doc.id.startsWith('mock-')) {
       alert('This is a simulated document view.');
       return;
@@ -437,6 +438,12 @@ function SearchExplore() {
 
     setSelectedOptionIds({});
     setSelectedDocumentId(doc.id);
+
+    try {
+      await axiosClient.post(`/documents/${doc.id}/view`);
+    } catch (err) {
+      console.error('Failed to record document view:', err);
+    }
   };
 
   const handleSelectOption = (questionId: string, optionId: string) => {
@@ -557,7 +564,7 @@ function SearchExplore() {
                   localStorage.removeItem('token');
                   router.replace('/');
                 }}
-                className="material-symbols-outlined text-error hover:bg-red-50 cursor-pointer rounded-full p-2 transition-colors active:scale-95"
+                className="material-symbols-outlined text-error cursor-pointer rounded-full p-2 transition-colors hover:bg-red-50 active:scale-95"
                 title="Đăng xuất"
               >
                 logout

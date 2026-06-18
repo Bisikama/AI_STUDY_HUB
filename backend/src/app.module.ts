@@ -6,6 +6,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { PrismaModule } from './database/prisma.module';
 import { ExploreModule } from './modules/explore/exploreModule';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ApiResponseInterceptor } from './common/interceptors';
 import { HttpExceptionFilter } from './common/filters';
 
@@ -17,6 +18,7 @@ import { HttpExceptionFilter } from './common/filters';
     DocumentsModule,
     AdminModule,
     ExploreModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [

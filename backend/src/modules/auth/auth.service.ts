@@ -1,5 +1,10 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma.service'; // Đường dẫn trỏ tới file prisma của bạn
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { PrismaService } from '../../database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
@@ -33,15 +38,15 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
-        password: hashedPassword,
-        name: dto.name,
-        role: 'USER',
+        passwordHash: hashedPassword,
+        fullName: dto.name,
+        role: 'STUDENT',
       },
     });
 
     return {
       message: 'Đăng ký thành công!',
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role },
     };
   }
 
@@ -52,18 +57,25 @@ export class AuthService {
       throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu!');
     }
     // 2. Kiểm tra mật khẩu
-    const isPasswordValid = await bcrypt.compare(dto.password, user.password);
+    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu!');
     }
     console.log('>>> ĐANG LOGIN VỚI QUYỀN:', user.role);
 
-    // 3. Tạo JWT Token asynchronously
+    // 3. Tạo JWT Token
     const payload = { sub: user.id, email: user.email, role: user.role };
     const token = await this.jwtService.signAsync(payload);
 
     return {
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        username: user.username,
+        phoneNumber: user.phoneNumber,
+        role: user.role,
+      },
       token,
     };
   }
@@ -98,10 +110,10 @@ export class AuthService {
         user = await this.prisma.user.create({
           data: {
             email,
-            password: hashedPassword,
-            name,
+            passwordHash: hashedPassword,
+            fullName: name,
             avatarUrl,
-            role: 'USER',
+            role: 'STUDENT',
           },
         });
       }
@@ -111,7 +123,14 @@ export class AuthService {
       const token = await this.jwtService.signAsync(jwtPayload);
 
       return {
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          username: user.username,
+          phoneNumber: user.phoneNumber,
+          role: user.role,
+        },
         token,
       };
     } catch (error) {
@@ -182,7 +201,7 @@ export class AuthService {
     // 4. Cập nhật mật khẩu mới cho user
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { password: hashedPassword },
+      data: { passwordHash: hashedPassword },
     });
 
     // 5. Đánh dấu token đã sử dụng
@@ -204,9 +223,46 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
-      name: user.name,
+      fullName: user.fullName,
+      username: user.username,
+      phoneNumber: user.phoneNumber,
       role: user.role,
       avatarUrl: user.avatarUrl,
+    };
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: { fullName: string; username?: string; phoneNumber?: string },
+  ) {
+    if (dto.username) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { username: dto.username },
+      });
+      if (existingUser && existingUser.id !== userId) {
+        throw new BadRequestException('Tên đăng nhập này đã được sử dụng!');
+      }
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        fullName: dto.fullName,
+        username: dto.username || null,
+        phoneNumber: dto.phoneNumber || null,
+      },
+    });
+
+    return {
+      message: 'Cập nhật thông tin tài khoản thành công!',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        fullName: updatedUser.fullName,
+        username: updatedUser.username,
+        phoneNumber: updatedUser.phoneNumber,
+        role: updatedUser.role,
+      },
     };
   }
 }

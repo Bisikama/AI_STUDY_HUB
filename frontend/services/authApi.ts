@@ -16,8 +16,12 @@ export interface RegisterData {
 export interface UserProfile {
   id: string;
   email: string;
-  name: string;
+  name?: string;
+  fullName?: string;
+  username?: string | null;
+  phoneNumber?: string | null;
   role: string;
+  avatarUrl?: string | null;
 }
 
 export const authApi = {
