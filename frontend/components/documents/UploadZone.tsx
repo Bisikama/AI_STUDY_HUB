@@ -3,6 +3,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone, FileRejection } from 'react-dropzone';
 import { useUploadDocument } from '@/hooks/useUploadDocument';
+import useSWR from 'swr';
+import { subjectsApi, Subject } from '@/services/subjectsApi';
+import { tagsApi, Tag } from '@/services/tagsApi';
 
 //  Constants
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -11,9 +14,6 @@ const ACCEPTED_TYPES: Record<string, string[]> = {
   'text/plain': ['.txt'],
 };
 const ACCEPTED_EXTENSIONS = ['.pdf', '.txt'];
-
-// Default subject ID — should be replaced once subject selector is implemented
-const DEFAULT_SUBJECT_ID = 1;
 
 //  Toast types
 type ToastVariant = 'success' | 'error';
@@ -261,16 +261,44 @@ export default function UploadZone() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState('');
-  const [institution, setInstitution] = useState('');
-  const [tagInput, setTagInput] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
+  const [description, setDescription] = useState('');
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // Study Folder state
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  // Tags state
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [newTagName, setNewTagName] = useState('');
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const toastIdRef = useRef(0);
 
   const { trigger, isMutating } = useUploadDocument();
+
+  // Load subjects
+  const { data: subjectsResponse, mutate: mutateSubjects } = useSWR(
+    '/subjects',
+    () => subjectsApi.getSubjects(),
+  );
+  const subjects: Subject[] = subjectsResponse?.data || [];
+
+  // Load tags
+  const { data: tagsResponse, error: tagsError } = useSWR(
+    '/tags',
+    () => tagsApi.getTags(),
+  );
+  const availableTags: Tag[] = tagsResponse?.data || [];
+  
+  // Warn if tags failed to load
+  useEffect(() => {
+    if (tagsError) {
+      addToast('Failed to load tags. You can still upload without them.', 'error');
+    }
+  }, [tagsError]);
 
   //  Toast helpers
   const addToast = useCallback((message: string, variant: ToastVariant) => {
@@ -344,32 +372,75 @@ export default function UploadZone() {
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
   };
 
-  //  Tag handling
-  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const trimmed = tagInput.trim();
-      if (trimmed && !tags.includes(trimmed)) {
-        setTags((prev) => [...prev, trimmed]);
-      }
-      setTagInput('');
+  //  Tags logic
+  const handleAddTag = (tagName: string) => {
+    const trimmed = tagName.trim();
+    if (!trimmed) return;
+    
+    // Convert to slug logic for deduplication on FE side
+    const slug = trimmed.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w-]/g, '');
+    if (!slug) return;
+
+    if (selectedTags.length >= 10) {
+      addToast('Maximum 10 tags allowed', 'error');
+      return;
     }
+
+    // Check duplicate
+    if (selectedTags.some((t) => t.slug === slug || t.name.toLowerCase() === trimmed.toLowerCase())) {
+      setNewTagName('');
+      return;
+    }
+
+    // Find if it matches an existing tag
+    const existing = availableTags.find((t) => t.slug === slug);
+    if (existing) {
+      setSelectedTags([...selectedTags, existing]);
+    } else {
+      setSelectedTags([...selectedTags, { id: -1, name: trimmed, slug, isSystem: false }]);
+    }
+    
+    setNewTagName('');
+    setShowTagDropdown(false);
   };
 
-  const removeTag = (tag: string) => {
-    setTags((prev) => prev.filter((t) => t !== tag));
+  const handleRemoveTag = (tagToRemove: Tag) => {
+    setSelectedTags(selectedTags.filter((t) => t.slug !== tagToRemove.slug));
   };
-
   //  Reset form
   const handleCancel = () => {
     setSelectedFile(null);
     setProgress(0);
     setTitle('');
-    setSubject('');
-    setInstitution('');
-    setTagInput('');
-    setTags([]);
+    setDescription('');
+    setSelectedSubjectId(null);
+    setShowCreateFolder(false);
+    setNewFolderName('');
+    setSelectedTags([]);
+    setNewTagName('');
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+  };
+
+  //  Create new folder inline
+  const handleCreateFolder = async () => {
+    const name = newFolderName.trim();
+    if (!name) {
+      addToast('Folder name cannot be empty.', 'error');
+      return;
+    }
+    try {
+      setIsCreatingFolder(true);
+      const result = await subjectsApi.createSubject({ name });
+      await mutateSubjects();
+      setSelectedSubjectId(result.data.id);
+      setShowCreateFolder(false);
+      setNewFolderName('');
+      addToast(`Study Folder "${result.data.name}" created and selected!`, 'success');
+    } catch {
+      addToast('Failed to create folder. Please try again.', 'error');
+    } finally {
+      setIsCreatingFolder(false);
+    }
   };
 
   //  Submit
@@ -382,24 +453,38 @@ export default function UploadZone() {
       addToast('Tiêu đề tài liệu là bắt buộc.', 'error');
       return;
     }
+    if (!selectedSubjectId) {
+      addToast('Vui lòng chọn Study Folder trước khi upload.', 'error');
+      return;
+    }
 
     startProgress();
     try {
-      await trigger({
+      const payload: any = {
         file: selectedFile,
         title: title.trim(),
-        description: [subject, institution, ...tags].filter(Boolean).join(' | ') || undefined,
-        subjectId: DEFAULT_SUBJECT_ID,
-      });
+        description: description.trim() || undefined,
+        subjectId: selectedSubjectId,
+      };
+
+      if (selectedTags.length > 0) {
+        payload.tags = JSON.stringify(selectedTags.map((t) => t.name));
+      }
+
+      await trigger(payload);
 
       stopProgress(true);
       addToast('Tài liệu đã được upload thành công!', 'success');
 
       // Reset after short delay so user sees 100%
       setTimeout(() => handleCancel(), 1500);
-    } catch {
+    } catch (err: any) {
       stopProgress(false);
-      addToast('Upload thất bại. Vui lòng thử lại.', 'error');
+      if (err?.response?.status === 401) {
+        addToast('Please login to upload documents.', 'error');
+      } else {
+        addToast('Upload thất bại. Vui lòng thử lại.', 'error');
+      }
     }
   };
 
@@ -412,16 +497,11 @@ export default function UploadZone() {
 
   //  Render
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <>
       {/* Toasts */}
       <ToastNotification toasts={toasts} />
 
-      {/* Sidebar */}
-      <Sidebar />
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-8 py-10">
+      <div className="mx-auto max-w-3xl px-4 py-8 md:px-8 md:py-10">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-900">Upload Materials</h1>
@@ -589,127 +669,150 @@ export default function UploadZone() {
               />
             </div>
 
-            {/* Subject + Institution grid */}
-            <div className="mb-5 grid grid-cols-2 gap-4">
-              {/* Subject / Course */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Subject / Course
-                </label>
-                <div className="relative">
-                  <input
-                    id="doc-subject"
-                    type="text"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    disabled={isMutating}
-                    placeholder="e.g. PHYS 401"
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pr-10 pl-4 text-sm text-gray-900 placeholder-gray-400 transition-colors outline-none focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                  {/* Book icon */}
-                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-400">
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.8}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                      />
-                    </svg>
-                  </span>
-                </div>
+            {/* Study Folder */}
+            <div className="mb-5">
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Study Folder <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2">
+                <select
+                  id="doc-study-folder"
+                  value={selectedSubjectId ?? ''}
+                  onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
+                  disabled={isMutating}
+                  className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">-- Select a folder --</option>
+                  {subjects.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}{!s.isSystem ? ' (personal)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateFolder((v) => !v)}
+                  disabled={isMutating}
+                  className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-60"
+                  title="Create new folder"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
               </div>
-
-              {/* Institution */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Institution
-                </label>
-                <div className="relative">
+              {showCreateFolder && (
+                <div className="mt-2 flex gap-2">
                   <input
-                    id="doc-institution"
                     type="text"
-                    value={institution}
-                    onChange={(e) => setInstitution(e.target.value)}
-                    disabled={isMutating}
-                    placeholder="e.g. MIT"
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pr-10 pl-4 text-sm text-gray-900 placeholder-gray-400 transition-colors outline-none focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleCreateFolder(); } }}
+                    placeholder="New folder name..."
+                    disabled={isCreatingFolder}
+                    className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white disabled:opacity-60"
                   />
-                  {/* Institution icon */}
-                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-400">
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.8}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"
-                      />
-                    </svg>
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateFolder()}
+                    disabled={isCreatingFolder || !newFolderName.trim()}
+                    className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {isCreatingFolder ? '...' : 'Create'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowCreateFolder(false); setNewFolderName(''); }}
+                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-500 hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Category Tags */}
-            <div className="mb-7">
+            {/* Description */}
+            <div className="mb-5">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Category Tags
+                Description
               </label>
-              <div
-                className={`flex min-h-[44px] flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 transition-colors focus-within:border-gray-400 focus-within:bg-white ${
-                  isMutating ? 'cursor-not-allowed opacity-60' : ''
-                }`}
-              >
-                {/* Existing tags as pills */}
-                {tags.map((tag) => (
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                disabled={isMutating}
+                className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                placeholder="Optional description or notes for this document..."
+              />
+            </div>
+
+            {/* Study Tags */}
+            <div className="mb-7 relative">
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Study Tags <span className="text-gray-400 font-normal">(Max 10)</span>
+              </label>
+              
+              <div className="flex min-h-[44px] flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 transition-colors focus-within:border-gray-400 focus-within:bg-white">
+                {selectedTags.map((tag) => (
                   <span
-                    key={tag}
-                    className="flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-xs font-medium text-gray-700"
+                    key={tag.slug}
+                    className="flex items-center gap-1.5 rounded-full bg-[#1a1c23] px-3 py-1 text-xs font-medium text-white"
                   >
-                    {tag}
+                    {tag.name}
                     <button
                       type="button"
+                      onClick={() => handleRemoveTag(tag)}
                       disabled={isMutating}
-                      onClick={() => removeTag(tag)}
-                      className="ml-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-gray-400 hover:text-gray-700 disabled:cursor-not-allowed"
-                      aria-label={`Remove tag ${tag}`}
+                      className="flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-white/20 disabled:opacity-50"
                     >
-                      <svg
-                        className="h-2.5 w-2.5"
-                        viewBox="0 0 10 10"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path strokeLinecap="round" d="M2 2l6 6M8 2l-6 6" />
+                      <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </span>
                 ))}
-
-                {/* Tag input */}
-                <input
-                  id="doc-tag-input"
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  disabled={isMutating}
-                  placeholder={tags.length === 0 ? 'Add a tag...' : ''}
-                  className="min-w-[100px] flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:cursor-not-allowed"
-                />
+                
+                <div className="relative flex-1 min-w-[120px]">
+                  <input
+                    type="text"
+                    value={newTagName}
+                    onChange={(e) => {
+                      setNewTagName(e.target.value);
+                      setShowTagDropdown(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddTag(newTagName);
+                      }
+                    }}
+                    onFocus={() => setShowTagDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowTagDropdown(false), 200)}
+                    disabled={isMutating || selectedTags.length >= 10}
+                    placeholder={selectedTags.length >= 10 ? 'Max tags reached' : 'Type or select a tag...'}
+                    className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:cursor-not-allowed"
+                  />
+                  
+                  {/* Dropdown for suggestions */}
+                  {showTagDropdown && availableTags.length > 0 && (
+                    <div className="absolute left-0 top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                      {availableTags
+                        .filter(t => !selectedTags.some(st => st.slug === t.slug))
+                        .filter(t => t.name.toLowerCase().includes(newTagName.toLowerCase()))
+                        .map(tag => (
+                          <div
+                            key={tag.slug}
+                            onClick={() => handleAddTag(tag.name)}
+                            className="cursor-pointer px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            <span className="font-medium">{tag.name}</span>
+                            {tag.isSystem && <span className="ml-2 text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">System</span>}
+                          </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <p className="mt-1.5 text-xs text-gray-400">Press enter to add a tag.</p>
             </div>
 
             {/* Actions */}
@@ -727,7 +830,7 @@ export default function UploadZone() {
                 type="button"
                 id="upload-submit-btn"
                 onClick={handleSubmit}
-                disabled={isMutating || !selectedFile || !title.trim()}
+                disabled={isMutating || !selectedFile || !title.trim() || !selectedSubjectId}
                 className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 active:bg-gray-950 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isMutating ? (
@@ -750,13 +853,12 @@ export default function UploadZone() {
                     Uploading...
                   </span>
                 ) : (
-                  'Save Document'
+                  'Upload Document'
                 )}
               </button>
             </div>
           </div>
         </div>
-      </main>
-    </div>
+    </>
   );
 }

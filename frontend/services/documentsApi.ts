@@ -5,6 +5,7 @@ export interface UploadDocumentPayload {
   title: string;
   description?: string;
   subjectId: number;
+  tags?: string; // JSON string
 }
 
 export interface Document {
@@ -12,6 +13,7 @@ export interface Document {
   title: string;
   description: string | null;
   subjectId: number;
+  subject?: { id: number; name: string; code: string; isSystem: boolean } | null;
   uploadedBy: string;
   fileUrl: string;
   previewUrl: string | null;
@@ -24,6 +26,7 @@ export interface Document {
   isAIGenerated: boolean;
   createdAt: string;
   updatedAt: string;
+  tags?: Array<{ documentId: string; tagId: number; tag: { id: number; name: string; slug: string; isSystem: boolean } }>;
 }
 
 export interface UploadDocumentResponse {
@@ -53,6 +56,7 @@ export const documentsApi = {
     formData.append("title", payload.title);
     if (payload.description) formData.append("description", payload.description);
     formData.append("subjectId", String(payload.subjectId));
+    if (payload.tags) formData.append("tags", payload.tags);
 
     const response = await axiosClient.post<UploadDocumentResponse>(
       "/documents/upload",
@@ -72,5 +76,28 @@ export const documentsApi = {
     const response = await axiosClient.get("/documents/me");
     return response.data;
   },
-};
 
+  /**
+   * Get a specific document by its ID.
+   */
+  getDocumentById: async (id: string): Promise<{ statusCode: number; message: string; data: Document }> => {
+    const response = await axiosClient.get(`/documents/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Soft delete a document by its ID.
+   */
+  deleteDocument: async (id: string): Promise<{ statusCode: number; message: string }> => {
+    const response = await axiosClient.delete(`/documents/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Update document metadata (title, description, subjectId).
+   */
+  updateDocument: async (id: string, payload: { title?: string; description?: string; subjectId?: number; tags?: string }): Promise<{ statusCode: number; message: string; data: Document }> => {
+    const response = await axiosClient.patch(`/documents/${id}`, payload);
+    return response.data;
+  },
+};
