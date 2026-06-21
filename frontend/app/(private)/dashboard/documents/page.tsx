@@ -3,9 +3,11 @@
 import React, { useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { documentsApi, Document } from '@/services/documentsApi';
 
 export default function MyDocumentsPage() {
+  const router = useRouter();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const {
@@ -14,7 +16,7 @@ export default function MyDocumentsPage() {
     isLoading,
   } = useSWR('/documents/me', () => documentsApi.getMyDocuments());
 
-  const documents = response?.data || [];
+  const documents = response || [];
 
   const formatSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -109,7 +111,8 @@ export default function MyDocumentsPage() {
               return (
                 <div
                   key={doc.id}
-                  className={`group relative flex flex-col justify-between rounded-2xl border p-5 shadow-sm transition-all hover:shadow-md ${
+                  onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
+                  className={`group relative flex flex-col justify-between rounded-2xl border p-5 shadow-sm transition-all hover:shadow-md cursor-pointer hover:border-gray-400 hover:shadow-md ${
                     doc.isAIGenerated ? 'border-gray-300 bg-gray-100' : 'border-gray-200 bg-white'
                   }`}
                 >
@@ -184,10 +187,16 @@ export default function MyDocumentsPage() {
                     <div className="flex items-center gap-1 text-gray-400">
                       {doc.isAIGenerated ? (
                         <>
-                          <button className="rounded p-1.5 transition-colors hover:bg-gray-200 hover:text-gray-700">
+                          <button 
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded p-1.5 transition-colors hover:bg-gray-200 hover:text-gray-700"
+                          >
                             <span className="material-symbols-outlined text-[18px]">refresh</span>
                           </button>
-                          <button className="ml-1 flex h-7 w-7 items-center justify-center rounded-full bg-black text-white transition-colors hover:bg-gray-800">
+                          <button 
+                            onClick={(e) => e.stopPropagation()}
+                            className="ml-1 flex h-7 w-7 items-center justify-center rounded-full bg-black text-white transition-colors hover:bg-gray-800"
+                          >
                             <span className="material-symbols-outlined text-[16px]">bolt</span>
                           </button>
                         </>
@@ -195,6 +204,7 @@ export default function MyDocumentsPage() {
                         <>
                           <Link
                             href={`/dashboard/documents/${doc.id}`}
+                            onClick={(e) => e.stopPropagation()}
                             className="rounded p-1.5 transition-colors hover:bg-gray-100 hover:text-gray-700"
                           >
                             <span className="material-symbols-outlined text-[18px]">

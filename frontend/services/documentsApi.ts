@@ -30,19 +30,15 @@ export interface Document {
 }
 
 export interface UploadDocumentResponse {
-  statusCode: number;
-  message: string;
-  data: {
-    id: string;
-    title: string;
-    description: string | null;
-    subjectId: number;
-    fileUrl: string;
-    fileSize: number;
-    fileType: string;
-    status: string;
-    createdAt: string;
-  };
+  id: string;
+  title: string;
+  description: string | null;
+  subjectId: number;
+  fileUrl: string;
+  fileSize: number;
+  fileType: string;
+  status: string;
+  createdAt: string;
 }
 
 export const documentsApi = {
@@ -72,7 +68,7 @@ export const documentsApi = {
   /**
    * Get all documents uploaded by the current user.
    */
-  getMyDocuments: async (): Promise<{ statusCode: number; message: string; data: Document[] }> => {
+  getMyDocuments: async (): Promise<Document[]> => {
     const response = await axiosClient.get("/documents/me");
     return response.data;
   },
@@ -80,7 +76,7 @@ export const documentsApi = {
   /**
    * Get a specific document by its ID.
    */
-  getDocumentById: async (id: string): Promise<{ statusCode: number; message: string; data: Document }> => {
+  getDocumentById: async (id: string): Promise<Document> => {
     const response = await axiosClient.get(`/documents/${id}`);
     return response.data;
   },
@@ -96,8 +92,16 @@ export const documentsApi = {
   /**
    * Update document metadata (title, description, subjectId).
    */
-  updateDocument: async (id: string, payload: { title?: string; description?: string; subjectId?: number; tags?: string }): Promise<{ statusCode: number; message: string; data: Document }> => {
+  updateDocument: async (id: string, payload: { title?: string; description?: string; subjectId?: number; tags?: string }): Promise<Document> => {
     const response = await axiosClient.patch(`/documents/${id}`, payload);
+    return response.data;
+  },
+
+  /**
+   * Analyze a document to generate its summary and quiz.
+   */
+  analyzeDocument: async (id: string): Promise<any> => {
+    const response = await axiosClient.post(`/documents/analyze/${id}`);
     return response.data;
   },
 };

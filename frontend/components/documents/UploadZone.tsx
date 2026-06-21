@@ -284,14 +284,14 @@ export default function UploadZone() {
     '/subjects',
     () => subjectsApi.getSubjects(),
   );
-  const subjects: Subject[] = subjectsResponse?.data || [];
+  const subjects: Subject[] = subjectsResponse || [];
 
   // Load tags
   const { data: tagsResponse, error: tagsError } = useSWR(
     '/tags',
     () => tagsApi.getTags(),
   );
-  const availableTags: Tag[] = tagsResponse?.data || [];
+  const availableTags: Tag[] = tagsResponse || [];
   
   // Warn if tags failed to load
   useEffect(() => {
@@ -432,10 +432,10 @@ export default function UploadZone() {
       setIsCreatingFolder(true);
       const result = await subjectsApi.createSubject({ name });
       await mutateSubjects();
-      setSelectedSubjectId(result.data.id);
+      setSelectedSubjectId(result.id);
       setShowCreateFolder(false);
       setNewFolderName('');
-      addToast(`Study Folder "${result.data.name}" created and selected!`, 'success');
+      addToast(`Study Folder "${result.name}" created and selected!`, 'success');
     } catch {
       addToast('Failed to create folder. Please try again.', 'error');
     } finally {

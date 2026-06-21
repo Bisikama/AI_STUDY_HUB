@@ -76,6 +76,7 @@ describe('DocumentsController', () => {
         'Desc',
         42,
         'user-123',
+        undefined,
       );
       expect(response).toEqual({
         statusCode: 201,
@@ -92,7 +93,7 @@ describe('DocumentsController', () => {
 
       const response = await controller.getDetails('doc-123');
 
-      expect(mockDocumentsService.getDetails).toHaveBeenCalledWith('doc-123');
+      expect(mockDocumentsService.getDetails).toHaveBeenCalledWith('doc-123', undefined);
       expect(response).toEqual({
         statusCode: 200,
         message: 'Get document details successfully',

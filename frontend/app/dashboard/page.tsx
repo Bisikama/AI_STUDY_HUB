@@ -6,6 +6,7 @@ import { useAuth, User } from '@/hooks/useAuth';
 import { dashboardApi, ExploreDocument, Contributor } from '@/services/dashboardApi';
 import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
+import Link from 'next/link';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
@@ -223,7 +224,7 @@ function DashboardPage() {
     }
     return null;
   });
-  const { getProfile } = useAuth();
+  const { getProfile, logout } = useAuth();
 
   const aiCacheUrl = selectedDocumentId
     ? `${API_BASE_URL}/api/explore/${selectedDocumentId}/ai-cache`
@@ -279,6 +280,7 @@ function DashboardPage() {
       .catch((err) => {
         // eslint-disable-next-line no-console
         console.error('Failed to sync profile:', err);
+        logout();
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -356,12 +358,16 @@ function DashboardPage() {
           mobileMenuOpen ? 'flex' : 'hidden'
         } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
-        <div className="mb-8 flex items-center justify-between px-4">
+        <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
-              <h1 className="font-headline-md text-headline-md text-primary">ScholarHub</h1>
-              <p className="font-label-sm text-label-sm text-secondary">Academic Excellence</p>
+              <h1 className="font-headline-md text-headline-md text-primary font-bold">
+                ScholarHub
+              </h1>
+              <p className="font-label-sm text-label-sm text-secondary text-[10px] tracking-wider uppercase">
+                Academic Excellence
+              </p>
             </div>
           </div>
           <button
@@ -373,62 +379,46 @@ function DashboardPage() {
         </div>
 
         <div className="mb-6 px-4">
-          <button
-            onClick={() => router.push('/explore')}
-            className="bg-primary-container text-on-primary font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-3 transition-opacity hover:opacity-90"
+          <Link
+            href="/dashboard/upload"
+            className="font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-3 text-white shadow-sm transition-opacity hover:opacity-90"
           >
             <span className="material-symbols-outlined">add</span> New Research
-          </button>
+          </Link>
         </div>
 
         <ul className="flex flex-grow flex-col gap-2">
           <li>
-            <a
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                router.push('/dashboard');
-              }}
+            <Link
+              href="/dashboard"
+              className="bg-surface-container-low text-primary font-semibold font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
             >
-              <span className="material-symbols-outlined">explore</span> Discover
-            </a>
+              <span className="material-symbols-outlined">search</span> Discover
+            </Link>
           </li>
           <li>
-            <a
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
+            <Link
               href="/dashboard/documents"
-              onClick={(e) => {
-                e.preventDefault();
-                router.push('/dashboard/documents');
-              }}
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
             >
               <span className="material-symbols-outlined">description</span> My Documents
-            </a>
+            </Link>
           </li>
           <li>
-            <a
+            <Link
+              href="/practice"
               className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                router.push('/practice');
-              }}
             >
-              <span className="material-symbols-outlined">school</span> Practice Mode
-            </a>
+              <span className="material-symbols-outlined">lightbulb</span> Practice Mode
+            </Link>
           </li>
           <li>
-            <a
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('AI Assistant clicked (Simulated)');
-              }}
+            <button
+              onClick={() => alert('AI Assistant clicked (Simulated)')}
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
             >
-              <span className="material-symbols-outlined">psychology</span> AI Assistant
-            </a>
+              <span className="material-symbols-outlined">computer</span> AI Assistant
+            </button>
           </li>
           {user?.role === 'ADMIN' && (
             <li>
@@ -646,7 +636,7 @@ function DashboardPage() {
                     {recentlyViewed.slice(0, 8).map((doc) => (
                       <div
                         key={doc.id}
-                        onClick={() => handleCardClick(doc.id, doc.title)}
+                        onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
                         className="bg-surface-container-lowest group flex min-h-[160px] w-[280px] flex-shrink-0 cursor-pointer snap-start flex-col justify-between rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] sm:w-[320px]"
                       >
                         <div>
@@ -719,7 +709,7 @@ function DashboardPage() {
                     {publicDocuments.map((doc) => (
                       <div
                         key={doc.id}
-                        onClick={() => handleCardClick(doc.id, doc.title)}
+                        onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
                         className="bg-surface-container-lowest group flex min-h-[160px] cursor-pointer flex-col justify-between rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)]"
                       >
                         <div>
@@ -780,7 +770,7 @@ function DashboardPage() {
                       return (
                         <div
                           key={doc.id}
-                          onClick={() => handleCardClick(doc.id, doc.title)}
+                          onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
                           className="hover:bg-surface-container-low group flex cursor-pointer items-center justify-between border-b border-[#E9ECEF] p-4 transition-colors last:border-b-0 sm:p-6"
                         >
                           <div className="flex items-start gap-4">
@@ -912,7 +902,7 @@ function DashboardPage() {
                       key={doc.id}
                       onClick={() => {
                         setShowRecentlyViewedModal(false);
-                        handleCardClick(doc.id, doc.title);
+                        router.push(`/dashboard/documents/${doc.id}`);
                       }}
                       className="bg-surface-container-low hover:bg-surface-container-high group border-outline-variant flex min-h-[140px] cursor-pointer flex-col justify-between rounded-xl border p-5 transition-all"
                     >
@@ -1375,19 +1365,17 @@ function DashboardSkeleton() {
 
 export default function HomePage() {
   const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(() => {
-    if (typeof window !== 'undefined') {
-      return !!localStorage.getItem('token');
-    }
-    return null;
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       router.replace('/login');
+      setIsLoggedIn(false);
+    } else {
+      setIsLoggedIn(true);
     }
-  }, [isLoggedIn, router]);
+  }, [router]);
 
   if (isLoggedIn === null || isLoggedIn === false) {
     return <DashboardSkeleton />;

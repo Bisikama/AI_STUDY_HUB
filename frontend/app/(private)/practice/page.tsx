@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
+import Link from 'next/link';
 
 type Subject = {
   id: number;
@@ -303,14 +304,16 @@ export default function PracticePage() {
           mobileMenuOpen ? 'flex' : 'hidden'
         } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
-        <div className="mb-8 flex items-center justify-between px-4">
+        <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
               <h1 className="font-headline-md text-headline-md text-primary font-bold">
                 ScholarHub
               </h1>
-              <p className="font-label-sm text-label-sm text-secondary">Academic Excellence</p>
+              <p className="font-label-sm text-label-sm text-secondary text-[10px] tracking-wider uppercase">
+                Academic Excellence
+              </p>
             </div>
           </div>
           <button
@@ -322,48 +325,45 @@ export default function PracticePage() {
         </div>
 
         <div className="mb-6 px-4">
-          <button
-            onClick={() => router.push('/explore')}
-            className="bg-primary-container text-on-primary font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold transition-opacity hover:opacity-90"
+          <Link
+            href="/dashboard/upload"
+            className="font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-3 text-white shadow-sm transition-opacity hover:opacity-90"
           >
             <span className="material-symbols-outlined">add</span> New Research
-          </button>
+          </Link>
         </div>
 
         <ul className="flex flex-grow flex-col gap-2">
           <li>
-            <button
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-              onClick={() => router.push('/dashboard')}
+            <Link
+              href="/dashboard"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
             >
-              <span className="material-symbols-outlined">explore</span> Discover
-            </button>
+              <span className="material-symbols-outlined">search</span> Discover
+            </Link>
           </li>
           <li>
-            <button
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-              onClick={() => router.push('/dashboard')}
+            <Link
+              href="/dashboard/documents"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
             >
               <span className="material-symbols-outlined">description</span> My Documents
-            </button>
+            </Link>
           </li>
           <li>
-            <button
-              className="text-primary bg-secondary-container text-on-secondary-container font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold transition-transform active:scale-95"
-              onClick={() => {
-                setSelectedDocId(null);
-                router.push('/practice');
-              }}
+            <Link
+              href="/practice"
+              className="bg-surface-container-low text-primary font-semibold font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
             >
-              <span className="material-symbols-outlined filled">school</span> Practice Mode
-            </button>
+              <span className="material-symbols-outlined">lightbulb</span> Practice Mode
+            </Link>
           </li>
           <li>
             <button
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
               onClick={() => alert('AI Assistant clicked (Simulated)')}
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
             >
-              <span className="material-symbols-outlined">psychology</span> AI Assistant
+              <span className="material-symbols-outlined">computer</span> AI Assistant
             </button>
           </li>
         </ul>
@@ -386,15 +386,17 @@ export default function PracticePage() {
             </button>
           </li>
           <li>
-            <button
-              className="text-error font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
-              onClick={() => {
+            <a
+              className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
                 localStorage.removeItem('token');
                 router.replace('/');
               }}
             >
               <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
-            </button>
+            </a>
           </li>
         </ul>
       </nav>
