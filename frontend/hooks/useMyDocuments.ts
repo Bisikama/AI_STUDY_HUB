@@ -8,7 +8,7 @@ export function useMyDocuments() {
   );
 
   return {
-    documents: data?.data || [],
+    documents: data || [],
     isLoading,
     isError: error,
     mutate,

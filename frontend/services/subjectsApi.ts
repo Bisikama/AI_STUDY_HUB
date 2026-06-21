@@ -14,7 +14,7 @@ export const subjectsApi = {
   /**
    * Get subjects visible to the current user (system + personal).
    */
-  getSubjects: async (): Promise<{ statusCode: number; message: string; data: Subject[] }> => {
+  getSubjects: async (): Promise<Subject[]> => {
     const response = await axiosClient.get("/subjects");
     return response.data;
   },
@@ -22,7 +22,7 @@ export const subjectsApi = {
   /**
    * Create a new personal subject for the current user.
    */
-  createSubject: async (payload: { name: string; description?: string }): Promise<{ statusCode: number; message: string; data: Subject }> => {
+  createSubject: async (payload: { name: string; description?: string }): Promise<Subject> => {
     const response = await axiosClient.post("/subjects", payload);
     return response.data;
   },

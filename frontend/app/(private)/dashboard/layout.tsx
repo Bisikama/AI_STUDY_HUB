@@ -67,6 +67,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
         </div>
 
+        <div className="mb-6 px-4">
+          <Link
+            href="/dashboard/upload"
+            className="font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-3 text-white shadow-sm transition-opacity hover:opacity-90"
+          >
+            <span className="material-symbols-outlined">add</span> New Research
+          </Link>
+        </div>
+
         <ul className="flex flex-grow flex-col gap-2">
           <li>
             <Link
@@ -113,15 +122,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
           </li>
         </ul>
-
-        <div className="mt-8 mb-6 px-4">
-          <Link
-            href="/dashboard/upload"
-            className="font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-3 text-white shadow-sm transition-opacity hover:opacity-90"
-          >
-            <span className="material-symbols-outlined">add</span> New Research
-          </Link>
-        </div>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
           <li>

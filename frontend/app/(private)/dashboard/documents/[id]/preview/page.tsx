@@ -15,7 +15,7 @@ export default function DocumentPreviewPage() {
     () => documentsApi.getDocumentById(id)
   );
 
-  const document = response?.data;
+  const document = response;
 
   const formatSize = (bytes: number): string => {
     if (!bytes) return '0 B';

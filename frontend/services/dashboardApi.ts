@@ -40,7 +40,7 @@ export interface DashboardData {
 export const dashboardApi = {
   getDashboardData: async (): Promise<DashboardData> => {
     const response = await axiosClient.get('/dashboard');
-    return response.data.data;
+    return response.data;
   },
 
   recordView: async (documentId: string): Promise<void> => {

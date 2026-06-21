@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -11,17 +11,56 @@ export default function DocumentDetailPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
 
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
-  const [isDeleting, setIsDeleting] = React.useState(false);
-  const [deleteError, setDeleteError] = React.useState<string | undefined>();
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | undefined>();
+
+  // Toast notifications state
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastIdRef = useRef(0);
+  const addToast = useCallback((message: string, variant: ToastVariant) => {
+    const toastId = ++toastIdRef.current;
+    setToasts((prev) => [...prev, { id: toastId, message, variant }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toastId)), 5000);
+  }, []);
+
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const {
     data: response,
     error,
     isLoading,
+    mutate,
   } = useSWR(id ? `/documents/${id}` : null, () => documentsApi.getDocumentById(id));
 
-  const document = response?.data;
+  const document = response;
+
+  const handleAnalyze = async () => {
+    if (!id) return;
+    setIsAnalyzing(true);
+    
+    // Toast 1: Loading
+    addToast('Loading document data...', 'info');
+    
+    // Transition Toast 2
+    const timer = setTimeout(() => {
+      addToast('AI is analyzing and generating questions...', 'info');
+    }, 1500);
+
+    try {
+      await documentsApi.analyzeDocument(id);
+      clearTimeout(timer);
+      addToast('Completed! Document has been successfully processed.', 'success');
+      mutate();
+    } catch (err: any) {
+      clearTimeout(timer);
+      console.error('Analysis failed:', err);
+      const errMsg = err.response?.data?.message || err.message || 'Document analysis error';
+      addToast(`Error: ${errMsg}`, 'error');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const formatSize = (bytes: number): string => {
     if (!bytes) return '0 B';
@@ -243,32 +282,57 @@ export default function DocumentDetailPage() {
           </div>
 
           {/* Action Card matching "AI Assistant" dark styling */}
-          <div className="rounded-2xl bg-[#1a1c23] p-6 text-white shadow-md">
+          <div className="rounded-2xl bg-[#1a1c23] p-6 text-white shadow-md relative overflow-hidden">
+            {isAnalyzing && (
+              <div className="absolute inset-0 bg-[#1a1c23]/95 flex flex-col items-center justify-center p-6 text-center z-10">
+                <span className="material-symbols-outlined text-5xl text-blue-400 animate-pulse mb-3">
+                  psychology
+                </span>
+                <h4 className="text-lg font-bold mb-1">AI Document Analysis</h4>
+                <p className="text-xs text-gray-400 mb-4">
+                  Processing content & generating questions...
+                </p>
+                <div className="flex items-center gap-2 text-sm text-gray-300">
+                  <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                  <span>Please wait (15-30 seconds)</span>
+                </div>
+              </div>
+            )}
+
             <h3 className="mb-2 text-xl font-bold">Document Actions</h3>
             <p className="mb-6 text-sm text-gray-400">
               What would you like to do with this document today?
             </p>
 
-            <div className="flex flex-col gap-3">
-              <button className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-gray-700">
-                Generate Quiz
-                <span className="material-symbols-outlined text-[18px] text-gray-400">
-                  chevron_right
+            {document.isAIGenerated ? (
+              <div className="flex flex-col items-center justify-center py-4 text-center">
+                <span className="material-symbols-outlined text-4xl text-emerald-400 mb-2">
+                  check_circle
                 </span>
-              </button>
-              <button className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-gray-700">
-                Create Flashcards
-                <span className="material-symbols-outlined text-[18px] text-gray-400">
-                  chevron_right
-                </span>
-              </button>
-              <button className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-gray-700">
-                Ask a Question
-                <span className="material-symbols-outlined text-[18px] text-gray-400">
-                  chevron_right
-                </span>
-              </button>
-            </div>
+                <p className="text-sm font-semibold text-gray-200">
+                  Document successfully processed
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Summary and Quiz are ready
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing}
+                  className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-gray-700 disabled:opacity-50 w-full"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-blue-400">auto_awesome</span>
+                    Generate Quiz and Summary
+                  </span>
+                  <span className="material-symbols-outlined text-[18px] text-gray-400">
+                    chevron_right
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* System Info Card */}
@@ -338,6 +402,52 @@ export default function DocumentDetailPage() {
           }
         }}
       />
+      <ToastNotification toasts={toasts} />
+    </div>
+  );
+}
+
+type ToastVariant = 'success' | 'error' | 'info';
+
+interface Toast {
+  id: number;
+  message: string;
+  variant: ToastVariant;
+}
+
+function ToastNotification({ toasts }: { toasts: Toast[] }) {
+  return (
+    <div className="pointer-events-none fixed right-6 bottom-6 z-[110] flex flex-col gap-2">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${
+            t.variant === 'success'
+              ? 'bg-emerald-600'
+              : t.variant === 'error'
+              ? 'bg-red-600'
+              : 'bg-blue-600'
+          }`}
+        >
+          {t.variant === 'success' && (
+            <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+          {t.variant === 'error' && (
+            <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
+          {t.variant === 'info' && (
+            <svg className="h-4.5 w-4.5 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          )}
+          {t.message}
+        </div>
+      ))}
     </div>
   );
 }

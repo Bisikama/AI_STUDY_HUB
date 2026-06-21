@@ -23,8 +23,8 @@ export default function EditDocumentPage() {
     () => subjectsApi.getSubjects(),
   );
 
-  const document = response?.data;
-  const subjects: Subject[] = subjectsResponse?.data || [];
+  const document = response;
+  const subjects: Subject[] = subjectsResponse || [];
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -43,7 +43,7 @@ export default function EditDocumentPage() {
     '/tags',
     () => tagsApi.getTags(),
   );
-  const availableTags: Tag[] = tagsResponse?.data || [];
+  const availableTags: Tag[] = tagsResponse || [];
 
   useEffect(() => {
     if (document) {
@@ -96,7 +96,7 @@ export default function EditDocumentPage() {
       setIsCreatingFolder(true);
       const result = await subjectsApi.createSubject({ name });
       await mutateSubjects();
-      setSelectedSubjectId(result.data.id);
+      setSelectedSubjectId(result.id);
       setShowCreateFolder(false);
       setNewFolderName('');
     } catch {
