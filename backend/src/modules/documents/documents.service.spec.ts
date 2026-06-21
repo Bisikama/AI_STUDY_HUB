@@ -74,6 +74,13 @@ describe('DocumentsService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
       deleteMany: jest.fn(),
+      findMany: jest.fn(),
+    },
+    userFollowedDocument: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      upsert: jest.fn(),
+      deleteMany: jest.fn(),
     },
     documentSummary: {
       create: jest.fn(),
@@ -519,6 +526,8 @@ describe('DocumentsService', () => {
         quizzes: [{ id: 'q-1' }],
         deletedAt: null,
         status: 'APPROVED',
+        isFollowed: false,
+        isOwner: false,
       });
     });
   });

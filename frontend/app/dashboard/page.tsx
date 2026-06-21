@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, User } from '@/hooks/useAuth';
 import { dashboardApi, ExploreDocument, Contributor } from '@/services/dashboardApi';
+import { documentsApi } from '@/services/documentsApi';
 import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
 import Link from 'next/link';
@@ -226,6 +227,31 @@ function DashboardPage() {
   });
   const { getProfile, logout } = useAuth();
 
+  const { data: myDocuments = [], mutate: mutateMyDocuments } = useSWR('/documents/me', () =>
+    documentsApi.getMyDocuments(),
+  );
+
+  const isDocumentOwner = myDocuments.some((d) => d.id === selectedDocumentId && d.isOwner);
+  const isDocumentFollowed = myDocuments.some((d) => d.id === selectedDocumentId && d.isFollowed);
+
+  const handleFollowDocument = async (docId: string) => {
+    try {
+      await documentsApi.followDocument(docId);
+      mutateMyDocuments();
+    } catch (err) {
+      console.error('Failed to follow document:', err);
+    }
+  };
+
+  const handleUnfollowDocument = async (docId: string) => {
+    try {
+      await documentsApi.unfollowDocument(docId);
+      mutateMyDocuments();
+    } catch (err) {
+      console.error('Failed to unfollow document:', err);
+    }
+  };
+
   const aiCacheUrl = selectedDocumentId
     ? `${API_BASE_URL}/api/explore/${selectedDocumentId}/ai-cache`
     : null;
@@ -379,7 +405,7 @@ function DashboardPage() {
 
         <div className="mb-6 px-4">
           <Link
-            href="/dashboard/upload"
+            href="/explore"
             className="font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-3 text-white shadow-sm transition-opacity hover:opacity-90"
           >
             <span className="material-symbols-outlined">add</span> New Research
@@ -635,7 +661,7 @@ function DashboardPage() {
                     {recentlyViewed.slice(0, 8).map((doc) => (
                       <div
                         key={doc.id}
-                        onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
+                        onClick={() => handleCardClick(doc.id, doc.title)}
                         className="bg-surface-container-lowest group flex min-h-[160px] w-[280px] flex-shrink-0 cursor-pointer snap-start flex-col justify-between rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] sm:w-[320px]"
                       >
                         <div>
@@ -708,7 +734,7 @@ function DashboardPage() {
                     {publicDocuments.map((doc) => (
                       <div
                         key={doc.id}
-                        onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
+                        onClick={() => handleCardClick(doc.id, doc.title)}
                         className="bg-surface-container-lowest group flex min-h-[160px] cursor-pointer flex-col justify-between rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)]"
                       >
                         <div>
@@ -769,7 +795,7 @@ function DashboardPage() {
                       return (
                         <div
                           key={doc.id}
-                          onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
+                          onClick={() => handleCardClick(doc.id, doc.title)}
                           className="hover:bg-surface-container-low group flex cursor-pointer items-center justify-between border-b border-[#E9ECEF] p-4 transition-colors last:border-b-0 sm:p-6"
                         >
                           <div className="flex items-start gap-4">
@@ -899,7 +925,7 @@ function DashboardPage() {
                       key={doc.id}
                       onClick={() => {
                         setShowRecentlyViewedModal(false);
-                        router.push(`/dashboard/documents/${doc.id}`);
+                        handleCardClick(doc.id, doc.title);
                       }}
                       className="bg-surface-container-low hover:bg-surface-container-high group border-outline-variant flex min-h-[140px] cursor-pointer flex-col justify-between rounded-xl border p-5 transition-all"
                     >
@@ -1183,17 +1209,36 @@ function DashboardPage() {
                       Close
                     </button>
 
+                    {!isDocumentOwner && (
+                      <button
+                        onClick={() => {
+                          if (isDocumentFollowed) {
+                            handleUnfollowDocument(aiCache.document.id);
+                          } else {
+                            handleFollowDocument(aiCache.document.id);
+                          }
+                        }}
+                        className={`cursor-pointer rounded-lg px-5 py-2 transition-all hover:shadow-md flex items-center gap-1.5 border ${
+                          isDocumentFollowed
+                            ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                            : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          {isDocumentFollowed ? 'bookmark_remove' : 'bookmark'}
+                        </span>
+                        {isDocumentFollowed ? 'Unfollow' : 'Follow'}
+                      </button>
+                    )}
+
                     <button
-                      onClick={() =>
-                        window.open(
-                          getDocumentUrl(aiCache.document.fileUrl),
-                          '_blank',
-                          'noopener,noreferrer',
-                        )
-                      }
+                      onClick={() => {
+                        setSelectedDocumentId(null);
+                        router.push(`/dashboard/documents/${aiCache.document.id}`);
+                      }}
                       className="bg-primary text-on-primary cursor-pointer rounded-lg px-5 py-2 transition-all hover:shadow-md"
                     >
-                      Open File
+                      View Full
                     </button>
                   </div>
                 </div>

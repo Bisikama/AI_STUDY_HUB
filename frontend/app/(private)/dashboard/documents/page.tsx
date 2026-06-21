@@ -14,6 +14,7 @@ export default function MyDocumentsPage() {
     data: response,
     error,
     isLoading,
+    mutate,
   } = useSWR('/documents/me', () => documentsApi.getMyDocuments());
 
   const documents = response || [];
@@ -122,6 +123,12 @@ export default function MyDocumentsPage() {
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-black text-white">
                           <span className="material-symbols-outlined">data_object</span>
                         </div>
+                      ) : doc.isFollowed ? (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-500 border border-blue-100">
+                          <span className="material-symbols-outlined">
+                            {isPdf ? 'picture_as_pdf' : 'description'}
+                          </span>
+                        </div>
                       ) : (
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F1F3F5] text-gray-500">
                           <span className="material-symbols-outlined">
@@ -178,6 +185,10 @@ export default function MyDocumentsPage() {
                       <span className="rounded bg-black px-2 py-1 text-[11px] font-bold tracking-wider text-white">
                         AI INSIGHT
                       </span>
+                    ) : doc.isFollowed ? (
+                      <span className="rounded bg-blue-100 px-2 py-0.5 text-[11px] font-bold tracking-wider text-blue-700">
+                        FOLLOWED
+                      </span>
                     ) : (
                       <span className="text-[11px] font-semibold text-gray-400">
                         DOCUMENT
@@ -202,6 +213,27 @@ export default function MyDocumentsPage() {
                         </>
                       ) : (
                         <>
+                          {doc.isFollowed && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (confirm('Bỏ theo dõi tài liệu này?')) {
+                                  try {
+                                    await documentsApi.unfollowDocument(doc.id);
+                                    mutate();
+                                  } catch (err) {
+                                    console.error('Failed to unfollow:', err);
+                                  }
+                                }
+                              }}
+                              className="rounded p-1.5 transition-colors hover:bg-red-50 hover:text-red-600"
+                              title="Bỏ theo dõi"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                bookmark_remove
+                              </span>
+                            </button>
+                          )}
                           <Link
                             href={`/dashboard/documents/${doc.id}`}
                             onClick={(e) => e.stopPropagation()}
