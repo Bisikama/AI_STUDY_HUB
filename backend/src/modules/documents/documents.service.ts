@@ -524,14 +524,31 @@ Quy định chặt chẽ:
       throw new ForbiddenException('You do not have permission to view this document');
     }
 
-    return this.sanitizeData<SanitizedDocumentDetails>(document);
+    const sanitized = this.sanitizeData<SanitizedDocumentDetails>(document);
+    sanitized.isOwner = userId ? document.uploadedBy === userId : false;
+
+    let isFollowed = false;
+    if (userId) {
+      const followRecord = await this.prisma.userFollowedDocument.findUnique({
+        where: {
+          userId_documentId: {
+            userId,
+            documentId,
+          },
+        },
+      });
+      isFollowed = !!followRecord;
+    }
+    sanitized.isFollowed = isFollowed;
+
+    return sanitized;
   }
 
   /**
    * Get all documents uploaded by a specific user.
    */
   async getDocumentsByUser(userId: string): Promise<SanitizedDocument[]> {
-    const documents = await this.prisma.document.findMany({
+    const ownedDocuments = await this.prisma.document.findMany({
       where: { uploadedBy: userId, deletedAt: null },
       include: {
         subject: true,
@@ -539,7 +556,37 @@ Quy định chặt chẽ:
       },
       orderBy: { createdAt: 'desc' },
     });
-    return this.sanitizeData<SanitizedDocument[]>(documents);
+
+    const followedRelations = await this.prisma.userFollowedDocument.findMany({
+      where: { userId },
+      include: {
+        document: {
+          include: {
+            subject: true,
+            tags: { include: { tag: true } },
+          },
+        },
+      },
+      orderBy: { followedAt: 'desc' },
+    });
+
+    const followedDocuments = followedRelations
+      .map((rel) => rel.document)
+      .filter((doc) => doc.deletedAt === null);
+
+    const sanitizedOwned = this.sanitizeData<any[]>(ownedDocuments).map((doc) => ({
+      ...doc,
+      isOwner: true,
+      isFollowed: false,
+    }));
+
+    const sanitizedFollowed = this.sanitizeData<any[]>(followedDocuments).map((doc) => ({
+      ...doc,
+      isOwner: false,
+      isFollowed: true,
+    }));
+
+    return [...sanitizedOwned, ...sanitizedFollowed];
   }
 
   /**
@@ -777,5 +824,44 @@ Quy định chặt chẽ:
     }
 
     return this.sanitizeData<SanitizedDocument>(updatedDocument);
+  }
+
+  /**
+   * Follow a document by adding a record in UserFollowedDocument.
+   */
+  async followDocument(documentId: string, userId: string): Promise<void> {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document || document.deletedAt !== null) {
+      throw new NotFoundException(`Document with ID ${documentId} not found`);
+    }
+
+    await this.prisma.userFollowedDocument.upsert({
+      where: {
+        userId_documentId: {
+          userId,
+          documentId,
+        },
+      },
+      create: {
+        userId,
+        documentId,
+      },
+      update: {},
+    });
+  }
+
+  /**
+   * Unfollow a document by deleting the record from UserFollowedDocument.
+   */
+  async unfollowDocument(documentId: string, userId: string): Promise<void> {
+    await this.prisma.userFollowedDocument.deleteMany({
+      where: {
+        userId,
+        documentId,
+      },
+    });
   }
 }

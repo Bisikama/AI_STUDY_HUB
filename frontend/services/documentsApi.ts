@@ -24,6 +24,10 @@ export interface Document {
   status: 'PRIVATE' | 'PENDING' | 'APPROVED' | 'REJECTED';
   fullText: string | null;
   isAIGenerated: boolean;
+  isOwner?: boolean;
+  isFollowed?: boolean;
+  summary?: { id: string; documentId: string; summaryText: string; keyPoints: string | null; status: string; errorMessage: string | null } | null;
+  quizzes?: any[];
   createdAt: string;
   updatedAt: string;
   tags?: Array<{ documentId: string; tagId: number; tag: { id: number; name: string; slug: string; isSystem: boolean } }>;
@@ -102,6 +106,22 @@ export const documentsApi = {
    */
   analyzeDocument: async (id: string): Promise<any> => {
     const response = await axiosClient.post(`/documents/analyze/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Follow/save a document.
+   */
+  followDocument: async (id: string): Promise<any> => {
+    const response = await axiosClient.post(`/documents/${id}/follow`);
+    return response.data;
+  },
+
+  /**
+   * Unfollow/unsave a document.
+   */
+  unfollowDocument: async (id: string): Promise<any> => {
+    const response = await axiosClient.post(`/documents/${id}/unfollow`);
     return response.data;
   },
 };

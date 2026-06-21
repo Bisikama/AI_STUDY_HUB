@@ -8,6 +8,8 @@ import {
 
 export type SanitizedDocument = Omit<Document, 'fileSize'> & {
   fileSize: number;
+  isOwner?: boolean;
+  isFollowed?: boolean;
 };
 
 export interface SanitizedQuizQuestion extends QuizQuestion {

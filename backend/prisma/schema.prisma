@@ -66,6 +66,7 @@ model User {
   quizzes             Quiz[]
   quizAttempts        UserQuizAttempt[]
   documentViews       UserDocumentView[]
+  followedDocuments   UserFollowedDocument[]
 
   @@map("users")
 }
@@ -156,6 +157,7 @@ model Document {
   quizzes        Quiz[]
   documentViews  UserDocumentView[]
   tags           DocumentTag[]
+  followers      UserFollowedDocument[]
 
   @@index([subjectId, status])
   @@map("documents")
@@ -268,4 +270,19 @@ model UserDocumentView {
   @@unique([userId, documentId])
   @@index([userId, viewedAt(sort: Desc)])
   @@map("user_document_views")
+}
+
+/// Lưu/Theo dõi tài liệu của người dùng
+model UserFollowedDocument {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  followedAt DateTime @default(now()) @map("followed_at")
+
+  // Quan hệ
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@map("user_followed_documents")
 }

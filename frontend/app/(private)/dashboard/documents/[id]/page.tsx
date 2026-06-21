@@ -14,6 +14,7 @@ export default function DocumentDetailPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | undefined>();
+  const [viewType, setViewType] = useState<'text' | 'summary'>('text');
 
   // Toast notifications state
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -177,13 +178,56 @@ export default function DocumentDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 lg:shrink-0">
-          <button
-            onClick={() => router.push(`/dashboard/documents/${document.id}/edit`)}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-          >
-            <span className="material-symbols-outlined text-[18px]">edit</span>
-            Edit
-          </button>
+          {document.summary && (
+            <button
+              onClick={() => setViewType((prev) => (prev === 'text' ? 'summary' : 'text'))}
+              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {viewType === 'text' ? 'summarize' : 'text_snippet'}
+              </span>
+              {viewType === 'text' ? 'View Summary' : 'View Full Text'}
+            </button>
+          )}
+
+          {document.isOwner !== false && (
+            <button
+              onClick={() => router.push(`/dashboard/documents/${document.id}/edit`)}
+              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            >
+              <span className="material-symbols-outlined text-[18px]">edit</span>
+              Edit
+            </button>
+          )}
+
+          {document.isOwner === false && (
+            <button
+              onClick={async () => {
+                try {
+                  if (document.isFollowed) {
+                    await documentsApi.unfollowDocument(document.id);
+                    addToast('Unfollowed document successfully.', 'success');
+                  } else {
+                    await documentsApi.followDocument(document.id);
+                    addToast('Followed document successfully.', 'success');
+                  }
+                  mutate();
+                } catch (err) {
+                  console.error('Follow toggle failed:', err);
+                }
+              }}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold shadow-sm transition-colors border ${
+                document.isFollowed
+                  ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                  : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {document.isFollowed ? 'bookmark_remove' : 'bookmark'}
+              </span>
+              {document.isFollowed ? 'Unfollow' : 'Follow'}
+            </button>
+          )}
 
           <a
             href={document.fileUrl || document.previewUrl || '#'}
@@ -212,21 +256,59 @@ export default function DocumentDetailPage() {
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900">
-                <span className="material-symbols-outlined text-gray-400">text_snippet</span>
-                Extracted Text / Description
+                <span className="material-symbols-outlined text-gray-400">
+                  {viewType === 'text' ? 'text_snippet' : 'auto_awesome'}
+                </span>
+                {viewType === 'text' ? 'Extracted Text / Description' : 'AI Summary & Key Insights'}
               </h2>
             </div>
 
-            {document.description && (
-              <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 p-4">
-                <h3 className="mb-2 text-sm font-bold text-gray-700">Description</h3>
-                <p className="text-sm text-gray-600">{document.description}</p>
+            {viewType === 'text' ? (
+              <>
+                {document.description && (
+                  <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <h3 className="mb-2 text-sm font-bold text-gray-700">Description</h3>
+                    <p className="text-sm text-gray-600">{document.description}</p>
+                  </div>
+                )}
+
+                <div className="prose prose-sm max-w-none leading-relaxed text-gray-600">
+                  <p className="whitespace-pre-wrap">{truncatedText}</p>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-6">
+                {document.summary ? (
+                  <>
+                    <div className="prose prose-sm max-w-none leading-relaxed text-gray-700">
+                      <p className="whitespace-pre-wrap font-medium">{document.summary.summaryText}</p>
+                    </div>
+
+                    {document.summary.keyPoints && (
+                      <div className="mt-6 border-t border-gray-100 pt-6">
+                        <h3 className="mb-3 text-lg font-bold text-gray-900 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-amber-500">lightbulb</span>
+                          Key Insights
+                        </h3>
+                        <ul className="space-y-2.5">
+                          {document.summary.keyPoints
+                            .split('\n')
+                            .filter(Boolean)
+                            .map((point: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
+                                <span className="text-primary mt-1 font-bold">•</span>
+                                <span>{point.replace(/^•\s*/, '')}</span>
+                              </li>
+                            ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-gray-500 italic">No summary available.</p>
+                )}
               </div>
             )}
-
-            <div className="prose prose-sm max-w-none leading-relaxed text-gray-600">
-              <p className="whitespace-pre-wrap">{truncatedText}</p>
-            </div>
 
             <div className="mt-8 grid grid-cols-3 gap-4 border-t border-gray-100 pt-6 text-center">
               <div>
@@ -316,7 +398,7 @@ export default function DocumentDetailPage() {
                   Summary and Quiz are ready
                 </p>
               </div>
-            ) : (
+            ) : document.isOwner !== false ? (
               <div className="flex flex-col gap-3">
                 <button
                   onClick={handleAnalyze}
@@ -331,6 +413,18 @@ export default function DocumentDetailPage() {
                     chevron_right
                   </span>
                 </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-4 text-center">
+                <span className="material-symbols-outlined text-4xl text-gray-400 mb-2">
+                  lock
+                </span>
+                <p className="text-sm font-semibold text-gray-200">
+                  Followed Document
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  AI Quiz and Summary are not available.
+                </p>
               </div>
             )}
           </div>
@@ -369,14 +463,33 @@ export default function DocumentDetailPage() {
               )}
             </div>
 
-            <div className="mt-6 border-t border-gray-100 pt-4">
-              <button
-                onClick={() => setIsDeleteModalOpen(true)}
-                className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
-              >
-                Delete Document
-              </button>
-            </div>
+            {document.isOwner !== false ? (
+              <div className="mt-6 border-t border-gray-100 pt-4">
+                <button
+                  onClick={() => setIsDeleteModalOpen(true)}
+                  className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                >
+                  Delete Document
+                </button>
+              </div>
+            ) : (
+              <div className="mt-6 border-t border-gray-100 pt-4">
+                <button
+                  onClick={async () => {
+                    try {
+                      await documentsApi.unfollowDocument(document.id);
+                      addToast('Unfollowed document successfully.', 'success');
+                      router.push('/dashboard/documents');
+                    } catch (err) {
+                      console.error('Failed to unfollow:', err);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                >
+                  Unfollow Document
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
