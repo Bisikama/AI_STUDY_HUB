@@ -1370,19 +1370,18 @@ function DashboardSkeleton() {
 
 export default function HomePage() {
   const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(() => {
-    if (typeof window !== 'undefined') {
-      return !!localStorage.getItem('token');
-    }
-    return null;
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
+      setIsLoggedIn(false);
       router.replace('/login');
+      return;
     }
-  }, [isLoggedIn, router]);
+
+    setIsLoggedIn(true);
+  }, [router]);
 
   if (isLoggedIn === null || isLoggedIn === false) {
     return <DashboardSkeleton />;
