@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import LandingPage from '@/components/LandingPage';
+import { useAuth, User } from '@/hooks/useAuth';
 import { dashboardApi, ExploreDocument, Contributor } from '@/services/dashboardApi';
 import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
@@ -144,19 +144,86 @@ function DashboardPage() {
   const [trendingDocs, setTrendingDocs] = useState<ExploreDocument[]>([]);
   const [topContributors, setTopContributors] = useState<Contributor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userFullName, setUserFullName] = useState('User');
+  const [userFullName, setUserFullName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined') {
+        try {
+          const userObj = JSON.parse(userStr);
+          return userObj?.fullName || 'User';
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    return 'User';
+  });
   const [showRecentlyViewedModal, setShowRecentlyViewedModal] = useState(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
   const [showEditAccountModal, setShowEditAccountModal] = useState(false);
-  const [editFullName, setEditFullName] = useState('');
-  const [editUsername, setEditUsername] = useState('');
-  const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  const [editFullName, setEditFullName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined') {
+        try {
+          const userObj = JSON.parse(userStr);
+          return userObj?.fullName || '';
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    return '';
+  });
+  const [editUsername, setEditUsername] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined') {
+        try {
+          const userObj = JSON.parse(userStr);
+          return userObj?.username || '';
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    return '';
+  });
+  const [editPhoneNumber, setEditPhoneNumber] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr && userStr !== 'undefined') {
+        try {
+          const userObj = JSON.parse(userStr);
+          return userObj?.phoneNumber || '';
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    return '';
+  });
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
   const [editLoading, setEditLoading] = useState(false);
+
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          return JSON.parse(userStr);
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    return null;
+  });
+  const { getProfile } = useAuth();
 
   const aiCacheUrl = selectedDocumentId
     ? `${API_BASE_URL}/api/explore/${selectedDocumentId}/ai-cache`
@@ -195,21 +262,25 @@ function DashboardPage() {
   };
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser && storedUser !== 'undefined') {
-      try {
-        const userObj = JSON.parse(storedUser);
-        if (userObj) {
-          if (userObj.fullName) setUserFullName(userObj.fullName);
-          setEditFullName(userObj.fullName || '');
-          setEditUsername(userObj.username || '');
-          setEditPhoneNumber(userObj.phoneNumber || '');
-        }
-      } catch (e) {
-        console.error('Error parsing user info:', e);
-      }
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDashboardData();
+
+    // Fetch từ API để đồng bộ dữ liệu mới nhất từ database
+    getProfile()
+      .then((updatedUser) => {
+        if (updatedUser) {
+          setUser(updatedUser);
+          setUserFullName(updatedUser.fullName || 'User');
+          setEditFullName(updatedUser.fullName || '');
+          setEditUsername(updatedUser.username || '');
+          setEditPhoneNumber(updatedUser.phoneNumber || '');
+        }
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to sync profile:', err);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -234,13 +305,13 @@ function DashboardPage() {
   const toggleSaveDoc = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSavedDocIds((prev) =>
-      prev.includes(id) ? prev.filter((dId) => dId !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((dId) => dId !== id) : [...prev, id],
     );
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     window.location.reload();
   };
 
@@ -259,6 +330,7 @@ function DashboardPage() {
 
       const updatedUser = response.data.data?.user || response.data.user;
       localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
       setUserFullName(updatedUser.fullName);
 
       setEditSuccess('Cập nhật thông tin tài khoản thành công!');
@@ -266,9 +338,10 @@ function DashboardPage() {
         setShowEditAccountModal(false);
         setEditSuccess('');
       }, 1500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update profile:', err);
-      const errMsg = err.response?.data?.message || 'Cập nhật tài khoản thất bại!';
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      const errMsg = axiosError.response?.data?.message || 'Cập nhật tài khoản thất bại!';
       setEditError(Array.isArray(errMsg) ? errMsg[0] : errMsg);
     } finally {
       setEditLoading(false);
@@ -276,13 +349,13 @@ function DashboardPage() {
   };
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex font-sans">
+    <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
         className={`${mobileMenuOpen ? 'flex' : 'hidden'
           } md:flex fixed left-0 top-0 h-full flex-col p-4 border-r border-outline-variant bg-surface-container-lowest shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-64 z-20 transition-all`}
       >
-        <div className="flex items-center justify-between mb-8 px-4">
+        <div className="mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
@@ -292,7 +365,7 @@ function DashboardPage() {
           </div>
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden text-secondary p-1 hover:text-primary"
+            className="text-secondary hover:text-primary p-1 md:hidden"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
@@ -301,16 +374,16 @@ function DashboardPage() {
         <div className="mb-6 px-4">
           <button
             onClick={() => router.push('/explore')}
-            className="w-full bg-primary-container text-on-primary py-3 px-4 rounded-lg font-label-md text-label-md flex justify-center items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer"
+            className="bg-primary-container text-on-primary font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-3 transition-opacity hover:opacity-90"
           >
             <span className="material-symbols-outlined">add</span> New Research
           </button>
         </div>
 
-        <ul className="flex flex-col gap-2 flex-grow">
+        <ul className="flex flex-grow flex-col gap-2">
           <li>
             <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
               href="#"
               onClick={(e) => {
                 e.preventDefault();
@@ -322,11 +395,11 @@ function DashboardPage() {
           </li>
           <li>
             <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
-              href="#"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
+              href="/dashboard/documents"
               onClick={(e) => {
                 e.preventDefault();
-                alert('My Documents clicked (Simulated)');
+                router.push('/dashboard/documents');
               }}
             >
               <span className="material-symbols-outlined">description</span> My Documents
@@ -334,7 +407,7 @@ function DashboardPage() {
           </li>
           <li>
             <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
               href="#"
               onClick={(e) => {
                 e.preventDefault();
@@ -346,7 +419,7 @@ function DashboardPage() {
           </li>
           <li>
             <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
               href="#"
               onClick={(e) => {
                 e.preventDefault();
@@ -356,12 +429,27 @@ function DashboardPage() {
               <span className="material-symbols-outlined">psychology</span> AI Assistant
             </a>
           </li>
+          {user?.role === 'ADMIN' && (
+            <li>
+              <a
+                className="font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 font-bold text-red-600 transition-transform hover:bg-rose-50 active:scale-95"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/admin');
+                }}
+              >
+                <span className="material-symbols-outlined text-red-600">admin_panel_settings</span>{' '}
+                Admin Panel
+              </a>
+            </li>
+          )}
         </ul>
 
-        <ul className="flex flex-col gap-2 mt-auto border-t border-outline-variant pt-4">
+        <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
           <li>
             <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
               href="#"
               onClick={(e) => {
                 e.preventDefault();
@@ -373,7 +461,7 @@ function DashboardPage() {
           </li>
           <li>
             <a
-              className="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-low rounded-lg font-label-md text-label-md active:scale-95 transition-transform"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
               href="#"
               onClick={(e) => {
                 e.preventDefault();
@@ -385,12 +473,12 @@ function DashboardPage() {
           </li>
           <li>
             <a
-              className="flex items-center gap-3 text-error px-4 py-3 hover:bg-red-50 hover:text-rose-700 rounded-lg font-label-md text-label-md active:scale-95 transition-transform cursor-pointer"
+              className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                localStorage.removeItem("token");
-                router.replace("/");
+                localStorage.removeItem('token');
+                router.replace('/');
               }}
             >
               <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
@@ -400,14 +488,14 @@ function DashboardPage() {
       </nav>
 
       {/* Main Content Area */}
-      <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
+      <div className="flex min-h-screen flex-1 flex-col md:ml-64">
         {/* Top Header */}
-        <header className="sticky top-0 z-10 bg-surface shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-full">
-          <div className="flex justify-between items-center w-full px-container-margin-desktop max-w-max-width mx-auto h-16">
+        <header className="bg-surface sticky top-0 z-10 w-full shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
+          <div className="px-container-margin-desktop max-w-max-width mx-auto flex h-16 w-full items-center justify-between">
             <div className="flex items-center gap-4 md:hidden">
               <button
                 onClick={() => setMobileMenuOpen(true)}
-                className="text-primary hover:text-secondary transition-colors p-2 cursor-pointer"
+                className="text-primary hover:text-secondary cursor-pointer p-2 transition-colors"
               >
                 <span className="material-symbols-outlined">menu</span>
               </button>
@@ -415,14 +503,17 @@ function DashboardPage() {
             </div>
 
             {/* Search Form */}
-            <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 max-w-2xl mx-8 relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary">
+            <form
+              onSubmit={handleSearchSubmit}
+              className="relative mx-8 hidden max-w-2xl flex-1 md:flex"
+            >
+              <span className="material-symbols-outlined text-secondary absolute top-1/2 left-4 -translate-y-1/2">
                 search
               </span>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-surface-container-low border-none rounded-full py-2.5 pl-12 pr-4 text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all font-body-md text-body-md outline-none"
+                className="bg-surface-container-low text-on-surface focus:ring-primary focus:bg-surface-container-lowest font-body-md text-body-md w-full rounded-full border-none py-2.5 pr-4 pl-12 transition-all outline-none focus:ring-2"
                 placeholder="Search for courses, documents, or keywords..."
                 type="text"
               />
@@ -430,25 +521,25 @@ function DashboardPage() {
 
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push('/explore')}
-                className="hidden md:flex items-center gap-2 px-4 py-2 bg-[#212529] text-white rounded-full font-label-md text-label-md hover:opacity-90 transition-opacity h-10 cursor-pointer"
+                onClick={() => router.push('/upload')}
+                className="font-label-md text-label-md hidden h-10 cursor-pointer items-center gap-2 rounded-full bg-[#212529] px-4 py-2 text-white transition-opacity hover:opacity-90 md:flex"
               >
                 <span className="material-symbols-outlined text-[20px]">upload</span> Upload
               </button>
 
-              <button className="text-secondary hover:text-primary transition-colors p-2 relative cursor-pointer">
+              <button className="text-secondary hover:text-primary relative cursor-pointer p-2 transition-colors">
                 <span className="material-symbols-outlined">notifications</span>
-                <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+                <span className="bg-error absolute top-2 right-2 h-2 w-2 rounded-full"></span>
               </button>
 
               <div className="relative">
                 <button
                   onClick={() => setShowAvatarDropdown(!showAvatarDropdown)}
-                  className="w-10 h-10 rounded-full overflow-hidden border border-outline-variant hover:border-primary transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer flex items-center justify-center"
+                  className="border-outline-variant hover:border-primary focus:ring-primary flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border transition-colors focus:ring-2 focus:ring-offset-2"
                 >
                   <img
                     alt="User profile avatar"
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                     src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYqSMGF3Z3oHdYhn5TKuHMKRLqgbBxxxtoRNxnakx4QY5gEAylvvaC7DqnO-6wRdWbBIdm8lN9SEhMxCbp8hakT47O6vbJLl91-97D8pkJXLj50c3nW8qB-8avFTT50YGPsF-9s6SN75_vCxKk31GsSz7WxQH4X-qlX6XGkFSqpq9alyYCX-ZxYLwHMCljNf0kwH5AertyqfjrTSYFBaxqzh-1604Hz7HFbNugFP3ndIVAs_2OpIbQSJgwvDs5Kcf11UWU6_PEEOQ"
                   />
                 </button>
@@ -459,20 +550,23 @@ function DashboardPage() {
                       className="fixed inset-0 z-30"
                       onClick={() => setShowAvatarDropdown(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg py-2 z-40">
+                    <div className="bg-surface-container-lowest border-outline-variant absolute right-0 z-40 mt-2 w-48 rounded-xl border py-2 shadow-lg">
                       <button
                         onClick={() => {
                           setShowAvatarDropdown(false);
                           setShowEditAccountModal(true);
                         }}
-                        className="w-full text-left px-4 py-2 hover:bg-surface-container-low text-on-surface font-label-md text-label-md transition-colors cursor-pointer flex items-center gap-2"
+                        className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
                       >
-                        <span className="material-symbols-outlined text-[18px]">manage_accounts</span> Edit Account
+                        <span className="material-symbols-outlined text-[18px]">
+                          manage_accounts
+                        </span>{' '}
+                        Edit Account
                       </button>
                       <hr className="border-outline-variant my-1" />
                       <button
                         onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 hover:bg-error-container/10 text-error font-label-md text-label-md transition-colors cursor-pointer flex items-center gap-2"
+                        className="hover:bg-error-container/10 text-error font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
                       >
                         <span className="material-symbols-outlined text-[18px]">logout</span> Logout
                       </button>
@@ -485,7 +579,7 @@ function DashboardPage() {
         </header>
 
         {/* Main Canvas */}
-        <main className="flex-1 p-container-margin-mobile md:p-container-margin-desktop max-w-max-width mx-auto w-full">
+        <main className="p-container-margin-mobile md:p-container-margin-desktop max-w-max-width mx-auto w-full flex-1">
           <section className="mb-12">
             <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
               Welcome back, {userFullName}
@@ -496,30 +590,30 @@ function DashboardPage() {
           </section>
 
           {/* Mobile Search Form */}
-          <form onSubmit={handleSearchSubmit} className="md:hidden mb-6 relative">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary">
+          <form onSubmit={handleSearchSubmit} className="relative mb-6 md:hidden">
+            <span className="material-symbols-outlined text-secondary absolute top-1/2 left-4 -translate-y-1/2">
               search
             </span>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface-container-low border-none rounded-full py-2.5 pl-12 pr-4 text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all font-body-md text-body-md outline-none"
+              className="bg-surface-container-low text-on-surface focus:ring-primary focus:bg-surface-container-lowest font-body-md text-body-md w-full rounded-full border-none py-2.5 pr-4 pl-12 transition-all outline-none focus:ring-2"
               placeholder="Search for courses, documents, or keywords..."
               type="text"
             />
           </form>
 
           {/* Grid Layout */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            <div className="xl:col-span-2 flex flex-col gap-8">
+          <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
+            <div className="flex flex-col gap-8 xl:col-span-2">
               {/* Recently Viewed */}
               <section>
-                <div className="flex justify-between items-end mb-6">
+                <div className="mb-6 flex items-end justify-between">
                   <h3 className="font-headline-md text-headline-md text-on-surface">
                     Recently Viewed
                   </h3>
                   <a
-                    className="font-label-md text-label-md text-primary-container hover:underline cursor-pointer"
+                    className="font-label-md text-label-md text-primary-container cursor-pointer hover:underline"
                     onClick={(e) => {
                       e.preventDefault();
                       setShowRecentlyViewedModal(true);
@@ -530,31 +624,33 @@ function DashboardPage() {
                 </div>
 
                 {loading ? (
-                  <div className="text-center py-8 text-secondary">Loading...</div>
+                  <div className="text-secondary py-8 text-center">Loading...</div>
                 ) : recentlyViewed.length === 0 ? (
-                  <div className="bg-surface-container-lowest rounded-xl p-8 text-center border border-dashed border-[#E9ECEF] shadow-[0px_4px_12px_rgba(0,0,0,0.03)] flex flex-col items-center">
-                    <span className="material-symbols-outlined text-secondary text-4xl mb-2">find_in_page</span>
+                  <div className="bg-surface-container-lowest flex flex-col items-center rounded-xl border border-dashed border-[#E9ECEF] p-8 text-center shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
+                    <span className="material-symbols-outlined text-secondary mb-2 text-4xl">
+                      find_in_page
+                    </span>
                     <p className="font-body-md text-body-md text-secondary">
                       Chưa xem, hãy khám phá tài liệu mà bạn muốn.
                     </p>
                     <button
                       onClick={() => router.push('/explore')}
-                      className="mt-4 bg-[#212529] text-white py-2 px-4 rounded-full font-label-sm text-label-sm hover:opacity-90 transition-opacity cursor-pointer"
+                      className="font-label-sm text-label-sm mt-4 cursor-pointer rounded-full bg-[#212529] px-4 py-2 text-white transition-opacity hover:opacity-90"
                     >
                       Khám phá tài liệu
                     </button>
                   </div>
                 ) : (
-                  <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-outline-variant snap-x snap-mandatory">
+                  <div className="scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-outline-variant -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
                     {recentlyViewed.slice(0, 8).map((doc) => (
                       <div
                         key={doc.id}
                         onClick={() => handleCardClick(doc.id, doc.title)}
-                        className="flex-shrink-0 w-[280px] sm:w-[320px] bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[160px] snap-start"
+                        className="bg-surface-container-lowest group flex min-h-[160px] w-[280px] flex-shrink-0 cursor-pointer snap-start flex-col justify-between rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] sm:w-[320px]"
                       >
                         <div>
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="bg-[#E9ECEF] text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">
+                          <div className="mb-2 flex items-start justify-between">
+                            <span className="text-on-secondary-container font-label-sm text-label-sm rounded-full bg-[#E9ECEF] px-3 py-1">
                               {doc.subject?.code ?? 'GEN101'}
                             </span>
                             <button
@@ -562,24 +658,26 @@ function DashboardPage() {
                                 e.stopPropagation();
                                 window.open(doc.fileUrl, '_blank');
                               }}
-                              className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
+                              className="text-secondary hover:text-primary cursor-pointer p-1 opacity-0 transition-opacity group-hover:opacity-100"
                             >
                               <span className="material-symbols-outlined">download</span>
                             </button>
                           </div>
-                          <h4 className="font-body-lg text-body-lg font-semibold text-on-surface mb-1 line-clamp-2">
+                          <h4 className="font-body-lg text-body-lg text-on-surface mb-1 line-clamp-2 font-semibold">
                             {doc.title}
                           </h4>
                           <p className="font-body-md text-body-md text-secondary line-clamp-1">
                             {doc.subject?.name ?? 'General'}
                           </p>
                         </div>
-                        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#E9ECEF] text-secondary">
-                          <span className="flex items-center gap-1 font-label-sm text-label-sm">
-                            <span className="material-symbols-outlined text-[16px]">visibility</span>{' '}
+                        <div className="text-secondary mt-4 flex items-center gap-4 border-t border-[#E9ECEF] pt-4">
+                          <span className="font-label-sm text-label-sm flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[16px]">
+                              visibility
+                            </span>{' '}
                             {doc.viewCount}
                           </span>
-                          <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                          <span className="font-label-sm text-label-sm flex items-center gap-1">
                             <span className="material-symbols-outlined text-[16px]">thumb_up</span>{' '}
                             {doc.rating ? Math.round((doc.rating / 5) * 100) + '%' : '0%'}
                           </span>
@@ -592,12 +690,12 @@ function DashboardPage() {
 
               {/* Public Documents (Uploaded by other users) */}
               <section>
-                <div className="flex justify-between items-end mb-6">
+                <div className="mb-6 flex items-end justify-between">
                   <h3 className="font-headline-md text-headline-md text-on-surface">
                     Public Documents
                   </h3>
                   <a
-                    className="font-label-md text-label-md text-primary-container hover:underline cursor-pointer"
+                    className="font-label-md text-label-md text-primary-container cursor-pointer hover:underline"
                     onClick={(e) => {
                       e.preventDefault();
                       router.push('/explore');
@@ -608,24 +706,24 @@ function DashboardPage() {
                 </div>
 
                 {loading ? (
-                  <div className="text-center py-8 text-secondary">Loading...</div>
+                  <div className="text-secondary py-8 text-center">Loading...</div>
                 ) : publicDocuments.length === 0 ? (
-                  <div className="bg-surface-container-lowest rounded-xl p-8 text-center border border-dashed border-[#E9ECEF] shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
+                  <div className="bg-surface-container-lowest rounded-xl border border-dashed border-[#E9ECEF] p-8 text-center shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
                     <p className="font-body-md text-body-md text-secondary">
                       Chưa có tài liệu công khai nào khác từ cộng đồng.
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {publicDocuments.map((doc) => (
                       <div
                         key={doc.id}
                         onClick={() => handleCardClick(doc.id, doc.title)}
-                        className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between min-h-[160px]"
+                        className="bg-surface-container-lowest group flex min-h-[160px] cursor-pointer flex-col justify-between rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)]"
                       >
                         <div>
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="bg-[#E9ECEF] text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">
+                          <div className="mb-2 flex items-start justify-between">
+                            <span className="text-on-secondary-container font-label-sm text-label-sm rounded-full bg-[#E9ECEF] px-3 py-1">
                               {doc.subject?.code ?? 'GEN101'}
                             </span>
                             <button
@@ -633,24 +731,26 @@ function DashboardPage() {
                                 e.stopPropagation();
                                 window.open(doc.fileUrl, '_blank');
                               }}
-                              className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
+                              className="text-secondary hover:text-primary cursor-pointer p-1 opacity-0 transition-opacity group-hover:opacity-100"
                             >
                               <span className="material-symbols-outlined">download</span>
                             </button>
                           </div>
-                          <h4 className="font-body-lg text-body-lg font-semibold text-on-surface mb-1 line-clamp-2">
+                          <h4 className="font-body-lg text-body-lg text-on-surface mb-1 line-clamp-2 font-semibold">
                             {doc.title}
                           </h4>
                           <p className="font-body-md text-body-md text-secondary line-clamp-1">
                             {doc.subject?.name ?? 'General'}
                           </p>
                         </div>
-                        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#E9ECEF] text-secondary">
-                          <span className="flex items-center gap-1 font-label-sm text-label-sm">
-                            <span className="material-symbols-outlined text-[16px]">visibility</span>{' '}
+                        <div className="text-secondary mt-4 flex items-center gap-4 border-t border-[#E9ECEF] pt-4">
+                          <span className="font-label-sm text-label-sm flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[16px]">
+                              visibility
+                            </span>{' '}
                             {doc.viewCount}
                           </span>
-                          <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                          <span className="font-label-sm text-label-sm flex items-center gap-1">
                             <span className="material-symbols-outlined text-[16px]">thumb_up</span>{' '}
                             {doc.rating ? Math.round((doc.rating / 5) * 100) + '%' : '0%'}
                           </span>
@@ -666,11 +766,11 @@ function DashboardPage() {
                 <h3 className="font-headline-md text-headline-md text-on-surface mb-6">
                   Trending in your network
                 </h3>
-                <div className="bg-surface-container-lowest rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.03)] overflow-hidden">
+                <div className="bg-surface-container-lowest overflow-hidden rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
                   {loading ? (
-                    <div className="text-center py-8 text-secondary">Loading...</div>
+                    <div className="text-secondary py-8 text-center">Loading...</div>
                   ) : trendingDocs.length === 0 ? (
-                    <div className="p-8 text-center text-secondary">
+                    <div className="text-secondary p-8 text-center">
                       Chưa có tài liệu thịnh hành.
                     </div>
                   ) : (
@@ -680,26 +780,29 @@ function DashboardPage() {
                         <div
                           key={doc.id}
                           onClick={() => handleCardClick(doc.id, doc.title)}
-                          className="flex items-center justify-between p-4 sm:p-6 border-b border-[#E9ECEF] last:border-b-0 hover:bg-surface-container-low transition-colors cursor-pointer group"
+                          className="hover:bg-surface-container-low group flex cursor-pointer items-center justify-between border-b border-[#E9ECEF] p-4 transition-colors last:border-b-0 sm:p-6"
                         >
                           <div className="flex items-start gap-4">
                             <div
-                              className={`w-12 h-12 rounded ${fileInfo.bgClass} flex items-center justify-center flex-shrink-0`}
+                              className={`h-12 w-12 rounded ${fileInfo.bgClass} flex flex-shrink-0 items-center justify-center`}
                             >
                               <span className="material-symbols-outlined">{fileInfo.icon}</span>
                             </div>
                             <div>
-                              <h4 className="font-body-md text-body-md font-semibold text-on-surface line-clamp-1">
+                              <h4 className="font-body-md text-body-md text-on-surface line-clamp-1 font-semibold">
                                 {doc.title}
                               </h4>
-                              <div className="flex flex-wrap items-center gap-2 mt-1 text-secondary font-label-sm text-label-sm">
+                              <div className="text-secondary font-label-sm text-label-sm mt-1 flex flex-wrap items-center gap-2">
                                 <span>{doc.subject?.name ?? 'General'}</span>
                                 <span>•</span>
                                 <span>{doc.subject?.code ?? 'GEN101'}</span>
                                 <span>•</span>
-                                <span className="text-[#212529] font-medium flex items-center gap-0.5 text-amber-600">
-                                  <span className="material-symbols-outlined text-[14px] fill-current">star</span>
-                                  {doc.rating ? doc.rating.toFixed(1) : '0.0'} ({doc.rating ? Math.round((doc.rating / 5) * 100) + '%' : '0%'})
+                                <span className="flex items-center gap-0.5 font-medium text-[#212529] text-amber-600">
+                                  <span className="material-symbols-outlined fill-current text-[14px]">
+                                    star
+                                  </span>
+                                  {doc.rating ? doc.rating.toFixed(1) : '0.0'} (
+                                  {doc.rating ? Math.round((doc.rating / 5) * 100) + '%' : '0%'})
                                 </span>
                                 <span>•</span>
                                 <span className="text-[#212529]">
@@ -727,13 +830,13 @@ function DashboardPage() {
 
             {/* Right Column */}
             <div className="flex flex-col gap-8">
-              <section className="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] h-fit">
+              <section className="bg-surface-container-lowest h-fit rounded-xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
                 <h3 className="font-headline-md text-headline-md text-on-surface mb-6">
                   Top Contributors
                 </h3>
                 <div className="flex flex-col gap-4">
                   {topContributors.length === 0 ? (
-                    <p className="font-label-sm text-label-sm text-secondary text-center py-4">
+                    <p className="font-label-sm text-label-sm text-secondary py-4 text-center">
                       Chưa có contributor nào.
                     </p>
                   ) : (
@@ -742,11 +845,16 @@ function DashboardPage() {
                         <div className="flex items-center gap-3">
                           <img
                             alt={`${c.fullName}'s avatar`}
-                            className="w-10 h-10 rounded-full object-cover"
-                            src={c.avatarUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuDCbKnnE9P8WplUJMxgDKRUPtxvrITGrpi-hIFPFfkPJz6oIZBQQwhURIyhGnsxfdGzugqzkbfErVWvEXVDQj40Z8jZPgGOqIZxv-iQyguS7fnYjLa36ZJQnXbCk_lBFV7OxsVwQ3nvdhn0hnYgs75Q3OEbKjYauRURKkxAFUml8OZhtI9RB61neoZvyycGXvBcD6FfN7pEdKb-2n0h7XV1Hm6YScxugLFyu6R1-OspAxktJA0roF_6UUt98S76BVyaYvqEqcy1khE"}
+                            className="h-10 w-10 rounded-full object-cover"
+                            src={
+                              c.avatarUrl ||
+                              'https://lh3.googleusercontent.com/aida-public/AB6AXuDCbKnnE9P8WplUJMxgDKRUPtxvrITGrpi-hIFPFfkPJz6oIZBQQwhURIyhGnsxfdGzugqzkbfErVWvEXVDQj40Z8jZPgGOqIZxv-iQyguS7fnYjLa36ZJQnXbCk_lBFV7OxsVwQ3nvdhn0hnYgs75Q3OEbKjYauRURKkxAFUml8OZhtI9RB61neoZvyycGXvBcD6FfN7pEdKb-2n0h7XV1Hm6YScxugLFyu6R1-OspAxktJA0roF_6UUt98S76BVyaYvqEqcy1khE'
+                            }
                           />
                           <div>
-                            <p className="font-label-md text-label-md text-on-surface">{c.fullName}</p>
+                            <p className="font-label-md text-label-md text-on-surface">
+                              {c.fullName}
+                            </p>
                             <p className="font-label-sm text-label-sm text-secondary">
                               {c.uploadedCount} docs uploaded
                             </p>
@@ -764,7 +872,7 @@ function DashboardPage() {
                 </div>
                 <button
                   onClick={() => setShowLeaderboardModal(true)}
-                  className="w-full mt-6 py-2 border border-[#E9ECEF] text-on-surface rounded-lg font-label-md text-label-md hover:bg-surface-container-low transition-colors cursor-pointer"
+                  className="text-on-surface font-label-md text-label-md hover:bg-surface-container-low mt-6 w-full cursor-pointer rounded-lg border border-[#E9ECEF] py-2 transition-colors"
                 >
                   View Leaderboard
                 </button>
@@ -777,24 +885,25 @@ function DashboardPage() {
 
         {/* Recently Viewed Modal */}
         {showRecentlyViewedModal && (
-          <div className="fixed inset-0 bg-[#00000080] backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
-            <div className="bg-surface-container-lowest rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl border border-outline-variant overflow-hidden">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#00000080] p-4 backdrop-blur-sm transition-all">
+            <div className="bg-surface-container-lowest border-outline-variant flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-outline-variant">
-                <h3 className="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">history</span> Recently Viewed
+              <div className="border-outline-variant flex items-center justify-between border-b p-6">
+                <h3 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2 font-bold">
+                  <span className="material-symbols-outlined text-primary">history</span> Recently
+                  Viewed
                 </h3>
                 <button
                   onClick={() => setShowRecentlyViewedModal(false)}
-                  className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors cursor-pointer text-secondary"
+                  className="hover:bg-surface-container-low text-secondary flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
 
               {/* Content */}
-              <div className="p-6 overflow-y-auto flex-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {recentlyViewed.map((doc) => (
                     <div
                       key={doc.id}
@@ -802,11 +911,11 @@ function DashboardPage() {
                         setShowRecentlyViewedModal(false);
                         handleCardClick(doc.id, doc.title);
                       }}
-                      className="bg-surface-container-low rounded-xl p-5 hover:bg-surface-container-high transition-all cursor-pointer group flex flex-col justify-between min-h-[140px] border border-outline-variant"
+                      className="bg-surface-container-low hover:bg-surface-container-high group border-outline-variant flex min-h-[140px] cursor-pointer flex-col justify-between rounded-xl border p-5 transition-all"
                     >
                       <div>
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="bg-[#E9ECEF] text-on-secondary-container px-2.5 py-0.5 rounded-full font-label-sm text-label-sm font-semibold">
+                        <div className="mb-2 flex items-start justify-between">
+                          <span className="text-on-secondary-container font-label-sm text-label-sm rounded-full bg-[#E9ECEF] px-2.5 py-0.5 font-semibold">
                             {doc.subject?.code ?? 'GEN101'}
                           </span>
                           <button
@@ -814,24 +923,24 @@ function DashboardPage() {
                               e.stopPropagation();
                               window.open(doc.fileUrl, '_blank');
                             }}
-                            className="text-secondary opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary p-1 cursor-pointer"
+                            className="text-secondary hover:text-primary cursor-pointer p-1 opacity-0 transition-opacity group-hover:opacity-100"
                           >
                             <span className="material-symbols-outlined">download</span>
                           </button>
                         </div>
-                        <h4 className="font-body-md text-body-md font-semibold text-on-surface mb-1 line-clamp-2 group-hover:text-primary transition-colors">
+                        <h4 className="font-body-md text-body-md text-on-surface group-hover:text-primary mb-1 line-clamp-2 font-semibold transition-colors">
                           {doc.title}
                         </h4>
                         <p className="font-label-sm text-label-sm text-secondary line-clamp-1">
                           {doc.subject?.name ?? 'General'}
                         </p>
                       </div>
-                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-outline-variant text-secondary">
-                        <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                      <div className="border-outline-variant text-secondary mt-3 flex items-center gap-4 border-t pt-3">
+                        <span className="font-label-sm text-label-sm flex items-center gap-1">
                           <span className="material-symbols-outlined text-[16px]">visibility</span>{' '}
                           {doc.viewCount}
                         </span>
-                        <span className="flex items-center gap-1 font-label-sm text-label-sm">
+                        <span className="font-label-sm text-label-sm flex items-center gap-1">
                           <span className="material-symbols-outlined text-[16px]">thumb_up</span>{' '}
                           {doc.rating ? Math.round((doc.rating / 5) * 100) + '%' : '0%'}
                         </span>
@@ -846,23 +955,26 @@ function DashboardPage() {
 
         {/* Leaderboard Modal */}
         {showLeaderboardModal && (
-          <div className="fixed inset-0 bg-[#00000080] backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
-            <div className="bg-surface-container-lowest rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl border border-outline-variant overflow-hidden">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#00000080] p-4 backdrop-blur-sm transition-all">
+            <div className="bg-surface-container-lowest border-outline-variant flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border shadow-2xl">
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-outline-variant">
-                <h3 className="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#FFD700]">workspace_premium</span> Leaderboard
+              <div className="border-outline-variant flex items-center justify-between border-b p-6">
+                <h3 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2 font-bold">
+                  <span className="material-symbols-outlined text-[#FFD700]">
+                    workspace_premium
+                  </span>{' '}
+                  Leaderboard
                 </h3>
                 <button
                   onClick={() => setShowLeaderboardModal(false)}
-                  className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors cursor-pointer text-secondary"
+                  className="hover:bg-surface-container-low text-secondary flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
 
               {/* Content */}
-              <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-4">
+              <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
                 {topContributors.map((c, idx) => {
                   let rankBadgeClass = 'bg-surface-variant text-on-surface-variant';
                   let rankColor = '';
@@ -887,8 +999,11 @@ function DashboardPage() {
                         <div className="relative">
                           <img
                             alt={`${c.fullName}'s avatar`}
-                            className="w-11 h-11 rounded-full object-cover border border-outline-variant"
-                            src={c.avatarUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuDCbKnnE9P8WplUJMxgDKRUPtxvrITGrpi-hIFPFfkPJz6oIZBQQwhURIyhGnsxfdGzugqzkbfErVWvEXVDQj40Z8jZPgGOqIZxv-iQyguS7fnYjLa36ZJQnXbCk_lBFV7OxsVwQ3nvdhn0hnYgs75Q3OEbKjYauRURKkxAFUml8OZhtI9RB61neoZvyycGXvBcD6FfN7pEdKb-2n0h7XV1Hm6YScxugLFyu6R1-OspAxktJA0roF_6UUt98S76BVyaYvqEqcy1khE"}
+                            className="border-outline-variant h-11 w-11 rounded-full border object-cover"
+                            src={
+                              c.avatarUrl ||
+                              'https://lh3.googleusercontent.com/aida-public/AB6AXuDCbKnnE9P8WplUJMxgDKRUPtxvrITGrpi-hIFPFfkPJz6oIZBQQwhURIyhGnsxfdGzugqzkbfErVWvEXVDQj40Z8jZPgGOqIZxv-iQyguS7fnYjLa36ZJQnXbCk_lBFV7OxsVwQ3nvdhn0hnYgs75Q3OEbKjYauRURKkxAFUml8OZhtI9RB61neoZvyycGXvBcD6FfN7pEdKb-2n0h7XV1Hm6YScxugLFyu6R1-OspAxktJA0roF_6UUt98S76BVyaYvqEqcy1khE'
+                            }
                           />
                           {idx < 3 && (
                             <span className="absolute -top-1 -right-1 text-xs">
@@ -897,13 +1012,17 @@ function DashboardPage() {
                           )}
                         </div>
                         <div>
-                          <p className="font-label-md text-label-md text-on-surface font-semibold">{c.fullName}</p>
+                          <p className="font-label-md text-label-md text-on-surface font-semibold">
+                            {c.fullName}
+                          </p>
                           <p className="font-label-sm text-label-sm text-secondary">
                             {c.uploadedCount} docs uploaded
                           </p>
                         </div>
                       </div>
-                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${rankBadgeClass}`}>
+                      <span
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${rankBadgeClass}`}
+                      >
                         #{idx + 1}
                       </span>
                     </div>
@@ -917,7 +1036,7 @@ function DashboardPage() {
         {/* AI Cache Preview Modal */}
         {selectedDocumentId && (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00000080] backdrop-blur-sm px-4"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00000080] px-4 backdrop-blur-sm"
             onClick={() => setSelectedDocumentId(null)}
           >
             <div
@@ -926,7 +1045,7 @@ function DashboardPage() {
             >
               <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-label-sm text-secondary mb-2 tracking-widest uppercase font-semibold">
+                  <p className="text-label-sm text-secondary mb-2 font-semibold tracking-widest uppercase">
                     AI Cache Preview
                   </p>
                   <h2 className="text-headline-md text-primary font-bold">
@@ -941,7 +1060,7 @@ function DashboardPage() {
 
                 <button
                   onClick={() => setSelectedDocumentId(null)}
-                  className="material-symbols-outlined text-secondary hover:text-primary hover:bg-surface-container-low rounded-full p-2 transition-colors cursor-pointer"
+                  className="material-symbols-outlined text-secondary hover:text-primary hover:bg-surface-container-low cursor-pointer rounded-full p-2 transition-colors"
                 >
                   close
                 </button>
@@ -1027,7 +1146,8 @@ function DashboardPage() {
                                   'border-outline-variant text-on-surface-variant hover:border-primary hover:bg-surface-container-low';
 
                                 if (hasAnswered && isCorrectAnswer) {
-                                  optionClass = 'border-primary bg-primary-container/20 text-primary';
+                                  optionClass =
+                                    'border-primary bg-primary-container/20 text-primary';
                                 }
 
                                 if (hasAnswered && isSelected && !isCorrectAnswer) {
@@ -1068,7 +1188,7 @@ function DashboardPage() {
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setSelectedDocumentId(null)}
-                      className="border-outline-variant text-primary hover:bg-surface-container-low rounded-lg border px-5 py-2 transition-colors cursor-pointer"
+                      className="border-outline-variant text-primary hover:bg-surface-container-low cursor-pointer rounded-lg border px-5 py-2 transition-colors"
                     >
                       Close
                     </button>
@@ -1081,7 +1201,7 @@ function DashboardPage() {
                           'noopener,noreferrer',
                         )
                       }
-                      className="bg-primary text-on-primary rounded-lg px-5 py-2 transition-all hover:shadow-md cursor-pointer"
+                      className="bg-primary text-on-primary cursor-pointer rounded-lg px-5 py-2 transition-all hover:shadow-md"
                     >
                       Open File
                     </button>
@@ -1094,36 +1214,40 @@ function DashboardPage() {
 
         {/* Edit Account Modal */}
         {showEditAccountModal && (
-          <div className="fixed inset-0 bg-[#00000080] backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
-            <div className="bg-surface-container-lowest rounded-2xl w-full max-w-md shadow-2xl border border-outline-variant overflow-hidden flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#00000080] p-4 backdrop-blur-sm transition-all">
+            <div className="bg-surface-container-lowest border-outline-variant flex w-full max-w-md flex-col overflow-hidden rounded-2xl border shadow-2xl">
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-outline-variant">
-                <h3 className="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">manage_accounts</span> Edit Account
+              <div className="border-outline-variant flex items-center justify-between border-b p-6">
+                <h3 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2 font-bold">
+                  <span className="material-symbols-outlined text-primary">manage_accounts</span>{' '}
+                  Edit Account
                 </h3>
                 <button
                   onClick={() => setShowEditAccountModal(false)}
-                  className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors cursor-pointer text-secondary"
+                  className="hover:bg-surface-container-low text-secondary flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSaveProfile} className="p-6 flex flex-col gap-4">
+              <form onSubmit={handleSaveProfile} className="flex flex-col gap-4 p-6">
                 {editError && (
-                  <div className="bg-error-container text-on-error-container text-sm rounded-lg p-3">
+                  <div className="bg-error-container text-on-error-container rounded-lg p-3 text-sm">
                     {editError}
                   </div>
                 )}
                 {editSuccess && (
-                  <div className="bg-green-100 text-green-800 border border-green-200 text-sm rounded-lg p-3">
+                  <div className="rounded-lg border border-green-200 bg-green-100 p-3 text-sm text-green-800">
                     {editSuccess}
                   </div>
                 )}
 
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="fullName" className="font-label-md text-label-md text-on-surface font-semibold">
+                  <label
+                    htmlFor="fullName"
+                    className="font-label-md text-label-md text-on-surface font-semibold"
+                  >
                     Full Name (Họ và Tên)
                   </label>
                   <input
@@ -1132,13 +1256,16 @@ function DashboardPage() {
                     required
                     value={editFullName}
                     onChange={(e) => setEditFullName(e.target.value)}
-                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:border-primary font-body-md text-body-md"
+                    className="bg-surface-container-low border-outline-variant text-on-surface focus:border-primary font-body-md text-body-md w-full rounded-lg border px-3 py-2 focus:outline-none"
                     placeholder="Enter your full name"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="username" className="font-label-md text-label-md text-on-surface font-semibold">
+                  <label
+                    htmlFor="username"
+                    className="font-label-md text-label-md text-on-surface font-semibold"
+                  >
                     Username (Tên Đăng Nhập)
                   </label>
                   <input
@@ -1146,13 +1273,16 @@ function DashboardPage() {
                     type="text"
                     value={editUsername}
                     onChange={(e) => setEditUsername(e.target.value)}
-                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:border-primary font-body-md text-body-md"
+                    className="bg-surface-container-low border-outline-variant text-on-surface focus:border-primary font-body-md text-body-md w-full rounded-lg border px-3 py-2 focus:outline-none"
                     placeholder="Enter a username"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="phoneNumber" className="font-label-md text-label-md text-on-surface font-semibold">
+                  <label
+                    htmlFor="phoneNumber"
+                    className="font-label-md text-label-md text-on-surface font-semibold"
+                  >
                     Phone Number (Số Điện Thoại)
                   </label>
                   <input
@@ -1160,26 +1290,28 @@ function DashboardPage() {
                     type="tel"
                     value={editPhoneNumber}
                     onChange={(e) => setEditPhoneNumber(e.target.value)}
-                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:border-primary font-body-md text-body-md"
+                    className="bg-surface-container-low border-outline-variant text-on-surface focus:border-primary font-body-md text-body-md w-full rounded-lg border px-3 py-2 focus:outline-none"
                     placeholder="Enter your phone number"
                   />
                 </div>
 
-                <div className="flex justify-end gap-3 mt-4">
+                <div className="mt-4 flex justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setShowEditAccountModal(false)}
-                    className="border border-outline-variant text-on-surface hover:bg-surface-container-low rounded-lg px-4 py-2 transition-colors font-label-md text-label-md cursor-pointer"
+                    className="border-outline-variant text-on-surface hover:bg-surface-container-low font-label-md text-label-md cursor-pointer rounded-lg border px-4 py-2 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={editLoading}
-                    className="bg-primary text-on-primary hover:opacity-90 rounded-lg px-5 py-2 transition-all font-label-md text-label-md cursor-pointer flex items-center justify-center min-w-[80px]"
+                    className="bg-primary text-on-primary font-label-md text-label-md flex min-w-[80px] cursor-pointer items-center justify-center rounded-lg px-5 py-2 transition-all hover:opacity-90"
                   >
                     {editLoading ? (
-                      <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                      <span className="material-symbols-outlined animate-spin text-[18px]">
+                        sync
+                      </span>
                     ) : (
                       'Save'
                     )}
@@ -1196,38 +1328,38 @@ function DashboardPage() {
 
 function DashboardSkeleton() {
   return (
-    <div className="bg-background text-on-background min-h-screen flex font-sans animate-pulse w-full">
+    <div className="bg-background text-on-background flex min-h-screen w-full animate-pulse font-sans">
       {/* Sidebar Skeleton */}
-      <div className="hidden md:flex flex-col p-4 border-r border-outline-variant bg-surface-container-lowest w-64 h-screen">
-        <div className="h-8 bg-surface-container-high rounded mb-8 w-3/4"></div>
-        <div className="h-10 bg-surface-container-high rounded mb-6"></div>
+      <div className="border-outline-variant bg-surface-container-lowest hidden h-screen w-64 flex-col border-r p-4 md:flex">
+        <div className="bg-surface-container-high mb-8 h-8 w-3/4 rounded"></div>
+        <div className="bg-surface-container-high mb-6 h-10 rounded"></div>
         <div className="space-y-4">
-          <div className="h-6 bg-surface-container-low rounded w-1/2"></div>
-          <div className="h-6 bg-surface-container-low rounded w-2/3"></div>
-          <div className="h-6 bg-surface-container-low rounded w-1/3"></div>
+          <div className="bg-surface-container-low h-6 w-1/2 rounded"></div>
+          <div className="bg-surface-container-low h-6 w-2/3 rounded"></div>
+          <div className="bg-surface-container-low h-6 w-1/3 rounded"></div>
         </div>
       </div>
 
       {/* Content Skeleton */}
-      <div className="flex-grow flex flex-col h-screen">
+      <div className="flex h-screen flex-grow flex-col">
         {/* Header Skeleton */}
-        <div className="h-16 bg-surface-container-lowest border-b border-outline-variant px-6 flex items-center justify-between">
-          <div className="h-8 bg-surface-container-high rounded w-96 animate-pulse"></div>
-          <div className="h-8 bg-surface-container-high rounded-full w-8 animate-pulse"></div>
+        <div className="bg-surface-container-lowest border-outline-variant flex h-16 items-center justify-between border-b px-6">
+          <div className="bg-surface-container-high h-8 w-96 animate-pulse rounded"></div>
+          <div className="bg-surface-container-high h-8 w-8 animate-pulse rounded-full"></div>
         </div>
 
         {/* Body Skeleton */}
-        <div className="flex-1 p-6 md:p-8 space-y-8 overflow-y-auto">
-          <div className="h-12 bg-surface-container-high rounded w-1/2 animate-pulse"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="h-32 bg-surface-container-low rounded-xl col-span-2 animate-pulse"></div>
-            <div className="h-32 bg-surface-container-low rounded-xl animate-pulse"></div>
+        <div className="flex-1 space-y-8 overflow-y-auto p-6 md:p-8">
+          <div className="bg-surface-container-high h-12 w-1/2 animate-pulse rounded"></div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="bg-surface-container-low col-span-2 h-32 animate-pulse rounded-xl"></div>
+            <div className="bg-surface-container-low h-32 animate-pulse rounded-xl"></div>
           </div>
-          <div className="space-y-4 animate-pulse">
-            <div className="h-8 bg-surface-container-high rounded w-1/4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="h-40 bg-surface-container-lowest border border-outline-variant rounded-xl"></div>
-              <div className="h-40 bg-surface-container-lowest border border-outline-variant rounded-xl"></div>
+          <div className="animate-pulse space-y-4">
+            <div className="bg-surface-container-high h-8 w-1/4 rounded"></div>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="bg-surface-container-lowest border-outline-variant h-40 rounded-xl border"></div>
+              <div className="bg-surface-container-lowest border-outline-variant h-40 rounded-xl border"></div>
             </div>
           </div>
         </div>
@@ -1238,17 +1370,19 @@ function DashboardSkeleton() {
 
 export default function HomePage() {
   const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem('token');
+    }
+    return null;
+  });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem('token');
     if (!token) {
       router.replace('/login');
-      setIsLoggedIn(false);
-    } else {
-      setIsLoggedIn(true);
     }
-  }, [router]);
+  }, [isLoggedIn, router]);
 
   if (isLoggedIn === null || isLoggedIn === false) {
     return <DashboardSkeleton />;

@@ -1,4 +1,4 @@
-import axiosClient from "../utils/axios";
+import axiosClient from '../utils/axios';
 
 export interface Subject {
   id: number;
@@ -39,7 +39,7 @@ export interface DashboardData {
 
 export const dashboardApi = {
   getDashboardData: async (): Promise<DashboardData> => {
-    const response = await axiosClient.get("/dashboard");
+    const response = await axiosClient.get('/dashboard');
     return response.data.data;
   },
 

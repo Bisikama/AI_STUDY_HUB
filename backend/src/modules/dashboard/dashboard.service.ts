@@ -78,10 +78,7 @@ export class DashboardService {
       where: {
         status: 'APPROVED',
       },
-      orderBy: [
-        { rating: 'desc' },
-        { viewCount: 'desc' },
-      ],
+      orderBy: [{ rating: 'desc' }, { viewCount: 'desc' }],
       take: 5,
       include: {
         subject: true,

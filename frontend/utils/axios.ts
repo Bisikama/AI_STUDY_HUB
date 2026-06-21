@@ -80,4 +80,17 @@ axiosClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Giải nén response envelope { statusCode, message, data } từ NestJS
+axiosClient.interceptors.response.use(
+  (response) => {
+    if (response.data && response.data.hasOwnProperty('statusCode') && response.data.hasOwnProperty('data')) {
+      response.data = response.data.data;
+    }
+    return response;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export default axiosClient;
