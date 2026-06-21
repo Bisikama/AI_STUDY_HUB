@@ -51,6 +51,8 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   fullName     String   @map("full_name")
+  username     String?  @unique
+  phoneNumber  String?  @map("phone_number")
   avatarUrl    String?  @map("avatar_url")
   role         UserRole @default(STUDENT)
   isActive     Boolean  @default(true) @map("is_active")
@@ -63,6 +65,7 @@ model User {
   uploadStatuses      UploadStatus[]
   quizzes             Quiz[]
   quizAttempts        UserQuizAttempt[]
+  documentViews       UserDocumentView[]
 
   @@map("users")
 }
@@ -86,12 +89,42 @@ model Subject {
   name        String   @unique
   code        String   @unique
   description String?  @db.Text
+  isSystem    Boolean  @default(true) @map("is_system")
+  createdBy   String?  @map("created_by") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Quan hệ
   documents Document[]
 
   @@map("subjects")
+}
+
+/// Tag quản lý nhãn dán cho Document
+model Tag {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String
+  createdBy String?  @map("created_by") @db.Uuid
+  isSystem  Boolean  @default(false) @map("is_system")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  documents DocumentTag[]
+
+  @@unique([slug, createdBy])
+  @@map("tags")
+}
+
+/// Bảng trung gian Document và Tag
+model DocumentTag {
+  documentId String   @map("document_id") @db.Uuid
+  tagId      Int      @map("tag_id")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, tagId])
+  @@map("document_tags")
 }
 
 /// Thông tin siêu dữ liệu tài liệu học thuật
@@ -112,6 +145,8 @@ model Document {
   status        DocumentStatus @default(PRIVATE)
   fullText      String?        @map("full_text") @db.Text
   isAIGenerated Boolean        @default(false) @map("is_ai_generated")
+  rating        Float          @default(0.0) @map("rating")
+  deletedAt     DateTime?      @map("deleted_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
@@ -119,6 +154,8 @@ model Document {
   summary        DocumentSummary?
   uploadStatuses UploadStatus[]
   quizzes        Quiz[]
+  documentViews  UserDocumentView[]
+  tags           DocumentTag[]
 
   @@index([subjectId, status])
   @@map("documents")
@@ -215,4 +252,20 @@ model UserQuizAttempt {
 
   @@index([userId, completedAt(sort: Desc)])
   @@map("user_quiz_attempts")
+}
+
+/// Nhật ký/Lịch sử xem tài liệu của người dùng
+model UserDocumentView {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  viewedAt   DateTime @default(now()) @map("viewed_at")
+
+  // Quan hệ
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@index([userId, viewedAt(sort: Desc)])
+  @@map("user_document_views")
 }

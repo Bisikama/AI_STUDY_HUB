@@ -26,4 +26,8 @@ export class UploadDocumentDto {
   @IsNumber({}, { message: 'Subject ID must be a valid number' })
   @IsPositive({ message: 'Subject ID must be a positive number' })
   subjectId!: number;
+
+  @IsString()
+  @IsOptional()
+  tags?: string; // JSON string of tag names
 }

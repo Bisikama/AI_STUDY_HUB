@@ -1,10 +1,14 @@
 import { Module } from '@nestjs/common';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
-import { PrismaModule } from '../../database/prisma.module'; // Đảm bảo đường dẫn này trỏ đúng tới folder PrismaModule của dự án bạn
+import { PrismaModule } from '../../database/prisma.module';
+import { SupabaseModule } from '../../supabase/supabase.module';
 
 @Module({
-  imports: [PrismaModule], // Import PrismaModule để AdminService có thể xài được Prisma
+  imports: [
+    PrismaModule,
+    SupabaseModule, // Cần để AdminService dùng được SupabaseService (xóa file Cloud)
+  ],
   controllers: [AdminController],
   providers: [AdminService],
 })

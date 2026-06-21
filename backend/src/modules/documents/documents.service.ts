@@ -4,6 +4,8 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
@@ -18,6 +20,8 @@ import type {
 } from './types/document.types';
 import { SupabaseService } from 'src/supabase/supabase.service';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constant';
+import { SubjectsService } from '../subjects/subjects.service';
+import { TagsService } from '../tags/tags.service';
 
 @Injectable()
 export class DocumentsService {
@@ -25,6 +29,8 @@ export class DocumentsService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(ConfigService) private readonly configService: ConfigService,
     @Inject(SupabaseService) private readonly supabaseService: SupabaseService,
+    private readonly subjectsService: SubjectsService,
+    private readonly tagsService: TagsService,
   ) {}
 
   /**
@@ -55,30 +61,40 @@ export class DocumentsService {
     title: string,
     description: string | undefined,
     subjectId: number,
-    userId?: string,
+    userId: string,
+    tagsStr?: string,
   ): Promise<SanitizedDocument> {
-    // 1. Verify Subject exists
-    const subject = await this.prisma.subject.findUnique({
-      where: { id: subjectId },
+    // 1. Verify User exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
     });
-    if (!subject) {
-      throw new NotFoundException(`Subject with ID ${subjectId} not found`);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    // 2. Determine uploadedBy User (fallback to first user if not provided/auth not implemented yet)
-    let finalUserId = userId;
-    if (!finalUserId) {
-      const firstUser = await this.prisma.user.findFirst();
-      if (!firstUser) {
-        throw new BadRequestException('No users found in database. Cannot associate upload.');
-      }
-      finalUserId = firstUser.id;
-    } else {
-      const user = await this.prisma.user.findUnique({
-        where: { id: finalUserId },
-      });
-      if (!user) {
-        throw new NotFoundException(`User with ID ${finalUserId} not found`);
+    // 2. Verify Subject exists AND user has access
+    await this.subjectsService.validateSubjectAccess(subjectId, userId);
+
+    // 2.5 Parse and normalize tags
+    let parsedTags: string[] = [];
+    if (tagsStr) {
+      try {
+        const parsed = JSON.parse(tagsStr);
+        if (Array.isArray(parsed)) {
+          parsedTags = parsed
+            .map((t) => String(t).trim())
+            .filter((t) => t.length > 0)
+            .map((t) => t.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w-]/g, ''));
+          // Remove duplicates and empty
+          parsedTags = [...new Set(parsedTags)].filter((t) => t.length > 0);
+          
+          if (parsedTags.length > 10) {
+            throw new BadRequestException('Maximum 10 tags allowed per document');
+          }
+        }
+      } catch (e) {
+        if (e instanceof BadRequestException) throw e;
+        throw new BadRequestException('Invalid tags format');
       }
     }
 
@@ -123,7 +139,7 @@ export class DocumentsService {
         title,
         description: description || null,
         subjectId,
-        uploadedBy: finalUserId,
+        uploadedBy: userId,
         fileUrl,
         fileSize: BigInt(file.size),
         fileType: file.mimetype,
@@ -131,6 +147,49 @@ export class DocumentsService {
         fullText: extractedText,
       },
     });
+
+    // 6. Handle tags creation and association
+    if (parsedTags.length > 0) {
+      const tagIds: number[] = [];
+      for (const tagSlug of parsedTags) {
+        // Find existing tag by slug
+        let existingTag = await this.prisma.tag.findFirst({
+          where: {
+            slug: tagSlug,
+            OR: [{ isSystem: true }, { createdBy: userId }],
+          },
+        });
+
+        if (!existingTag) {
+          // Fallback to name if creating new
+          const originalName = JSON.parse(tagsStr!).find((t: string) => 
+            t.trim().toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w-]/g, '') === tagSlug
+          )?.trim() || tagSlug;
+
+          existingTag = await this.prisma.tag.create({
+            data: {
+              name: originalName,
+              slug: tagSlug,
+              createdBy: userId,
+              isSystem: false,
+            },
+          });
+        }
+        tagIds.push(existingTag.id);
+      }
+
+      // Associate tags
+      await Promise.all(
+        tagIds.map((tagId) =>
+          this.prisma.documentTag.create({
+            data: {
+              documentId: document.id,
+              tagId,
+            },
+          })
+        )
+      );
+    }
 
     return this.sanitizeData(document);
   }
@@ -149,14 +208,16 @@ export class DocumentsService {
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
+    if (document.deletedAt !== null) {
+      throw new NotFoundException(`Document with ID ${documentId} has been deleted`);
+    }
+
     if (document.status !== 'PENDING') {
       throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.ANALYZING_DOCUMENT);
     }
 
-    // Determine user ID who triggered this (fallback to uploader)
-    let finalUserId = userId;
-    if (!finalUserId) {
-      finalUserId = document.uploadedBy;
+    if (document.uploadedBy !== userId) {
+      throw new ForbiddenException('You do not have permission to analyze this document');
     }
 
     let text = document.fullText;
@@ -341,7 +402,7 @@ Quy định chặt chẽ:
           data: {
             documentId,
             title: `${document.title} - AI Quiz`,
-            createdBy: finalUserId,
+            createdBy: userId,
           },
         });
 
@@ -408,10 +469,12 @@ Quy định chặt chẽ:
   /**
    * Retrieves document metadata along with its AI summary and quizzes.
    */
-  async getDetails(documentId: string): Promise<SanitizedDocumentDetails> {
+  async getDetails(documentId: string, userId?: string): Promise<SanitizedDocumentDetails> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
       include: {
+        subject: true,
+        tags: { include: { tag: true } },
         summary: true,
         quizzes: {
           include: {
@@ -429,6 +492,253 @@ Quy định chặt chẽ:
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
+    if (document.deletedAt !== null) {
+      throw new NotFoundException(`Document with ID ${documentId} not found`);
+    }
+
+    if (document.uploadedBy !== userId && document.status !== 'APPROVED') {
+      throw new ForbiddenException('You do not have permission to view this document');
+    }
+
     return this.sanitizeData<SanitizedDocumentDetails>(document);
+  }
+
+  /**
+   * Get all documents uploaded by a specific user.
+   */
+  async getDocumentsByUser(userId: string): Promise<SanitizedDocument[]> {
+    const documents = await this.prisma.document.findMany({
+      where: { uploadedBy: userId, deletedAt: null },
+      include: {
+        subject: true,
+        tags: { include: { tag: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return this.sanitizeData<SanitizedDocument[]>(documents);
+  }
+
+  /**
+   * Records a user view event for a document and updates viewCount.
+   */
+  async recordView(documentId: string, userId: string): Promise<void> {
+    // 1. Kiểm tra User tồn tại trong DB để tránh lỗi Foreign Key khi token bị stale (sau khi reset DB)
+    const userExists = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!userExists) {
+      throw new UnauthorizedException(
+        'User not found in database. Please log out and log in again.',
+      );
+    }
+
+    // 2. Kiểm tra Document tồn tại
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document with ID ${documentId} not found`);
+    }
+
+    // 1. Upsert UserDocumentView (lưu lịch sử xem gần đây)
+    await this.prisma.userDocumentView.upsert({
+      where: {
+        userId_documentId: {
+          userId,
+          documentId,
+        },
+      },
+      update: {
+        viewedAt: new Date(),
+      },
+      create: {
+        userId,
+        documentId,
+      },
+    });
+
+    // 2. Tăng số lượt xem global
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        viewCount: {
+          increment: 1,
+        },
+      },
+    });
+  }
+
+  /**
+   * Soft deletes a document by setting deletedAt to current date.
+   */
+  async softDeleteDocument(documentId: string, userId: string): Promise<{ message: string }> {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document with ID ${documentId} not found`);
+    }
+
+    if (document.deletedAt !== null) {
+      throw new NotFoundException(`Document with ID ${documentId} has already been deleted`);
+    }
+
+    if (document.uploadedBy !== userId) {
+      throw new ForbiddenException('You do not have permission to delete this document');
+    }
+
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: { deletedAt: new Date() },
+    });
+
+    return { message: 'Document deleted successfully' };
+  }
+
+  /**
+   * Updates document metadata (title, description).
+   */
+  async updateDocument(
+    documentId: string,
+    userId: string,
+    dto: { title?: string; description?: string; subjectId?: number; tags?: string },
+  ): Promise<SanitizedDocument> {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document with ID ${documentId} not found`);
+    }
+
+    if (document.deletedAt !== null) {
+      throw new NotFoundException(`Document with ID ${documentId} has been deleted`);
+    }
+
+    if (document.uploadedBy !== userId) {
+      throw new ForbiddenException('You do not have permission to edit this document');
+    }
+
+    let { title, description } = dto;
+
+    if (title !== undefined) {
+      title = title.trim();
+      if (!title) {
+        throw new BadRequestException('Title cannot be empty');
+      }
+    }
+
+    if (description !== undefined) {
+      description = description.trim();
+    }
+
+    // Validate subject access if subjectId is being changed
+    if (dto.subjectId !== undefined) {
+      await this.subjectsService.validateSubjectAccess(dto.subjectId, userId);
+    }
+
+    // Handle tags if provided
+    let tagIds: number[] | undefined;
+    if (dto.tags !== undefined) {
+      let parsedTags: string[] = [];
+      try {
+        const parsed = JSON.parse(dto.tags);
+        if (Array.isArray(parsed)) {
+          parsedTags = parsed
+            .map((t) => String(t).trim())
+            .filter((t) => t.length > 0)
+            .map((t) => t.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w-]/g, ''));
+          // Remove duplicates
+          parsedTags = [...new Set(parsedTags)].filter((t) => t.length > 0);
+          
+          if (parsedTags.length > 10) {
+            throw new BadRequestException('Maximum 10 tags allowed per document');
+          }
+        }
+      } catch (e) {
+        if (e instanceof BadRequestException) throw e;
+        throw new BadRequestException('Invalid tags format');
+      }
+
+      tagIds = [];
+      for (const tagSlug of parsedTags) {
+        let existingTag = await this.prisma.tag.findFirst({
+          where: {
+            slug: tagSlug,
+            OR: [{ isSystem: true }, { createdBy: userId }],
+          },
+        });
+
+        if (!existingTag) {
+          const originalName = JSON.parse(dto.tags).find((t: string) => 
+            t.trim().toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w-]/g, '') === tagSlug
+          )?.trim() || tagSlug;
+
+          existingTag = await this.prisma.tag.create({
+            data: {
+              name: originalName,
+              slug: tagSlug,
+              createdBy: userId,
+              isSystem: false,
+            },
+          });
+        }
+        tagIds.push(existingTag.id);
+      }
+    }
+
+    // Use transaction if updating tags
+    let updatedDocument;
+    if (tagIds !== undefined) {
+      updatedDocument = await this.prisma.$transaction(async (tx) => {
+        // Update basic fields
+        const updated = await tx.document.update({
+          where: { id: documentId },
+          data: {
+            ...(title !== undefined && { title }),
+            ...(description !== undefined && { description }),
+            ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
+          },
+        });
+
+        // Delete old tags
+        await tx.documentTag.deleteMany({
+          where: { documentId },
+        });
+
+        // Insert new tags
+        if (tagIds!.length > 0) {
+          await Promise.all(
+            tagIds!.map((tagId) =>
+              tx.documentTag.create({
+                data: {
+                  documentId,
+                  tagId,
+                },
+              })
+            )
+          );
+        }
+
+        return tx.document.findUnique({
+          where: { id: documentId },
+          include: { subject: true, tags: { include: { tag: true } } },
+        });
+      });
+    } else {
+      updatedDocument = await this.prisma.document.update({
+        where: { id: documentId },
+        data: {
+          ...(title !== undefined && { title }),
+          ...(description !== undefined && { description }),
+          ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
+        },
+        include: { subject: true, tags: { include: { tag: true } } },
+      });
+    }
+
+    return this.sanitizeData<SanitizedDocument>(updatedDocument);
   }
 }

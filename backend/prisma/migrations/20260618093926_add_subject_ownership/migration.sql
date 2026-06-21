@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "subjects" ADD COLUMN     "created_by" UUID,
+ADD COLUMN     "is_system" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
