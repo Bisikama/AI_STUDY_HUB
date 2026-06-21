@@ -52,10 +52,14 @@ export default function LoginPage() {
   // 3. HÀM SUBMIT
   const onSubmit = async (data: LoginFormValues) => {
     try {
-      await login({ email: data.email, password: data.password });
-      // Đăng nhập thành công thì đá thẳng vô dashboard
-      router.push('/dashboard');
-    } catch {
+      const user = await login({ email: data.email, password: data.password });
+      // Sau khi login thành công → phân quyền dựa trên role
+      if (user.role === 'ADMIN') {
+        router.push('/admin');
+      } else {
+        router.push('/');
+      }
+    } catch (err) {
       // Lỗi API (sai email, sai pass) sẽ tự hiện ở biến apiError
     }
   };

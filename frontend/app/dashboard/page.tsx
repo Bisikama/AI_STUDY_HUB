@@ -54,10 +54,10 @@ type ExploreAiCache = {
 type ApiResponse<T> =
   | T
   | {
-      statusCode: number;
-      message: string;
-      data: T;
-    };
+    statusCode: number;
+    message: string;
+    data: T;
+  };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
   const response = await fetch(url);
@@ -352,9 +352,8 @@ function DashboardPage() {
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${
-          mobileMenuOpen ? 'flex' : 'hidden'
-        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
+        className={`${mobileMenuOpen ? 'flex' : 'hidden'
+          } md:flex fixed left-0 top-0 h-full flex-col p-4 border-r border-outline-variant bg-surface-container-lowest shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-64 z-20 transition-all`}
       >
         <div className="mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
@@ -814,11 +813,10 @@ function DashboardPage() {
                           </div>
                           <button
                             onClick={(e) => toggleSaveDoc(doc.id, e)}
-                            className={`font-label-sm text-label-sm hidden cursor-pointer rounded-full border px-4 py-2 transition-colors sm:block ${
-                              savedDocIds.includes(doc.id)
-                                ? 'bg-primary-container border-primary-container text-white'
+                            className={`hidden sm:block px-4 py-2 border rounded-full font-label-sm text-label-sm transition-colors cursor-pointer ${savedDocIds.includes(doc.id)
+                                ? 'bg-primary-container text-white border-primary-container'
                                 : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
-                            }`}
+                              }`}
                           >
                             {savedDocIds.includes(doc.id) ? 'Saved' : 'Save'}
                           </button>
@@ -862,13 +860,10 @@ function DashboardPage() {
                             </p>
                           </div>
                         </div>
-                        <span
-                          className={`rounded px-2 py-1 text-xs font-bold ${
-                            idx === 0
-                              ? 'bg-primary-fixed-dim text-on-primary-fixed'
-                              : 'bg-surface-variant text-on-surface-variant'
-                          }`}
-                        >
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${idx === 0
+                            ? 'bg-primary-fixed-dim text-on-primary-fixed'
+                            : 'bg-surface-variant text-on-surface-variant'
+                          }`}>
                           #{idx + 1}
                         </span>
                       </div>
@@ -882,6 +877,8 @@ function DashboardPage() {
                   View Leaderboard
                 </button>
               </section>
+
+
             </div>
           </div>
         </main>
@@ -995,9 +992,8 @@ function DashboardPage() {
                   return (
                     <div
                       key={c.id}
-                      className={`flex items-center justify-between rounded-xl border p-3 transition-all ${
-                        rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
-                      }`}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-all ${rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -1165,9 +1161,8 @@ function DashboardPage() {
                                     type="button"
                                     disabled={hasAnswered}
                                     onClick={() => handleSelectOption(question.id, option.id)}
-                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
-                                      hasAnswered ? 'cursor-default' : 'cursor-pointer'
-                                    }`}
+                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${hasAnswered ? 'cursor-default' : 'cursor-pointer'
+                                      }`}
                                   >
                                     {option.optionText}
 
