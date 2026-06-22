@@ -306,6 +306,9 @@ function SearchExplore() {
   });
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [activeAiCacheTab, setActiveAiCacheTab] = useState<'summary' | 'quiz'>('summary');
+  const [isQuizSubmitted, setIsQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState<number | null>(null);
+  const [quizAuthWarning, setQuizAuthWarning] = useState<string | null>(null);
 
   // key = questionId, value = selected optionId
   const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
@@ -473,6 +476,9 @@ function SearchExplore() {
     setSelectedDocumentId(null);
     setSelectedOptionIds({});
     setActiveAiCacheTab('summary');
+    setIsQuizSubmitted(false);
+    setQuizScore(null);
+    setQuizAuthWarning(null);
   };
 
   const handleViewFull = (fileUrl?: string | null) => {
@@ -492,6 +498,9 @@ function SearchExplore() {
 
     setSelectedOptionIds({});
     setActiveAiCacheTab('summary');
+    setIsQuizSubmitted(false);
+    setQuizScore(null);
+    setQuizAuthWarning(null);
     setSelectedDocumentId(doc.id);
 
     try {
@@ -501,17 +510,76 @@ function SearchExplore() {
     }
   };
 
-  const handleSelectOption = (questionId: string, optionId: string) => {
-    setSelectedOptionIds((prev) => {
-      if (prev[questionId]) {
-        return prev;
-      }
+  const isGuestAttempt = () => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
 
-      return {
-        ...prev,
-        [questionId]: optionId,
-      };
-    });
+    return (
+      window.localStorage.getItem('studyhub_guest') === 'true' ||
+      window.localStorage.getItem('guestMode') === 'true' ||
+      window.localStorage.getItem('isGuest') === 'true'
+    );
+  };
+
+  const guardQuizAttempt = () => {
+    if (!isGuestAttempt()) {
+      return true;
+    }
+
+    setQuizAuthWarning('Please log in to take the quiz and save your result.');
+    return false;
+  };
+
+  const handleSelectOption = (questionId: string, optionId: string) => {
+    if (isQuizSubmitted) {
+      return;
+    }
+
+    if (!guardQuizAttempt()) {
+      return;
+    }
+
+    setQuizAuthWarning(null);
+    setSelectedOptionIds((prev) => ({
+      ...prev,
+      [questionId]: optionId,
+    }));
+  };
+
+  const handleSubmitQuiz = (questions: QuizQuestion[]) => {
+    if (!guardQuizAttempt()) {
+      return;
+    }
+
+    if (questions.length === 0) {
+      return;
+    }
+
+    const unansweredCount = questions.filter((question) => !selectedOptionIds[question.id]).length;
+
+    if (unansweredCount > 0) {
+      alert(`Please answer all questions before submitting. Missing: ${unansweredCount}`);
+      return;
+    }
+
+    const score = questions.reduce((total, question) => {
+      const selectedOptionId = selectedOptionIds[question.id];
+      const selectedOption = question.options.find((option) => option.id === selectedOptionId);
+
+      return total + (selectedOption?.isCorrect ? 1 : 0);
+    }, 0);
+
+    setQuizScore(score);
+    setIsQuizSubmitted(true);
+    setQuizAuthWarning(null);
+  };
+
+  const handleRetryQuiz = () => {
+    setSelectedOptionIds({});
+    setIsQuizSubmitted(false);
+    setQuizScore(null);
+    setQuizAuthWarning(null);
   };
 
   const handleSuggestionClick = (discipline: string) => {
@@ -1167,70 +1235,175 @@ function SearchExplore() {
 
                 {activeAiCacheTab === 'quiz' && (
                   <section className="bg-surface-container-lowest border-outline-variant rounded-xl border p-5">
-                    <h3 className="text-primary mb-4 text-lg font-bold">
-                      Quiz Questions ({aiCache.quizzes[0]?.questions.length ?? 0})
-                    </h3>
+                    {(() => {
+                      const quizQuestions = aiCache.quizzes[0]?.questions ?? [];
+                      const answeredCount = quizQuestions.filter(
+                        (question) => selectedOptionIds[question.id],
+                      ).length;
+                      const totalQuestions = quizQuestions.length;
+                      const hasAllAnswers = totalQuestions > 0 && answeredCount === totalQuestions;
 
-                    {aiCache.quizzes.length > 0 ? (
-                      <div className="space-y-5">
-                        {aiCache.quizzes[0].questions.map((question, questionIndex) => (
-                          <div
-                            key={question.id}
-                            className="border-outline-variant bg-surface rounded-xl border p-4"
-                          >
-                            <p className="text-primary mb-3 font-semibold">
-                              {questionIndex + 1}. {question.questionText}
-                            </p>
+                      return (
+                        <div className="space-y-5">
+                          <div className="border-outline-variant flex flex-col gap-3 border-b pb-4 md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <h3 className="text-primary text-lg font-bold">
+                                Quiz Questions ({totalQuestions})
+                              </h3>
+                              <p className="text-secondary mt-1 text-sm">
+                                Choose one answer for each question, then submit to see your score.
+                              </p>
+                            </div>
 
-                            <div className="grid gap-2">
-                              {question.options.map((option) => {
-                                const selectedOptionId = selectedOptionIds[question.id];
-                                const hasAnswered = Boolean(selectedOptionId);
-                                const isSelected = selectedOptionId === option.id;
-                                const isCorrectAnswer = option.isCorrect;
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="bg-surface-container-high text-secondary rounded-full px-3 py-1 text-xs font-semibold">
+                                Answered {answeredCount}/{totalQuestions}
+                              </span>
 
-                                let optionClass =
-                                  'border-outline-variant text-on-surface-variant hover:border-primary hover:bg-surface-container-low';
-
-                                if (hasAnswered && isCorrectAnswer) {
-                                  optionClass =
-                                    'border-primary bg-primary-container/20 text-primary';
-                                }
-
-                                if (hasAnswered && isSelected && !isCorrectAnswer) {
-                                  optionClass =
-                                    'border-error bg-error-container text-on-error-container';
-                                }
-
-                                return (
-                                  <button
-                                    key={option.id}
-                                    type="button"
-                                    disabled={hasAnswered}
-                                    onClick={() => handleSelectOption(question.id, option.id)}
-                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
-                                      hasAnswered ? 'cursor-default' : 'cursor-pointer'
-                                    }`}
-                                  >
-                                    {option.optionText}
-
-                                    {hasAnswered && isCorrectAnswer && (
-                                      <span className="ml-2 text-xs font-bold">(Correct)</span>
-                                    )}
-
-                                    {hasAnswered && isSelected && !isCorrectAnswer && (
-                                      <span className="ml-2 text-xs font-bold">(Your answer)</span>
-                                    )}
-                                  </button>
-                                );
-                              })}
+                              {isQuizSubmitted && quizScore !== null && (
+                                <span className="bg-primary-container/20 text-primary rounded-full px-3 py-1 text-xs font-bold">
+                                  Score {quizScore}/{totalQuestions}
+                                </span>
+                              )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-secondary">No quiz available for this document.</p>
-                    )}
+
+                          {quizAuthWarning && (
+                            <div className="bg-error-container text-on-error-container flex items-start gap-3 rounded-xl p-4 text-sm">
+                              <span className="material-symbols-outlined text-[20px]">lock</span>
+                              <div>
+                                <p className="font-semibold">Login required</p>
+                                <p>{quizAuthWarning}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {quizQuestions.length > 0 ? (
+                            <>
+                              <div className="space-y-5">
+                                {quizQuestions.map((question, questionIndex) => (
+                                  <div
+                                    key={question.id}
+                                    className="border-outline-variant bg-surface rounded-xl border p-4"
+                                  >
+                                    <p className="text-primary mb-3 font-semibold">
+                                      {questionIndex + 1}. {question.questionText}
+                                    </p>
+
+                                    <div className="grid gap-2">
+                                      {question.options.map((option) => {
+                                        const selectedOptionId = selectedOptionIds[question.id];
+                                        const isSelected = selectedOptionId === option.id;
+                                        const isCorrectAnswer = option.isCorrect;
+
+                                        let optionClass =
+                                          'border-outline-variant text-on-surface-variant hover:border-primary hover:bg-surface-container-low';
+
+                                        if (!isQuizSubmitted && isSelected) {
+                                          optionClass =
+                                            'border-primary bg-primary-container/10 text-primary';
+                                        }
+
+                                        if (isQuizSubmitted && isCorrectAnswer) {
+                                          optionClass =
+                                            'border-primary bg-primary-container/20 text-primary';
+                                        }
+
+                                        if (isQuizSubmitted && isSelected && !isCorrectAnswer) {
+                                          optionClass =
+                                            'border-error bg-error-container text-on-error-container';
+                                        }
+
+                                        return (
+                                          <button
+                                            key={option.id}
+                                            type="button"
+                                            disabled={isQuizSubmitted}
+                                            onClick={() =>
+                                              handleSelectOption(question.id, option.id)
+                                            }
+                                            className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
+                                              isQuizSubmitted ? 'cursor-default' : 'cursor-pointer'
+                                            }`}
+                                          >
+                                            <span
+                                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                isSelected
+                                                  ? 'border-primary bg-primary text-on-primary'
+                                                  : 'border-outline-variant bg-surface'
+                                              }`}
+                                            >
+                                              {isSelected && (
+                                                <span className="material-symbols-outlined text-[14px]">
+                                                  check
+                                                </span>
+                                              )}
+                                            </span>
+
+                                            <span className="flex-1">{option.optionText}</span>
+
+                                            {isQuizSubmitted && isCorrectAnswer && (
+                                              <span className="text-xs font-bold">Correct</span>
+                                            )}
+
+                                            {isQuizSubmitted && isSelected && !isCorrectAnswer && (
+                                              <span className="text-xs font-bold">Your answer</span>
+                                            )}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="border-outline-variant flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
+                                <p className="text-secondary text-sm">
+                                  {isQuizSubmitted
+                                    ? 'Quiz submitted. You can review the correct answers or retry.'
+                                    : hasAllAnswers
+                                      ? 'All questions answered. You can submit now.'
+                                      : 'Answer all questions before submitting.'}
+                                </p>
+
+                                <div className="flex gap-3">
+                                  {isQuizSubmitted ? (
+                                    <button
+                                      type="button"
+                                      onClick={handleRetryQuiz}
+                                      className="border-outline-variant text-primary hover:bg-surface-container-low flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-[18px]">
+                                        replay
+                                      </span>
+                                      Retry Quiz
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSubmitQuiz(quizQuestions)}
+                                      disabled={!hasAllAnswers}
+                                      className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                                        hasAllAnswers
+                                          ? 'bg-primary text-on-primary hover:shadow-md'
+                                          : 'bg-surface-container-high text-secondary cursor-not-allowed'
+                                      }`}
+                                    >
+                                      <span className="material-symbols-outlined text-[18px]">
+                                        task_alt
+                                      </span>
+                                      Submit Quiz
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-secondary">No quiz available for this document.</p>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </section>
                 )}
 
