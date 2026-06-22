@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
@@ -12,12 +12,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly prisma: PrismaService,
   ) {
     super({
-      // Hỗ trợ trích xuất JWT Token từ Cookie (access_token) hoặc Header (Bearer Token)
+      // Hỗ trợ trích xuất JWT Token duy nhất từ Cookie (access_token)
       jwtFromRequest: ExtractJwt.fromExtractors([
         (request: Request) => {
           return request?.cookies?.access_token || null;
         },
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET') || 'super-secret-key', // Phải khớp với secret key trong auth.module.ts
@@ -40,7 +39,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException('Tài khoản của bạn đã bị khóa!');
+      throw new ForbiddenException({
+        statusCode: 403,
+        message: 'Tài khoản của bạn đã bị khóa!',
+        code: 'ACCOUNT_LOCKED',
+      });
     }
 
     // Đối tượng trả về ở đây sẽ được NestJS gán vào request.user

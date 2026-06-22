@@ -26,7 +26,7 @@ export class AuthController {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return result;
+    return { user: result.user };
   }
 
   @Post('google')
@@ -43,7 +43,7 @@ export class AuthController {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return result;
+    return { user: result.user };
   }
 
   @Post('logout')

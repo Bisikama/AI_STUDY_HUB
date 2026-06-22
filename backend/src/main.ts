@@ -5,6 +5,8 @@ import { AppModule } from './app.module';
 import { join } from 'path';
 import cookieParser from 'cookie-parser';
 
+import { ConfigService } from '@nestjs/config';
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
@@ -20,8 +22,13 @@ async function bootstrap() {
   });
 
   // Bật CORS (Bắt buộc phải có credentials: true để nhận Cookie)
+  const configService = app.get(ConfigService);
+  const allowedOrigins =
+    configService.get<string>('ALLOWED_ORIGINS') || 'http://localhost:3000,http://localhost:5000';
+  const originArray = allowedOrigins.split(',').map((origin) => origin.trim());
+
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:5000'],
+    origin: originArray,
     credentials: true,
   });
 
