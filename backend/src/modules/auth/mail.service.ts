@@ -10,7 +10,8 @@ export class MailService {
 
   constructor(private configService: ConfigService) {
     const host = this.configService.get<string>('SMTP_HOST');
-    const port = this.configService.get<number>('SMTP_PORT');
+    const portVal = this.configService.get<string | number>('SMTP_PORT');
+    const port = portVal ? Number(portVal) : undefined;
     const user = this.configService.get<string>('SMTP_USER');
     const pass = this.configService.get<string>('SMTP_PASS');
     const from = this.configService.get<string>('SMTP_FROM');

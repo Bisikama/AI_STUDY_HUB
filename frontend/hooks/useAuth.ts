@@ -30,12 +30,11 @@ export const useAuth = () => {
     setError(null);
     try {
       const res = await authApi.login(credentials);
-      // BE dùng ApiResponseInterceptor bọc response thành:
-      // { statusCode, message, data: { user, token } }
-      // Nên phải đọc ở tầng res.data.data chứ không phải res.data
-      const payload = res.data.data as { user: User; token: string };
-      localStorage.setItem("token", payload.token);
-      localStorage.setItem("user", JSON.stringify(payload.user));
+      // axiosClient interceptor đã giải nén response.data = response.data.data
+      // nên res.data chính là { user, token }
+      const payload = res.data as unknown as { user: User; token: string };
+      localStorage.setItem('token', payload.token);
+      localStorage.setItem('user', JSON.stringify(payload.user));
       return payload.user;
     } catch (err: unknown) {
       const errorMsg = handleError(err);
