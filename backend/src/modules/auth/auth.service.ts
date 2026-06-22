@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -61,6 +62,15 @@ export class AuthService {
     if (!isPasswordValid) {
       throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu!');
     }
+
+    if (!user.isActive) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        message: 'Tài khoản của bạn đã bị khóa!',
+        code: 'ACCOUNT_LOCKED',
+      });
+    }
+
     console.log('>>> ĐANG LOGIN VỚI QUYỀN:', user.role);
 
     // 3. Tạo JWT Token
@@ -115,6 +125,14 @@ export class AuthService {
             avatarUrl,
             role: 'STUDENT',
           },
+        });
+      }
+
+      if (!user.isActive) {
+        throw new ForbiddenException({
+          statusCode: 403,
+          message: 'Tài khoản của bạn đã bị khóa!',
+          code: 'ACCOUNT_LOCKED',
         });
       }
 

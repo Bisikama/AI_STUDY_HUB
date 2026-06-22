@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import axiosClient from '@/utils/axios';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -33,10 +34,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    try {
+      await axiosClient.post('/auth/logout');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
   };
 
   return (
@@ -144,11 +150,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
               href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                localStorage.removeItem('token');
-                router.replace('/');
-              }}
+              onClick={handleLogout}
             >
               <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
             </a>
@@ -168,9 +170,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <span className="material-symbols-outlined">menu</span>
               </button>
-              <span className="font-headline-md text-headline-md text-primary">
-                ScholarHub
-              </span>
+              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
             </div>
 
             {/* Search Form */}
@@ -226,7 +226,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           setShowAvatarDropdown(false);
                         }}
                       >
-                        <span className="material-symbols-outlined text-[18px]">person</span> Profile
+                        <span className="material-symbols-outlined text-[18px]">person</span>{' '}
+                        Profile
                       </button>
                       <hr className="border-outline-variant my-1" />
                       <button

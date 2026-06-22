@@ -33,7 +33,6 @@ export const useAuth = () => {
       // axiosClient interceptor đã giải nén response.data = response.data.data
       // nên res.data chính là { user, token }
       const payload = res.data as unknown as { user: User; token: string };
-      localStorage.setItem('token', payload.token);
       localStorage.setItem('user', JSON.stringify(payload.user));
       return payload.user;
     } catch (err: unknown) {
@@ -62,10 +61,15 @@ export const useAuth = () => {
     }
   };
 
-  const logout = (): void => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+  const logout = async (): Promise<void> => {
+    try {
+      await authApi.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
   };
 
   const checkEmail = async (email: string): Promise<boolean> => {
@@ -103,7 +107,6 @@ export const useAuth = () => {
     setError(null);
     try {
       const res = await authApi.loginWithGoogle(idToken);
-      localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       return res.data.user;
     } catch (err: unknown) {

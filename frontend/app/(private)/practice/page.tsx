@@ -60,12 +60,7 @@ type ExploreAiCache = {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-    },
-  });
+  const response = await fetch(url, { credentials: 'include' });
   if (!response.ok) {
     throw new Error('Failed to fetch explore documents');
   }
@@ -74,12 +69,7 @@ const fetcher = async (url: string): Promise<ExploreDocument[]> => {
 };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-    },
-  });
+  const response = await fetch(url, { credentials: 'include' });
   if (!response.ok) {
     throw new Error('Failed to fetch AI Cache');
   }
@@ -197,10 +187,16 @@ export default function PracticePage() {
     }
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+  const handleLogout = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    try {
+      await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
   };
 
   // States cho Flashcards
@@ -227,7 +223,6 @@ export default function PracticePage() {
   // Đồng bộ param URL
   useEffect(() => {
     if (docParam) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedDocId(docParam);
     }
   }, [docParam]);
@@ -276,12 +271,9 @@ export default function PracticePage() {
     setAnalyzeError(null);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const response = await fetch(`${API_BASE_URL}/api/documents/analyze/${selectedDocId}`, {
         method: 'POST',
-        headers: {
-          Authorization: token ? `Bearer ${token}` : '',
-        },
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -375,7 +367,7 @@ export default function PracticePage() {
           <li>
             <Link
               href="/practice"
-              className="bg-surface-container-low text-primary font-semibold font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
+              className="bg-surface-container-low text-primary font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 font-semibold transition-transform active:scale-95"
             >
               <span className="material-symbols-outlined">lightbulb</span> Practice Mode
             </Link>
@@ -411,11 +403,7 @@ export default function PracticePage() {
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
               href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                localStorage.removeItem('token');
-                router.replace('/');
-              }}
+              onClick={handleLogout}
             >
               <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
             </a>
@@ -435,9 +423,7 @@ export default function PracticePage() {
               >
                 <span className="material-symbols-outlined">menu</span>
               </button>
-              <span className="font-headline-md text-headline-md text-primary">
-                ScholarHub
-              </span>
+              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
             </div>
 
             {/* Search Form */}
@@ -500,7 +486,8 @@ export default function PracticePage() {
                           setShowAvatarDropdown(false);
                         }}
                       >
-                        <span className="material-symbols-outlined text-[18px]">person</span> Profile
+                        <span className="material-symbols-outlined text-[18px]">person</span>{' '}
+                        Profile
                       </button>
                       <hr className="border-outline-variant my-1" />
                       <button
@@ -520,10 +507,7 @@ export default function PracticePage() {
         {/* Content Body */}
         <main className="mx-auto w-full max-w-5xl flex-grow p-6 md:p-8">
           {/* Mobile Search Form */}
-          <form
-            onSubmit={(e) => e.preventDefault()}
-            className="relative mb-6 md:hidden"
-          >
+          <form onSubmit={(e) => e.preventDefault()} className="relative mb-6 md:hidden">
             <span className="material-symbols-outlined text-secondary absolute top-1/2 left-4 -translate-y-1/2">
               search
             </span>
