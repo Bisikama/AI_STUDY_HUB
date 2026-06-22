@@ -56,13 +56,13 @@ type ExploreAiCache = {
 type ApiResponse<T> =
   | T
   | {
-    statusCode: number;
-    message: string;
-    data: T;
-  };
+      statusCode: number;
+      message: string;
+      data: T;
+    };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
-  const response = await fetch(url);
+  const response = await fetch(url, { credentials: 'include' });
 
   if (!response.ok) {
     throw new Error('Failed to fetch AI cache');
@@ -289,7 +289,6 @@ function DashboardPage() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDashboardData();
 
     // Fetch từ API để đồng bộ dữ liệu mới nhất từ database
@@ -337,10 +336,15 @@ function DashboardPage() {
     );
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.reload();
+  const handleLogout = async () => {
+    try {
+      await axiosClient.post('/auth/logout');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -380,8 +384,9 @@ function DashboardPage() {
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${mobileMenuOpen ? 'flex' : 'hidden'
-          } md:flex fixed left-0 top-0 h-full flex-col p-4 border-r border-outline-variant bg-surface-container-lowest shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-64 z-20 transition-all`}
+        className={`${
+          mobileMenuOpen ? 'flex' : 'hidden'
+        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
         <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
@@ -416,7 +421,7 @@ function DashboardPage() {
           <li>
             <Link
               href="/dashboard"
-              className="bg-surface-container-low text-primary font-semibold font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
+              className="bg-surface-container-low text-primary font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 font-semibold transition-transform active:scale-95"
             >
               <span className="material-symbols-outlined">search</span> Discover
             </Link>
@@ -491,11 +496,7 @@ function DashboardPage() {
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
               href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                localStorage.removeItem('token');
-                router.replace('/');
-              }}
+              onClick={handleLogout}
             >
               <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
             </a>
@@ -657,7 +658,7 @@ function DashboardPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-outline-variant -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
+                  <div className="scrollbar-thumb-rounded scrollbar-thumb-outline-variant -mx-4 flex snap-x snap-mandatory scrollbar-thin gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
                     {recentlyViewed.slice(0, 8).map((doc) => (
                       <div
                         key={doc.id}
@@ -829,10 +830,11 @@ function DashboardPage() {
                           </div>
                           <button
                             onClick={(e) => toggleSaveDoc(doc.id, e)}
-                            className={`hidden sm:block px-4 py-2 border rounded-full font-label-sm text-label-sm transition-colors cursor-pointer ${savedDocIds.includes(doc.id)
-                                ? 'bg-primary-container text-white border-primary-container'
+                            className={`font-label-sm text-label-sm hidden cursor-pointer rounded-full border px-4 py-2 transition-colors sm:block ${
+                              savedDocIds.includes(doc.id)
+                                ? 'bg-primary-container border-primary-container text-white'
                                 : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
-                              }`}
+                            }`}
                           >
                             {savedDocIds.includes(doc.id) ? 'Saved' : 'Save'}
                           </button>
@@ -876,10 +878,13 @@ function DashboardPage() {
                             </p>
                           </div>
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${idx === 0
-                            ? 'bg-primary-fixed-dim text-on-primary-fixed'
-                            : 'bg-surface-variant text-on-surface-variant'
-                          }`}>
+                        <span
+                          className={`rounded px-2 py-1 text-xs font-bold ${
+                            idx === 0
+                              ? 'bg-primary-fixed-dim text-on-primary-fixed'
+                              : 'bg-surface-variant text-on-surface-variant'
+                          }`}
+                        >
                           #{idx + 1}
                         </span>
                       </div>
@@ -893,8 +898,6 @@ function DashboardPage() {
                   View Leaderboard
                 </button>
               </section>
-
-
             </div>
           </div>
         </main>
@@ -1008,8 +1011,9 @@ function DashboardPage() {
                   return (
                     <div
                       key={c.id}
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-all ${rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
-                        }`}
+                      className={`flex items-center justify-between rounded-xl border p-3 transition-all ${
+                        rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
+                      }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -1177,8 +1181,9 @@ function DashboardPage() {
                                     type="button"
                                     disabled={hasAnswered}
                                     onClick={() => handleSelectOption(question.id, option.id)}
-                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${hasAnswered ? 'cursor-default' : 'cursor-pointer'
-                                      }`}
+                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
+                                      hasAnswered ? 'cursor-default' : 'cursor-pointer'
+                                    }`}
                                   >
                                     {option.optionText}
 
@@ -1218,7 +1223,7 @@ function DashboardPage() {
                             handleFollowDocument(aiCache.document.id);
                           }
                         }}
-                        className={`cursor-pointer rounded-lg px-5 py-2 transition-all hover:shadow-md flex items-center gap-1.5 border ${
+                        className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-5 py-2 transition-all hover:shadow-md ${
                           isDocumentFollowed
                             ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
                             : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
@@ -1408,8 +1413,8 @@ export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
+    const user = localStorage.getItem('user');
+    if (!user) {
       router.replace('/login');
       setIsLoggedIn(false);
     } else {

@@ -64,33 +64,30 @@
 //     }
 // )
 // export default axiosInstance
-import axios from "axios";
+import axios from 'axios';
 
 // Tạo instance
 const axiosClient = axios.create({
-  baseURL: "http://localhost:3000/api", // Địa chỉ Backend
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api', // Địa chỉ Backend
   withCredentials: true,
-  headers: { "Content-Type": "application/json" }
-});
-
-// Chèn Token vào mỗi lần gọi (Interceptors)
-axiosClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+  headers: { 'Content-Type': 'application/json' },
 });
 
 // Giải nén response envelope { statusCode, message, data } từ NestJS
 axiosClient.interceptors.response.use(
   (response) => {
-    if (response.data && response.data.hasOwnProperty('statusCode') && response.data.hasOwnProperty('data')) {
+    if (
+      response.data &&
+      response.data.hasOwnProperty('statusCode') &&
+      response.data.hasOwnProperty('data')
+    ) {
       response.data = response.data.data;
     }
     return response;
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 export default axiosClient;

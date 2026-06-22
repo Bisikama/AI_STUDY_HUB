@@ -80,7 +80,7 @@ type ExploreAiCache = {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
-  const response = await fetch(url);
+  const response = await fetch(url, { credentials: 'include' });
 
   if (!response.ok) {
     throw new Error('Failed to fetch explore documents');
@@ -96,7 +96,7 @@ const fetcher = async (url: string): Promise<ExploreDocument[]> => {
 };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
-  const response = await fetch(url);
+  const response = await fetch(url, { credentials: 'include' });
 
   if (!response.ok) {
     throw new Error('Failed to fetch AI cache');
@@ -560,9 +560,15 @@ function SearchExplore() {
                 settings
               </button>
               <button
-                onClick={() => {
-                  localStorage.removeItem('token');
-                  router.replace('/');
+                onClick={async () => {
+                  try {
+                    await axiosClient.post('/auth/logout');
+                  } catch (e) {
+                    console.error(e);
+                  } finally {
+                    localStorage.removeItem('user');
+                    window.location.href = '/login';
+                  }
                 }}
                 className="material-symbols-outlined text-error cursor-pointer rounded-full p-2 transition-colors hover:bg-red-50 active:scale-95"
                 title="Đăng xuất"

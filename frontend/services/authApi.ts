@@ -53,6 +53,10 @@ export const authApi = {
     return axiosClient.post('/auth/google', { idToken });
   },
 
+  logout: async () => {
+    return axiosClient.post('/auth/logout');
+  },
+
   forgotPassword: async (email: string) => {
     return axiosClient.post('/auth/forgot-password', { email });
   },

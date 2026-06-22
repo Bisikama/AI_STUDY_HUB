@@ -6,38 +6,38 @@ import LandingPage from '@/components/LandingPage';
 
 function DashboardSkeleton() {
   return (
-    <div className="bg-background text-on-background min-h-screen flex font-sans animate-pulse w-full">
+    <div className="bg-background text-on-background flex min-h-screen w-full animate-pulse font-sans">
       {/* Sidebar Skeleton */}
-      <div className="hidden md:flex flex-col p-4 border-r border-outline-variant bg-surface-container-lowest w-64 h-screen">
-        <div className="h-8 bg-surface-container-high rounded mb-8 w-3/4"></div>
-        <div className="h-10 bg-surface-container-high rounded mb-6"></div>
+      <div className="border-outline-variant bg-surface-container-lowest hidden h-screen w-64 flex-col border-r p-4 md:flex">
+        <div className="bg-surface-container-high mb-8 h-8 w-3/4 rounded"></div>
+        <div className="bg-surface-container-high mb-6 h-10 rounded"></div>
         <div className="space-y-4">
-          <div className="h-6 bg-surface-container-low rounded w-1/2 animate-pulse"></div>
-          <div className="h-6 bg-surface-container-low rounded w-2/3 animate-pulse"></div>
-          <div className="h-6 bg-surface-container-low rounded w-1/3 animate-pulse"></div>
+          <div className="bg-surface-container-low h-6 w-1/2 animate-pulse rounded"></div>
+          <div className="bg-surface-container-low h-6 w-2/3 animate-pulse rounded"></div>
+          <div className="bg-surface-container-low h-6 w-1/3 animate-pulse rounded"></div>
         </div>
       </div>
 
       {/* Content Skeleton */}
-      <div className="flex-grow flex flex-col h-screen">
+      <div className="flex h-screen flex-grow flex-col">
         {/* Header Skeleton */}
-        <div className="h-16 bg-surface-container-lowest border-b border-outline-variant px-6 flex items-center justify-between">
-          <div className="h-8 bg-surface-container-high rounded w-96 animate-pulse"></div>
-          <div className="h-8 bg-surface-container-high rounded-full w-8 animate-pulse"></div>
+        <div className="bg-surface-container-lowest border-outline-variant flex h-16 items-center justify-between border-b px-6">
+          <div className="bg-surface-container-high h-8 w-96 animate-pulse rounded"></div>
+          <div className="bg-surface-container-high h-8 w-8 animate-pulse rounded-full"></div>
         </div>
-        
+
         {/* Body Skeleton */}
-        <div className="flex-1 p-6 md:p-8 space-y-8 overflow-y-auto">
-          <div className="h-12 bg-surface-container-high rounded w-1/2 animate-pulse"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="h-32 bg-surface-container-low rounded-xl col-span-2 animate-pulse"></div>
-            <div className="h-32 bg-surface-container-low rounded-xl animate-pulse"></div>
+        <div className="flex-1 space-y-8 overflow-y-auto p-6 md:p-8">
+          <div className="bg-surface-container-high h-12 w-1/2 animate-pulse rounded"></div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="bg-surface-container-low col-span-2 h-32 animate-pulse rounded-xl"></div>
+            <div className="bg-surface-container-low h-32 animate-pulse rounded-xl"></div>
           </div>
-          <div className="space-y-4 animate-pulse">
-            <div className="h-8 bg-surface-container-high rounded w-1/4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="h-40 bg-surface-container-lowest border border-outline-variant rounded-xl"></div>
-              <div className="h-40 bg-surface-container-lowest border border-outline-variant rounded-xl"></div>
+          <div className="animate-pulse space-y-4">
+            <div className="bg-surface-container-high h-8 w-1/4 rounded"></div>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="bg-surface-container-lowest border-outline-variant h-40 rounded-xl border"></div>
+              <div className="bg-surface-container-lowest border-outline-variant h-40 rounded-xl border"></div>
             </div>
           </div>
         </div>
@@ -51,8 +51,8 @@ export default function RootPage() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
+    const user = localStorage.getItem('user');
+    if (user) {
       setIsLoggedIn(true);
       router.replace('/dashboard');
     } else {

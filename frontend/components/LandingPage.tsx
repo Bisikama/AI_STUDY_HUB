@@ -8,9 +8,9 @@ export default function LandingPage() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const user = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
     setTimeout(() => {
-      setIsLoggedIn(!!token);
+      setIsLoggedIn(!!user);
     }, 0);
   }, []);
 
