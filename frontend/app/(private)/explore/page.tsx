@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { useEffect, useMemo, useState, Suspense } from 'react';
+import { useEffect, useMemo, useState, Suspense, type MouseEvent } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import axiosClient from '@/utils/axios';
 
@@ -305,6 +305,7 @@ function SearchExplore() {
     }
   });
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [activeAiCacheTab, setActiveAiCacheTab] = useState<'summary' | 'quiz'>('summary');
 
   // key = questionId, value = selected optionId
   const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
@@ -454,7 +455,7 @@ function SearchExplore() {
     }
   };
 
-  const toggleFollow = (doc: ExploreDocument, e: React.MouseEvent) => {
+  const toggleFollow = (doc: ExploreDocument, e: MouseEvent) => {
     e.stopPropagation();
 
     setFollowedDocumentIds((prev) => {
@@ -471,6 +472,7 @@ function SearchExplore() {
   const closeSelectedDocument = () => {
     setSelectedDocumentId(null);
     setSelectedOptionIds({});
+    setActiveAiCacheTab('summary');
   };
 
   const handleViewFull = (fileUrl?: string | null) => {
@@ -489,6 +491,7 @@ function SearchExplore() {
     }
 
     setSelectedOptionIds({});
+    setActiveAiCacheTab('summary');
     setSelectedDocumentId(doc.id);
 
     try {
@@ -1090,107 +1093,146 @@ function SearchExplore() {
 
             {aiCache && (
               <div className="space-y-6">
-                <section className="bg-surface-container-lowest border-outline-variant rounded-xl border p-5">
-                  <div className="mb-3 flex items-center justify-between gap-4">
-                    <h3 className="text-primary text-lg font-bold">AI Summary</h3>
-                    <span className="bg-surface-container-high text-secondary rounded-full px-3 py-1 text-xs">
-                      {aiCache.summaries[0]?.status ?? 'NO SUMMARY'}
+                <div className="bg-surface-container-low border-outline-variant flex rounded-xl border p-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveAiCacheTab('summary')}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                      activeAiCacheTab === 'summary'
+                        ? 'bg-surface text-primary shadow-sm'
+                        : 'text-secondary hover:text-primary'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">summarize</span>
+                    Summary
+                    <span className="bg-surface-container-high text-secondary rounded-full px-2 py-0.5 text-[11px]">
+                      {aiCache.summaries.length}
                     </span>
-                  </div>
+                  </button>
 
-                  {aiCache.summaries.length > 0 ? (
-                    <div className="space-y-4">
-                      <p className="text-on-surface-variant leading-relaxed">
-                        {aiCache.summaries[0].summaryText}
-                      </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveAiCacheTab('quiz')}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                      activeAiCacheTab === 'quiz'
+                        ? 'bg-surface text-primary shadow-sm'
+                        : 'text-secondary hover:text-primary'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">quiz</span>
+                    Quiz
+                    <span className="bg-surface-container-high text-secondary rounded-full px-2 py-0.5 text-[11px]">
+                      {aiCache.quizzes[0]?.questions.length ?? 0}
+                    </span>
+                  </button>
+                </div>
 
-                      {aiCache.summaries[0].keyPoints && (
-                        <div>
-                          <h4 className="text-primary mb-2 font-semibold">Key Points</h4>
-                          <ul className="text-on-surface-variant space-y-2">
-                            {aiCache.summaries[0].keyPoints
-                              .split('\n')
-                              .filter(Boolean)
-                              .map((point) => (
-                                <li key={point} className="flex gap-2">
-                                  <span className="text-primary">•</span>
-                                  <span>{point.replace(/^•\s*/, '')}</span>
-                                </li>
-                              ))}
-                          </ul>
-                        </div>
-                      )}
+                {activeAiCacheTab === 'summary' && (
+                  <section className="bg-surface-container-lowest border-outline-variant rounded-xl border p-5">
+                    <div className="mb-3 flex items-center justify-between gap-4">
+                      <h3 className="text-primary text-lg font-bold">AI Summary</h3>
+                      <span className="bg-surface-container-high text-secondary rounded-full px-3 py-1 text-xs">
+                        {aiCache.summaries[0]?.status ?? 'NO SUMMARY'}
+                      </span>
                     </div>
-                  ) : (
-                    <p className="text-secondary">No summary available for this document.</p>
-                  )}
-                </section>
 
-                <section className="bg-surface-container-lowest border-outline-variant rounded-xl border p-5">
-                  <h3 className="text-primary mb-4 text-lg font-bold">
-                    Quiz Questions ({aiCache.quizzes[0]?.questions.length ?? 0})
-                  </h3>
+                    {aiCache.summaries.length > 0 ? (
+                      <div className="space-y-4">
+                        <p className="text-on-surface-variant leading-relaxed">
+                          {aiCache.summaries[0].summaryText}
+                        </p>
 
-                  {aiCache.quizzes.length > 0 ? (
-                    <div className="space-y-5">
-                      {aiCache.quizzes[0].questions.map((question, questionIndex) => (
-                        <div
-                          key={question.id}
-                          className="border-outline-variant bg-surface rounded-xl border p-4"
-                        >
-                          <p className="text-primary mb-3 font-semibold">
-                            {questionIndex + 1}. {question.questionText}
-                          </p>
-
-                          <div className="grid gap-2">
-                            {question.options.map((option) => {
-                              const selectedOptionId = selectedOptionIds[question.id];
-                              const hasAnswered = Boolean(selectedOptionId);
-                              const isSelected = selectedOptionId === option.id;
-                              const isCorrectAnswer = option.isCorrect;
-
-                              let optionClass =
-                                'border-outline-variant text-on-surface-variant hover:border-primary hover:bg-surface-container-low';
-
-                              if (hasAnswered && isCorrectAnswer) {
-                                optionClass = 'border-primary bg-primary-container/20 text-primary';
-                              }
-
-                              if (hasAnswered && isSelected && !isCorrectAnswer) {
-                                optionClass =
-                                  'border-error bg-error-container text-on-error-container';
-                              }
-
-                              return (
-                                <button
-                                  key={option.id}
-                                  type="button"
-                                  disabled={hasAnswered}
-                                  onClick={() => handleSelectOption(question.id, option.id)}
-                                  className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
-                                    hasAnswered ? 'cursor-default' : 'cursor-pointer'
-                                  }`}
-                                >
-                                  {option.optionText}
-
-                                  {hasAnswered && isCorrectAnswer && (
-                                    <span className="ml-2 text-xs font-bold">(Correct)</span>
-                                  )}
-
-                                  {hasAnswered && isSelected && !isCorrectAnswer && (
-                                    <span className="ml-2 text-xs font-bold">(Your answer)</span>
-                                  )}
-                                </button>
-                              );
-                            })}
+                        {aiCache.summaries[0].keyPoints && (
+                          <div>
+                            <h4 className="text-primary mb-2 font-semibold">Key Points</h4>
+                            <ul className="text-on-surface-variant space-y-2">
+                              {aiCache.summaries[0].keyPoints
+                                .split('\n')
+                                .filter(Boolean)
+                                .map((point) => (
+                                  <li key={point} className="flex gap-2">
+                                    <span className="text-primary">•</span>
+                                    <span>{point.replace(/^•\s*/, '')}</span>
+                                  </li>
+                                ))}
+                            </ul>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-secondary">No quiz available for this document.</p>
-                  )}
-                </section>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-secondary">No summary available for this document.</p>
+                    )}
+                  </section>
+                )}
+
+                {activeAiCacheTab === 'quiz' && (
+                  <section className="bg-surface-container-lowest border-outline-variant rounded-xl border p-5">
+                    <h3 className="text-primary mb-4 text-lg font-bold">
+                      Quiz Questions ({aiCache.quizzes[0]?.questions.length ?? 0})
+                    </h3>
+
+                    {aiCache.quizzes.length > 0 ? (
+                      <div className="space-y-5">
+                        {aiCache.quizzes[0].questions.map((question, questionIndex) => (
+                          <div
+                            key={question.id}
+                            className="border-outline-variant bg-surface rounded-xl border p-4"
+                          >
+                            <p className="text-primary mb-3 font-semibold">
+                              {questionIndex + 1}. {question.questionText}
+                            </p>
+
+                            <div className="grid gap-2">
+                              {question.options.map((option) => {
+                                const selectedOptionId = selectedOptionIds[question.id];
+                                const hasAnswered = Boolean(selectedOptionId);
+                                const isSelected = selectedOptionId === option.id;
+                                const isCorrectAnswer = option.isCorrect;
+
+                                let optionClass =
+                                  'border-outline-variant text-on-surface-variant hover:border-primary hover:bg-surface-container-low';
+
+                                if (hasAnswered && isCorrectAnswer) {
+                                  optionClass =
+                                    'border-primary bg-primary-container/20 text-primary';
+                                }
+
+                                if (hasAnswered && isSelected && !isCorrectAnswer) {
+                                  optionClass =
+                                    'border-error bg-error-container text-on-error-container';
+                                }
+
+                                return (
+                                  <button
+                                    key={option.id}
+                                    type="button"
+                                    disabled={hasAnswered}
+                                    onClick={() => handleSelectOption(question.id, option.id)}
+                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
+                                      hasAnswered ? 'cursor-default' : 'cursor-pointer'
+                                    }`}
+                                  >
+                                    {option.optionText}
+
+                                    {hasAnswered && isCorrectAnswer && (
+                                      <span className="ml-2 text-xs font-bold">(Correct)</span>
+                                    )}
+
+                                    {hasAnswered && isSelected && !isCorrectAnswer && (
+                                      <span className="ml-2 text-xs font-bold">(Your answer)</span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-secondary">No quiz available for this document.</p>
+                    )}
+                  </section>
+                )}
 
                 <div className="flex justify-end gap-3">
                   <button
