@@ -78,6 +78,8 @@ type ExploreAiCache = {
 };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
+const FOLLOWED_DOCUMENTS_STORAGE_KEY = 'studyhub_followed_documents';
 
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
   const response = await fetch(url, { credentials: 'include' });
@@ -288,7 +290,20 @@ function SearchExplore() {
     year: false,
   });
 
-  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
+  const [followedDocumentIds, setFollowedDocumentIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    try {
+      const storedIds = window.localStorage.getItem(FOLLOWED_DOCUMENT_IDS_STORAGE_KEY);
+      const parsedIds = storedIds ? (JSON.parse(storedIds) as string[]) : [];
+
+      return Array.isArray(parsedIds) ? parsedIds : [];
+    } catch {
+      return [];
+    }
+  });
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
 
   // key = questionId, value = selected optionId
@@ -303,18 +318,6 @@ function SearchExplore() {
     error: aiCacheError,
     isLoading: isAiCacheLoading,
   } = useSWR(aiCacheUrl, aiCacheFetcher);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    if (activeQuery.trim()) {
-      params.set('search', activeQuery.trim());
-    } else {
-      params.delete('search');
-    }
-
-    router.replace(`/explore?${params.toString()}`);
-  }, [activeQuery, router]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -423,11 +426,60 @@ function SearchExplore() {
     setSortBy('recent');
   };
 
-  const toggleBookmark = (id: string, e: React.MouseEvent) => {
+  const saveFollowedDocuments = (nextIds: string[], currentDoc: ExploreDocument) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const storedDocs = window.localStorage.getItem(FOLLOWED_DOCUMENTS_STORAGE_KEY);
+      const parsedDocs = storedDocs ? (JSON.parse(storedDocs) as ExploreDocument[]) : [];
+      const safeDocs = Array.isArray(parsedDocs) ? parsedDocs : [];
+      const nextDocs = nextIds.includes(currentDoc.id)
+        ? [...safeDocs.filter((doc) => doc.id !== currentDoc.id), currentDoc]
+        : safeDocs.filter((doc) => doc.id !== currentDoc.id);
+
+      window.localStorage.setItem(FOLLOWED_DOCUMENT_IDS_STORAGE_KEY, JSON.stringify(nextIds));
+      window.localStorage.setItem(FOLLOWED_DOCUMENTS_STORAGE_KEY, JSON.stringify(nextDocs));
+      window.dispatchEvent(
+        new CustomEvent('studyhub-followed-documents-change', {
+          detail: {
+            followedDocumentIds: nextIds,
+            followedDocuments: nextDocs,
+          },
+        }),
+      );
+    } catch (err) {
+      console.error('Failed to save followed documents:', err);
+    }
+  };
+
+  const toggleFollow = (doc: ExploreDocument, e: React.MouseEvent) => {
     e.stopPropagation();
-    setBookmarkedIds((prev) =>
-      prev.includes(id) ? prev.filter((bId) => bId !== id) : [...prev, id],
-    );
+
+    setFollowedDocumentIds((prev) => {
+      const nextIds = prev.includes(doc.id)
+        ? prev.filter((followedId) => followedId !== doc.id)
+        : [...prev, doc.id];
+
+      saveFollowedDocuments(nextIds, doc);
+
+      return nextIds;
+    });
+  };
+
+  const closeSelectedDocument = () => {
+    setSelectedDocumentId(null);
+    setSelectedOptionIds({});
+  };
+
+  const handleViewFull = (fileUrl?: string | null) => {
+    if (!fileUrl || fileUrl === '#') {
+      alert('Document file is not available yet.');
+      return;
+    }
+
+    window.open(getDocumentUrl(fileUrl), '_blank', 'noopener,noreferrer');
   };
 
   const handleCardClick = async (doc: ExploreDocument) => {
@@ -822,16 +874,27 @@ function SearchExplore() {
                               {doc.title}
                             </h3>
                             <button
-                              onClick={(e) => toggleBookmark(doc.id, e)}
-                              className="material-symbols-outlined text-secondary hover:text-primary cursor-pointer transition-colors"
+                              type="button"
+                              onClick={(e) => toggleFollow(doc, e)}
+                              className={`font-label-sm text-label-sm flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 transition-colors ${
+                                followedDocumentIds.includes(doc.id)
+                                  ? 'border-primary bg-primary-container/20 text-primary'
+                                  : 'border-outline-variant text-secondary hover:border-primary hover:text-primary'
+                              }`}
+                              title={
+                                followedDocumentIds.includes(doc.id)
+                                  ? 'Unfollow this document'
+                                  : 'Follow this document'
+                              }
                             >
                               <span
-                                className={`material-symbols-outlined ${
-                                  bookmarkedIds.includes(doc.id) ? 'filled text-primary' : ''
+                                className={`material-symbols-outlined text-[18px] ${
+                                  followedDocumentIds.includes(doc.id) ? 'filled' : ''
                                 }`}
                               >
-                                bookmark
+                                bookmark_add
                               </span>
+                              {followedDocumentIds.includes(doc.id) ? 'Following' : 'Follow'}
                             </button>
                           </div>
                           <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -968,7 +1031,7 @@ function SearchExplore() {
       {selectedDocumentId && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4"
-          onClick={() => setSelectedDocumentId(null)}
+          onClick={closeSelectedDocument}
         >
           <div
             className="bg-surface border-outline-variant max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-2xl border p-6 shadow-2xl"
@@ -989,12 +1052,27 @@ function SearchExplore() {
                 )}
               </div>
 
-              <button
-                onClick={() => setSelectedDocumentId(null)}
-                className="material-symbols-outlined text-secondary hover:text-primary hover:bg-surface-container-low rounded-full p-2 transition-colors"
-              >
-                close
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {aiCache && (
+                  <button
+                    type="button"
+                    onClick={() => handleViewFull(aiCache.document.fileUrl)}
+                    className="bg-primary text-on-primary font-label-md text-label-md flex items-center gap-2 rounded-lg px-4 py-2 transition-all hover:shadow-md"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                    View Full
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={closeSelectedDocument}
+                  className="border-outline-variant text-primary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-2 rounded-lg border px-4 py-2 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  Close
+                </button>
+              </div>
             </div>
 
             {isAiCacheLoading && (
@@ -1116,23 +1194,21 @@ function SearchExplore() {
 
                 <div className="flex justify-end gap-3">
                   <button
-                    onClick={() => setSelectedDocumentId(null)}
-                    className="border-outline-variant text-primary hover:bg-surface-container-low rounded-lg border px-5 py-2 transition-colors"
+                    type="button"
+                    onClick={closeSelectedDocument}
+                    className="border-outline-variant text-primary hover:bg-surface-container-low flex items-center gap-2 rounded-lg border px-5 py-2 transition-colors"
                   >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
                     Close
                   </button>
 
                   <button
-                    onClick={() =>
-                      window.open(
-                        getDocumentUrl(aiCache.document.fileUrl),
-                        '_blank',
-                        'noopener,noreferrer',
-                      )
-                    }
-                    className="bg-primary text-on-primary rounded-lg px-5 py-2 transition-all hover:shadow-md"
+                    type="button"
+                    onClick={() => handleViewFull(aiCache.document.fileUrl)}
+                    className="bg-primary text-on-primary flex items-center gap-2 rounded-lg px-5 py-2 transition-all hover:shadow-md"
                   >
-                    Open File
+                    <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                    View Full
                   </button>
                 </div>
               </div>
