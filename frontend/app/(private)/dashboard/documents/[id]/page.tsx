@@ -177,7 +177,7 @@ export default function DocumentDetailPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 lg:shrink-0">
+        <div className="flex flex-wrap items-center gap-3 lg:shrink-0 ">
           {document.summary && (
             <button
               onClick={() => setViewType((prev) => (prev === 'text' ? 'summary' : 'text'))}
@@ -321,7 +321,7 @@ export default function DocumentDetailPage() {
               </div>
               <div className="border-r border-l border-gray-100">
                 <p className="text-2xl font-bold text-gray-900">
-                  {(document as any).summaries?.length || 0}
+                  {document.summary ? 1 : 0}
                 </p>
                 <p className="mt-1 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
                   SUMMARIES
@@ -431,10 +431,10 @@ export default function DocumentDetailPage() {
 
           {/* System Info Card */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
-              System Info
+            <h3 className="mb-4 text-sm font-bold tracking-wider text-blue-500 uppercase">
+              DOCUMENT STATUS: {document.status}
             </h3>
-            <div className="flex flex-col gap-3 text-sm">
+            {/* <div className="flex flex-col gap-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Document ID</span>
                 <span
@@ -461,7 +461,7 @@ export default function DocumentDetailPage() {
                   </span>
                 </div>
               )}
-            </div>
+            </div> */}
 
             {document.isOwner !== false ? (
               <div className="mt-6 border-t border-gray-100 pt-4">
