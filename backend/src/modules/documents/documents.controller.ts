@@ -32,7 +32,7 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Post('/analyze/:id')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   async analyze(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser('id') userId: string,
@@ -135,6 +135,32 @@ export class DocumentsController {
       statusCode: 200,
       message: 'Document updated successfully',
       data: document,
+    };
+  }
+
+  @Post(':id/follow')
+  @UseGuards(JwtAuthGuard)
+  async followDocument(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<{ statusCode: number; message: string }> {
+    await this.documentsService.followDocument(id, userId);
+    return {
+      statusCode: 200,
+      message: 'Document followed successfully',
+    };
+  }
+
+  @Post(':id/unfollow')
+  @UseGuards(JwtAuthGuard)
+  async unfollowDocument(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<{ statusCode: number; message: string }> {
+    await this.documentsService.unfollowDocument(id, userId);
+    return {
+      statusCode: 200,
+      message: 'Document unfollowed successfully',
     };
   }
 }

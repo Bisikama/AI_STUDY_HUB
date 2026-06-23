@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -11,17 +11,57 @@ export default function DocumentDetailPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
 
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
-  const [isDeleting, setIsDeleting] = React.useState(false);
-  const [deleteError, setDeleteError] = React.useState<string | undefined>();
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | undefined>();
+  const [viewType, setViewType] = useState<'text' | 'summary'>('text');
+
+  // Toast notifications state
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastIdRef = useRef(0);
+  const addToast = useCallback((message: string, variant: ToastVariant) => {
+    const toastId = ++toastIdRef.current;
+    setToasts((prev) => [...prev, { id: toastId, message, variant }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toastId)), 5000);
+  }, []);
+
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const {
     data: response,
     error,
     isLoading,
+    mutate,
   } = useSWR(id ? `/documents/${id}` : null, () => documentsApi.getDocumentById(id));
 
-  const document = response?.data;
+  const document = response;
+
+  const handleAnalyze = async () => {
+    if (!id) return;
+    setIsAnalyzing(true);
+    
+    // Toast 1: Loading
+    addToast('Loading document data...', 'info');
+    
+    // Transition Toast 2
+    const timer = setTimeout(() => {
+      addToast('AI is analyzing and generating questions...', 'info');
+    }, 1500);
+
+    try {
+      await documentsApi.analyzeDocument(id);
+      clearTimeout(timer);
+      addToast('Completed! Document has been successfully processed.', 'success');
+      mutate();
+    } catch (err: any) {
+      clearTimeout(timer);
+      console.error('Analysis failed:', err);
+      const errMsg = err.response?.data?.message || err.message || 'Document analysis error';
+      addToast(`Error: ${errMsg}`, 'error');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const formatSize = (bytes: number): string => {
     if (!bytes) return '0 B';
@@ -137,14 +177,57 @@ export default function DocumentDetailPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 lg:shrink-0">
-          <button
-            onClick={() => router.push(`/dashboard/documents/${document.id}/edit`)}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-          >
-            <span className="material-symbols-outlined text-[18px]">edit</span>
-            Edit
-          </button>
+        <div className="flex flex-wrap items-center gap-3 lg:shrink-0 ">
+          {document.summary && (
+            <button
+              onClick={() => setViewType((prev) => (prev === 'text' ? 'summary' : 'text'))}
+              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {viewType === 'text' ? 'summarize' : 'text_snippet'}
+              </span>
+              {viewType === 'text' ? 'View Summary' : 'View Full Text'}
+            </button>
+          )}
+
+          {document.isOwner !== false && (
+            <button
+              onClick={() => router.push(`/dashboard/documents/${document.id}/edit`)}
+              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            >
+              <span className="material-symbols-outlined text-[18px]">edit</span>
+              Edit
+            </button>
+          )}
+
+          {document.isOwner === false && (
+            <button
+              onClick={async () => {
+                try {
+                  if (document.isFollowed) {
+                    await documentsApi.unfollowDocument(document.id);
+                    addToast('Unfollowed document successfully.', 'success');
+                  } else {
+                    await documentsApi.followDocument(document.id);
+                    addToast('Followed document successfully.', 'success');
+                  }
+                  mutate();
+                } catch (err) {
+                  console.error('Follow toggle failed:', err);
+                }
+              }}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold shadow-sm transition-colors border ${
+                document.isFollowed
+                  ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                  : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {document.isFollowed ? 'bookmark_remove' : 'bookmark'}
+              </span>
+              {document.isFollowed ? 'Unfollow' : 'Follow'}
+            </button>
+          )}
 
           <a
             href={document.fileUrl || document.previewUrl || '#'}
@@ -173,21 +256,59 @@ export default function DocumentDetailPage() {
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900">
-                <span className="material-symbols-outlined text-gray-400">text_snippet</span>
-                Extracted Text / Description
+                <span className="material-symbols-outlined text-gray-400">
+                  {viewType === 'text' ? 'text_snippet' : 'auto_awesome'}
+                </span>
+                {viewType === 'text' ? 'Extracted Text / Description' : 'AI Summary & Key Insights'}
               </h2>
             </div>
 
-            {document.description && (
-              <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 p-4">
-                <h3 className="mb-2 text-sm font-bold text-gray-700">Description</h3>
-                <p className="text-sm text-gray-600">{document.description}</p>
+            {viewType === 'text' ? (
+              <>
+                {document.description && (
+                  <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <h3 className="mb-2 text-sm font-bold text-gray-700">Description</h3>
+                    <p className="text-sm text-gray-600">{document.description}</p>
+                  </div>
+                )}
+
+                <div className="prose prose-sm max-w-none leading-relaxed text-gray-600">
+                  <p className="whitespace-pre-wrap">{truncatedText}</p>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-6">
+                {document.summary ? (
+                  <>
+                    <div className="prose prose-sm max-w-none leading-relaxed text-gray-700">
+                      <p className="whitespace-pre-wrap font-medium">{document.summary.summaryText}</p>
+                    </div>
+
+                    {document.summary.keyPoints && (
+                      <div className="mt-6 border-t border-gray-100 pt-6">
+                        <h3 className="mb-3 text-lg font-bold text-gray-900 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-amber-500">lightbulb</span>
+                          Key Insights
+                        </h3>
+                        <ul className="space-y-2.5">
+                          {document.summary.keyPoints
+                            .split('\n')
+                            .filter(Boolean)
+                            .map((point: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
+                                <span className="text-primary mt-1 font-bold">•</span>
+                                <span>{point.replace(/^•\s*/, '')}</span>
+                              </li>
+                            ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-gray-500 italic">No summary available.</p>
+                )}
               </div>
             )}
-
-            <div className="prose prose-sm max-w-none leading-relaxed text-gray-600">
-              <p className="whitespace-pre-wrap">{truncatedText}</p>
-            </div>
 
             <div className="mt-8 grid grid-cols-3 gap-4 border-t border-gray-100 pt-6 text-center">
               <div>
@@ -200,7 +321,7 @@ export default function DocumentDetailPage() {
               </div>
               <div className="border-r border-l border-gray-100">
                 <p className="text-2xl font-bold text-gray-900">
-                  {(document as any).summaries?.length || 0}
+                  {document.summary ? 1 : 0}
                 </p>
                 <p className="mt-1 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
                   SUMMARIES
@@ -243,40 +364,77 @@ export default function DocumentDetailPage() {
           </div>
 
           {/* Action Card matching "AI Assistant" dark styling */}
-          <div className="rounded-2xl bg-[#1a1c23] p-6 text-white shadow-md">
+          <div className="rounded-2xl bg-[#1a1c23] p-6 text-white shadow-md relative overflow-hidden">
+            {isAnalyzing && (
+              <div className="absolute inset-0 bg-[#1a1c23]/95 flex flex-col items-center justify-center p-6 text-center z-10">
+                <span className="material-symbols-outlined text-5xl text-blue-400 animate-pulse mb-3">
+                  psychology
+                </span>
+                <h4 className="text-lg font-bold mb-1">AI Document Analysis</h4>
+                <p className="text-xs text-gray-400 mb-4">
+                  Processing content & generating questions...
+                </p>
+                <div className="flex items-center gap-2 text-sm text-gray-300">
+                  <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                  <span>Please wait (15-30 seconds)</span>
+                </div>
+              </div>
+            )}
+
             <h3 className="mb-2 text-xl font-bold">Document Actions</h3>
             <p className="mb-6 text-sm text-gray-400">
               What would you like to do with this document today?
             </p>
 
-            <div className="flex flex-col gap-3">
-              <button className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-gray-700">
-                Generate Quiz
-                <span className="material-symbols-outlined text-[18px] text-gray-400">
-                  chevron_right
+            {document.isAIGenerated ? (
+              <div className="flex flex-col items-center justify-center py-4 text-center">
+                <span className="material-symbols-outlined text-4xl text-emerald-400 mb-2">
+                  check_circle
                 </span>
-              </button>
-              <button className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-gray-700">
-                Create Flashcards
-                <span className="material-symbols-outlined text-[18px] text-gray-400">
-                  chevron_right
+                <p className="text-sm font-semibold text-gray-200">
+                  Document successfully processed
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Summary and Quiz are ready
+                </p>
+              </div>
+            ) : document.isOwner !== false ? (
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing}
+                  className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-gray-700 disabled:opacity-50 w-full"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-blue-400">auto_awesome</span>
+                    Generate Quiz and Summary
+                  </span>
+                  <span className="material-symbols-outlined text-[18px] text-gray-400">
+                    chevron_right
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-4 text-center">
+                <span className="material-symbols-outlined text-4xl text-gray-400 mb-2">
+                  lock
                 </span>
-              </button>
-              <button className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-gray-700">
-                Ask a Question
-                <span className="material-symbols-outlined text-[18px] text-gray-400">
-                  chevron_right
-                </span>
-              </button>
-            </div>
+                <p className="text-sm font-semibold text-gray-200">
+                  Followed Document
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  AI Quiz and Summary are not available.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* System Info Card */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
-              System Info
+            <h3 className="mb-4 text-sm font-bold tracking-wider text-blue-500 uppercase">
+              DOCUMENT STATUS: {document.status}
             </h3>
-            <div className="flex flex-col gap-3 text-sm">
+            {/* <div className="flex flex-col gap-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Document ID</span>
                 <span
@@ -303,16 +461,35 @@ export default function DocumentDetailPage() {
                   </span>
                 </div>
               )}
-            </div>
+            </div> */}
 
-            <div className="mt-6 border-t border-gray-100 pt-4">
-              <button
-                onClick={() => setIsDeleteModalOpen(true)}
-                className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
-              >
-                Delete Document
-              </button>
-            </div>
+            {document.isOwner !== false ? (
+              <div className="mt-6 border-t border-gray-100 pt-4">
+                <button
+                  onClick={() => setIsDeleteModalOpen(true)}
+                  className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                >
+                  Delete Document
+                </button>
+              </div>
+            ) : (
+              <div className="mt-6 border-t border-gray-100 pt-4">
+                <button
+                  onClick={async () => {
+                    try {
+                      await documentsApi.unfollowDocument(document.id);
+                      addToast('Unfollowed document successfully.', 'success');
+                      router.push('/dashboard/documents');
+                    } catch (err) {
+                      console.error('Failed to unfollow:', err);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                >
+                  Unfollow Document
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -338,6 +515,52 @@ export default function DocumentDetailPage() {
           }
         }}
       />
+      <ToastNotification toasts={toasts} />
+    </div>
+  );
+}
+
+type ToastVariant = 'success' | 'error' | 'info';
+
+interface Toast {
+  id: number;
+  message: string;
+  variant: ToastVariant;
+}
+
+function ToastNotification({ toasts }: { toasts: Toast[] }) {
+  return (
+    <div className="pointer-events-none fixed right-6 bottom-6 z-[110] flex flex-col gap-2">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${
+            t.variant === 'success'
+              ? 'bg-emerald-600'
+              : t.variant === 'error'
+              ? 'bg-red-600'
+              : 'bg-blue-600'
+          }`}
+        >
+          {t.variant === 'success' && (
+            <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+          {t.variant === 'error' && (
+            <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
+          {t.variant === 'info' && (
+            <svg className="h-4.5 w-4.5 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          )}
+          {t.message}
+        </div>
+      ))}
     </div>
   );
 }

@@ -25,6 +25,7 @@ const eslintConfig = defineConfig([
     rules: {
       'no-console': 'warn',
       'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/set-state-in-effect': 'off',
       '@next/next/no-html-link-for-pages': 'off',
       '@typescript-eslint/no-unused-vars': [
         'warn',

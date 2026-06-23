@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import axiosClient from '@/utils/axios';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -33,10 +34,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    try {
+      await axiosClient.post('/auth/logout');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
   };
 
   return (
@@ -65,6 +71,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <span className="material-symbols-outlined">close</span>
           </button>
+        </div>
+
+        <div className="mb-6 px-4">
+          <Link
+            href="/explore"
+            className="font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-3 text-white shadow-sm transition-opacity hover:opacity-90"
+          >
+            <span className="material-symbols-outlined">add</span> New Research
+          </Link>
         </div>
 
         <ul className="flex flex-grow flex-col gap-2">
@@ -104,24 +119,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="material-symbols-outlined">lightbulb</span> Practice Mode
             </Link>
           </li>
-          <li>
-            <button
-              onClick={() => alert('AI Assistant clicked (Simulated)')}
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-            >
-              <span className="material-symbols-outlined">computer</span> AI Assistant
-            </button>
-          </li>
         </ul>
-
-        <div className="mt-8 mb-6 px-4">
-          <Link
-            href="/dashboard/upload"
-            className="font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-3 text-white shadow-sm transition-opacity hover:opacity-90"
-          >
-            <span className="material-symbols-outlined">add</span> New Research
-          </Link>
-        </div>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
           <li>
@@ -144,11 +142,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
               href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                localStorage.removeItem('token');
-                router.replace('/');
-              }}
+              onClick={handleLogout}
             >
               <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
             </a>
@@ -159,8 +153,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main Content Area */}
       <div className="flex min-h-screen w-full flex-1 flex-col overflow-x-hidden md:ml-64">
         {/* Top Header */}
-        <header className="sticky top-0 z-10 w-full border-b border-gray-100 bg-white shadow-sm">
-          <div className="mx-auto flex h-16 w-full items-center justify-between px-4 md:px-8">
+        <header className="bg-surface sticky top-0 z-10 w-full shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
+          <div className="px-container-margin-desktop max-w-max-width mx-auto flex h-16 w-full items-center justify-between">
             <div className="flex items-center gap-4 md:hidden">
               <button
                 onClick={() => setMobileMenuOpen(true)}
@@ -168,46 +162,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <span className="material-symbols-outlined">menu</span>
               </button>
-              <span className="font-headline-md text-headline-md text-primary font-bold">
-                ScholarHub
-              </span>
+              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
             </div>
 
             {/* Search Form */}
             <form
               onSubmit={handleSearchSubmit}
-              className="relative mx-4 hidden max-w-2xl flex-1 md:flex"
+              className="relative mx-8 hidden max-w-2xl flex-1 md:flex"
             >
-              <span className="material-symbols-outlined text-secondary absolute top-1/2 left-4 -translate-y-1/2 text-[20px]">
+              <span className="material-symbols-outlined text-secondary absolute top-1/2 left-4 -translate-y-1/2">
                 search
               </span>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="bg-surface-container-low text-on-surface focus:ring-primary focus:bg-surface-container-lowest font-body-md text-body-md w-full rounded-full border-none bg-[#F1F3F5] py-2 pr-4 pl-12 transition-all outline-none focus:ring-2"
-                placeholder="Search documents..."
+                className="bg-surface-container-low text-on-surface focus:ring-primary focus:bg-surface-container-lowest font-body-md text-body-md w-full rounded-full border-none py-2.5 pr-4 pl-12 transition-all outline-none focus:ring-2"
+                placeholder="Search for courses, documents, or keywords..."
                 type="text"
               />
             </form>
 
-            <div className="flex items-center gap-3 sm:gap-5">
-              <button className="font-label-md text-label-md hidden cursor-pointer items-center gap-2 font-bold text-gray-700 transition-opacity hover:opacity-90 md:flex">
-                Upgrade Pro
+            <div className="flex items-center gap-4">
+              <button className="text-secondary hover:text-primary relative cursor-pointer p-2 transition-colors">
+                <span className="material-symbols-outlined">notifications</span>
+                <span className="bg-error absolute top-2 right-2 h-2 w-2 rounded-full"></span>
               </button>
 
-              <button className="text-secondary hover:text-primary relative cursor-pointer p-1 transition-colors">
-                <span className="material-symbols-outlined text-[22px]">notifications</span>
-                <span className="bg-error absolute top-1 right-1 h-2 w-2 rounded-full"></span>
-              </button>
-
-              <button className="text-secondary hover:text-primary relative cursor-pointer p-1 transition-colors">
-                <span className="material-symbols-outlined text-[22px]">dark_mode</span>
-              </button>
-
-              <div className="relative ml-2">
+              <div className="relative">
                 <button
                   onClick={() => setShowAvatarDropdown(!showAvatarDropdown)}
-                  className="border-outline-variant hover:border-primary focus:ring-primary flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-full border transition-colors focus:ring-2 focus:ring-offset-2"
+                  className="border-outline-variant hover:border-primary focus:ring-primary flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border transition-colors focus:ring-2 focus:ring-offset-2"
                 >
                   <img
                     alt="User profile avatar"
@@ -217,28 +201,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </button>
 
                 {showAvatarDropdown && (
-                  <div className="bg-surface-container-lowest border-outline-variant absolute right-0 mt-2 w-48 rounded-xl border py-2 shadow-lg">
-                    <div className="border-outline-variant border-b px-4 py-2">
-                      <p className="font-body-md text-on-surface truncate font-semibold">
-                        {userFullName}
-                      </p>
+                  <>
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setShowAvatarDropdown(false)}
+                    />
+                    <div className="bg-surface-container-lowest border-outline-variant absolute right-0 z-40 mt-2 w-48 rounded-xl border py-2 shadow-lg">
+                      <div className="border-outline-variant border-b px-4 py-2">
+                        <p className="font-body-md text-on-surface truncate font-semibold">
+                          {userFullName}
+                        </p>
+                      </div>
+                      <button
+                        className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
+                        onClick={() => {
+                          setShowAvatarDropdown(false);
+                        }}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">person</span>{' '}
+                        Profile
+                      </button>
+                      <hr className="border-outline-variant my-1" />
+                      <button
+                        onClick={handleLogout}
+                        className="hover:bg-error-container/10 text-error font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">logout</span> Logout
+                      </button>
                     </div>
-                    <button
-                      className="text-on-surface hover:bg-surface-container-low font-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 transition-colors"
-                      onClick={() => {
-                        setShowAvatarDropdown(false);
-                      }}
-                    >
-                      <span className="material-symbols-outlined text-[20px]">person</span> Hồ sơ
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="text-error font-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 transition-colors hover:bg-red-50"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">logout</span> Đăng
-                      xuất
-                    </button>
-                  </div>
+                  </>
                 )}
               </div>
             </div>

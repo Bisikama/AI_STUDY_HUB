@@ -15,7 +15,7 @@ export default function DocumentPreviewPage() {
     () => documentsApi.getDocumentById(id)
   );
 
-  const document = response?.data;
+  const document = response;
 
   const formatSize = (bytes: number): string => {
     if (!bytes) return '0 B';
@@ -143,10 +143,7 @@ export default function DocumentPreviewPage() {
             <span className="material-symbols-outlined text-[18px]">info</span>
             Metadata
           </button>
-          <button className="flex-1 border-b-2 border-transparent py-4 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center gap-2">
-            <span className="material-symbols-outlined text-[18px]">psychology</span>
-            AI Assistant
-          </button>
+         
         </div>
 
         <div className="flex flex-col gap-6 p-6">
@@ -188,20 +185,7 @@ export default function DocumentPreviewPage() {
             </div>
           </div>
 
-          {/* AI Teaser Card */}
-          <div className="rounded-xl bg-[#1a1c23] p-5 text-white shadow-md relative overflow-hidden">
-            <div className="relative z-10">
-              <span className="material-symbols-outlined text-3xl mb-3 text-blue-400">auto_awesome</span>
-              <h4 className="font-bold mb-2">Need a quick summary?</h4>
-              <p className="text-xs text-gray-400 leading-relaxed mb-4">
-                Switch to the AI Assistant tab to chat with this document, generate quizzes, and extract key insights instantly.
-              </p>
-              <button className="w-full rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 transition-colors text-white">
-                Try AI Features
-              </button>
-            </div>
-            <div className="absolute -right-6 -bottom-6 h-24 w-24 rounded-full bg-blue-500 opacity-20 blur-xl"></div>
-          </div>
+         
 
         </div>
       </div>

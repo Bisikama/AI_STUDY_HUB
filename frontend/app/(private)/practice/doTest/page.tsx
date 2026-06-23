@@ -59,12 +59,7 @@ type ExploreAiCache = {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-    },
-  });
+  const response = await fetch(url, { credentials: 'include' });
   if (!response.ok) {
     throw new Error('Failed to fetch AI Cache');
   }
@@ -92,7 +87,7 @@ export default function DoTestPage() {
   // Fetch dữ liệu câu hỏi từ AI Cache của tài liệu
   const { data: aiCache, error } = useSWR(
     documentId ? `${API_BASE_URL}/api/explore/${documentId}/ai-cache` : null,
-    aiCacheFetcher
+    aiCacheFetcher,
   );
 
   const questions = useMemo(() => {
@@ -126,10 +121,10 @@ export default function DoTestPage() {
   };
 
   // Tự động nộp bài khi hết giờ
-  const handleAutoSubmit = () => {
+  function handleAutoSubmit() {
     alert('Hết thời gian làm bài! Hệ thống đang tự động nộp bài làm của bạn.');
     handleSubmitQuiz();
-  };
+  }
 
   // Xử lý chọn đáp án
   const handleSelectOption = (questionId: string, optionId: string) => {
@@ -141,7 +136,7 @@ export default function DoTestPage() {
   };
 
   // Nộp bài và tính điểm
-  const handleSubmitQuiz = () => {
+  function handleSubmitQuiz() {
     if (isSubmitted || questions.length === 0) return;
 
     let correctCount = 0;
@@ -156,7 +151,7 @@ export default function DoTestPage() {
     setScore(correctCount);
     setIsSubmitted(true);
     setMobileSidebarOpen(false);
-  };
+  }
 
   // Làm lại bài test
   const handleResetQuiz = () => {
@@ -171,7 +166,7 @@ export default function DoTestPage() {
   const handleExitQuiz = () => {
     if (!isSubmitted) {
       const confirmExit = window.confirm(
-        'Bạn có chắc chắn muốn thoát? Kết quả bài làm hiện tại sẽ không được lưu.'
+        'Bạn có chắc chắn muốn thoát? Kết quả bài làm hiện tại sẽ không được lưu.',
       );
       if (!confirmExit) return;
     }
@@ -187,14 +182,16 @@ export default function DoTestPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 max-w-md text-center shadow">
-          <span className="material-symbols-outlined text-4xl text-error mb-3">error</span>
-          <h2 className="text-lg font-bold text-primary mb-2">Đã xảy ra lỗi</h2>
-          <p className="text-secondary text-sm mb-4">Không thể tải nội dung câu hỏi ôn tập cho tài liệu này.</p>
+      <div className="bg-background flex min-h-screen items-center justify-center p-6">
+        <div className="bg-surface-container-lowest border-outline-variant max-w-md rounded-xl border p-8 text-center shadow">
+          <span className="material-symbols-outlined text-error mb-3 text-4xl">error</span>
+          <h2 className="text-primary mb-2 text-lg font-bold">Đã xảy ra lỗi</h2>
+          <p className="text-secondary mb-4 text-sm">
+            Không thể tải nội dung câu hỏi ôn tập cho tài liệu này.
+          </p>
           <button
             onClick={() => router.push('/practice')}
-            className="w-full bg-primary text-on-primary py-2 px-4 rounded-lg font-semibold"
+            className="bg-primary text-on-primary w-full rounded-lg px-4 py-2 font-semibold"
           >
             Quay lại mục ôn tập
           </button>
@@ -205,10 +202,14 @@ export default function DoTestPage() {
 
   if (!aiCache) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="bg-background flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <span className="material-symbols-outlined animate-spin text-3xl text-secondary">sync</span>
-          <p className="text-secondary text-sm font-semibold">Đang chuẩn bị đề thi trắc nghiệm...</p>
+          <span className="material-symbols-outlined text-secondary animate-spin text-3xl">
+            sync
+          </span>
+          <p className="text-secondary text-sm font-semibold">
+            Đang chuẩn bị đề thi trắc nghiệm...
+          </p>
         </div>
       </div>
     );
@@ -217,38 +218,38 @@ export default function DoTestPage() {
   const currentQuestion = questions[currentIdx];
 
   return (
-    <div className="bg-surface text-on-surface antialiased min-h-screen flex flex-col overflow-x-hidden">
+    <div className="bg-surface text-on-surface flex min-h-screen flex-col overflow-x-hidden antialiased">
       {/* TopAppBar */}
-      <header className="fixed top-0 w-full z-50 bg-surface-container-lowest border-b border-outline-variant shadow-sm">
-        <div className="flex justify-between items-center h-16 px-6 max-w-5xl mx-auto">
-          <div className="font-headline-md text-headline-md font-bold text-primary flex items-center gap-2">
+      <header className="bg-surface-container-lowest border-outline-variant fixed top-0 z-50 w-full border-b shadow-sm">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
+          <div className="font-headline-md text-headline-md text-primary flex items-center gap-2 font-bold">
             <span className="material-symbols-outlined text-primary text-2xl">school</span>
             MindStitch Test
           </div>
-          
+
           <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-3">
-              <div className="w-32 h-2 bg-surface-container-highest rounded-full overflow-hidden">
+            <div className="hidden items-center gap-3 md:flex">
+              <div className="bg-surface-container-highest h-2 w-32 overflow-hidden rounded-full">
                 <div
-                  className="h-full bg-primary transition-all duration-300"
+                  className="bg-primary h-full transition-all duration-300"
                   style={{ width: `${progressPercent}%` }}
                 ></div>
               </div>
-              <span className="font-label-md text-xs font-semibold text-secondary">
+              <span className="font-label-md text-secondary text-xs font-semibold">
                 Tiến độ: {progressPercent}%
               </span>
             </div>
 
             <button
               onClick={handleExitQuiz}
-              className="font-label-lg text-sm text-secondary hover:text-primary transition-colors cursor-pointer px-4 py-1.5 border border-outline-variant rounded-lg font-semibold bg-surface-container-lowest hover:bg-surface-container-low"
+              className="font-label-lg text-secondary hover:text-primary border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low cursor-pointer rounded-lg border px-4 py-1.5 text-sm font-semibold transition-colors"
             >
               Thoát kiểm tra
             </button>
 
             <button
               onClick={() => setMobileSidebarOpen(true)}
-              className="flex items-center justify-center p-2 hover:bg-surface-container-low rounded-full transition-colors md:hidden text-secondary cursor-pointer"
+              className="hover:bg-surface-container-low text-secondary flex cursor-pointer items-center justify-center rounded-full p-2 transition-colors md:hidden"
             >
               <span className="material-symbols-outlined">menu_open</span>
             </button>
@@ -257,35 +258,36 @@ export default function DoTestPage() {
       </header>
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-row mt-16">
-        
+      <div className="mt-16 flex flex-1 flex-row">
         {/* Left Canvas (Khu vực câu hỏi) */}
-        <main className="flex-1 p-6 md:p-8 md:mr-72 transition-all duration-300 flex flex-col justify-between">
-          <div className="max-w-3xl w-full mx-auto my-auto py-6">
-            
+        <main className="flex flex-1 flex-col justify-between p-6 transition-all duration-300 md:mr-72 md:p-8">
+          <div className="mx-auto my-auto w-full max-w-3xl py-6">
             {/* Thẻ chứa Câu hỏi */}
             {currentQuestion ? (
               <div>
                 <section className="mb-6">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container-highest rounded-md mb-4 border border-outline-variant/40">
-                    <span className="material-symbols-outlined text-[18px] filled text-primary">psychology</span>
-                    <span className="font-label-md text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                  <div className="bg-surface-container-highest border-outline-variant/40 mb-4 inline-flex items-center gap-1.5 rounded-md border px-3 py-1">
+                    <span className="material-symbols-outlined filled text-primary text-[18px]">
+                      psychology
+                    </span>
+                    <span className="font-label-md text-on-surface-variant text-xs font-bold tracking-wider uppercase">
                       Câu hỏi {currentIdx + 1} / {questions.length}
                     </span>
                   </div>
-                  <h1 className="text-lg md:text-xl font-bold leading-relaxed text-on-surface">
+                  <h1 className="text-on-surface text-lg leading-relaxed font-bold md:text-xl">
                     {currentQuestion.questionText}
                   </h1>
                 </section>
 
                 {/* 2x2 Answer Grid */}
-                <section className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2">
                   {currentQuestion.options.map((option, oIdx) => {
                     const label = ['A', 'B', 'C', 'D'][oIdx] || 'A';
                     const isSelected = selectedAnswers[currentQuestion.id] === option.id;
                     const isCorrectAnswer = option.isCorrect;
 
-                    let optStyle = 'border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-primary hover:bg-surface-container-low';
+                    let optStyle =
+                      'border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-primary hover:bg-surface-container-low';
 
                     if (isSelected && !isSubmitted) {
                       optStyle = 'border-primary bg-primary text-white';
@@ -293,11 +295,13 @@ export default function DoTestPage() {
 
                     if (isSubmitted) {
                       if (isCorrectAnswer) {
-                        optStyle = 'border-emerald-500 bg-emerald-50 text-emerald-800 font-semibold';
+                        optStyle =
+                          'border-emerald-500 bg-emerald-50 text-emerald-800 font-semibold';
                       } else if (isSelected) {
                         optStyle = 'border-rose-500 bg-rose-50 text-rose-800';
                       } else {
-                        optStyle = 'border-outline-variant bg-surface-container-lowest text-on-surface-variant opacity-60';
+                        optStyle =
+                          'border-outline-variant bg-surface-container-lowest text-on-surface-variant opacity-60';
                       }
                     }
 
@@ -306,20 +310,20 @@ export default function DoTestPage() {
                         key={option.id}
                         disabled={isSubmitted}
                         onClick={() => handleSelectOption(currentQuestion.id, option.id)}
-                        className={`group flex items-start gap-4 p-4 border rounded-xl text-left transition-all ${
+                        className={`group flex items-start gap-4 rounded-xl border p-4 text-left transition-all ${
                           isSubmitted ? 'cursor-default' : 'cursor-pointer active:scale-[0.98]'
                         } ${optStyle}`}
                       >
                         <div
-                          className={`flex-shrink-0 w-7 h-7 rounded bg-surface flex items-center justify-center font-extrabold text-sm border ${
+                          className={`bg-surface flex h-7 w-7 flex-shrink-0 items-center justify-center rounded border text-sm font-extrabold ${
                             isSelected && !isSubmitted
-                              ? 'bg-primary-container text-white border-transparent'
+                              ? 'bg-primary-container border-transparent text-white'
                               : 'text-primary border-outline-variant/60 bg-surface-container-lowest'
                           }`}
                         >
                           {label}
                         </div>
-                        <div className="flex-1 text-sm md:text-base font-medium">
+                        <div className="flex-1 text-sm font-medium md:text-base">
                           {option.optionText}
                         </div>
                       </button>
@@ -328,11 +332,11 @@ export default function DoTestPage() {
                 </section>
 
                 {/* Navigation Buttons */}
-                <div className="flex items-center justify-center gap-4 max-w-md mx-auto">
+                <div className="mx-auto flex max-w-md items-center justify-center gap-4">
                   <button
                     disabled={currentIdx === 0}
                     onClick={() => setCurrentIdx((prev) => prev - 1)}
-                    className="flex-1 py-3 border border-outline-variant text-primary rounded-lg font-bold hover:bg-surface-container-low transition-colors flex items-center justify-center gap-1.5 disabled:opacity-30 cursor-pointer"
+                    className="border-outline-variant text-primary hover:bg-surface-container-low flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border py-3 font-bold transition-colors disabled:opacity-30"
                   >
                     <span className="material-symbols-outlined text-lg">arrow_back</span>
                     Quay lại
@@ -340,7 +344,7 @@ export default function DoTestPage() {
                   {currentIdx < questions.length - 1 ? (
                     <button
                       onClick={() => setCurrentIdx((prev) => prev + 1)}
-                      className="flex-1 py-3 bg-primary text-on-primary rounded-lg font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="bg-primary text-on-primary flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg py-3 font-bold transition-opacity hover:opacity-90"
                     >
                       Tiếp theo
                       <span className="material-symbols-outlined text-lg">arrow_forward</span>
@@ -350,7 +354,7 @@ export default function DoTestPage() {
                       <button
                         onClick={handleSubmitQuiz}
                         disabled={Object.keys(selectedAnswers).length === 0}
-                        className="flex-1 py-3 bg-emerald-600 text-on-primary rounded-lg font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer"
+                        className="text-on-primary flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-3 font-bold transition-opacity hover:opacity-90 disabled:opacity-40"
                       >
                         Nộp bài thi
                         <span className="material-symbols-outlined text-lg">check_circle</span>
@@ -369,25 +373,29 @@ export default function DoTestPage() {
         <aside
           className={`${
             mobileSidebarOpen ? 'translate-x-0' : 'translate-x-full'
-          } md:translate-x-0 fixed right-0 top-0 h-full w-72 z-40 bg-surface-container-low shadow-md transition-transform duration-300 border-l border-outline-variant flex flex-col`}
+          } bg-surface-container-low border-outline-variant fixed top-0 right-0 z-40 flex h-full w-72 flex-col border-l shadow-md transition-transform duration-300 md:translate-x-0`}
         >
           {/* Header Sidebar */}
-          <div className="p-5 border-b border-outline-variant/60 flex justify-between items-center mt-16">
+          <div className="border-outline-variant/60 mt-16 flex items-center justify-between border-b p-5">
             <div>
-              <h3 className="font-headline-sm text-base font-bold text-primary">Thông tin bài thi</h3>
-              <p className="text-xs text-on-surface-variant font-medium">Tài liệu học tập ScholarHub</p>
+              <h3 className="font-headline-sm text-primary text-base font-bold">
+                Thông tin bài thi
+              </h3>
+              <p className="text-on-surface-variant text-xs font-medium">
+                Tài liệu học tập ScholarHub
+              </p>
             </div>
             <button
               onClick={() => setMobileSidebarOpen(false)}
-              className="md:hidden text-secondary p-1 hover:text-primary cursor-pointer"
+              className="text-secondary hover:text-primary cursor-pointer p-1 md:hidden"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
           </div>
 
           {/* Hàng đợi các câu hỏi (Review Queue Grid) */}
-          <div className="flex-grow p-5 overflow-y-auto">
-            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider block mb-4">
+          <div className="flex-grow overflow-y-auto p-5">
+            <span className="text-on-surface-variant mb-4 block text-xs font-bold tracking-wider uppercase">
               Danh sách câu hỏi
             </span>
             <div className="grid grid-cols-5 gap-2.5">
@@ -395,7 +403,8 @@ export default function DoTestPage() {
                 const isAnswered = Boolean(selectedAnswers[q.id]);
                 const isActive = index === currentIdx;
 
-                let blockStyle = 'border-outline-variant text-on-surface-variant bg-surface-container-lowest';
+                let blockStyle =
+                  'border-outline-variant text-on-surface-variant bg-surface-container-lowest';
                 if (isAnswered) {
                   blockStyle = 'bg-primary-container text-white border-transparent';
                 }
@@ -410,7 +419,7 @@ export default function DoTestPage() {
                       setCurrentIdx(index);
                       setMobileSidebarOpen(false);
                     }}
-                    className={`aspect-square flex items-center justify-center rounded-lg border text-sm font-bold transition-all cursor-pointer hover:border-primary ${blockStyle}`}
+                    className={`hover:border-primary flex aspect-square cursor-pointer items-center justify-center rounded-lg border text-sm font-bold transition-all ${blockStyle}`}
                   >
                     {index + 1}
                   </button>
@@ -420,12 +429,14 @@ export default function DoTestPage() {
 
             {/* Khối hiển thị kết quả sau khi nộp bài */}
             {isSubmitted && (
-              <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                <span className="text-emerald-800 text-sm font-bold block mb-1">Kết quả bài thi</span>
-                <span className="text-2xl font-black text-emerald-600 block">
+              <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+                <span className="mb-1 block text-sm font-bold text-emerald-800">
+                  Kết quả bài thi
+                </span>
+                <span className="block text-2xl font-black text-emerald-600">
                   {score}/{questions.length} đúng
                 </span>
-                <span className="text-xs text-emerald-800 font-semibold">
+                <span className="text-xs font-semibold text-emerald-800">
                   Tỷ lệ: {Math.round((score / questions.length) * 100)}%
                 </span>
               </div>
@@ -433,17 +444,17 @@ export default function DoTestPage() {
           </div>
 
           {/* Footer Sidebar (Thời gian & Nút Submit) */}
-          <div className="p-5 border-t border-outline-variant/60 bg-surface-container-low/50">
+          <div className="border-outline-variant/60 bg-surface-container-low/50 border-t p-5">
             {!isSubmitted ? (
               <>
                 <button
                   onClick={handleSubmitQuiz}
                   disabled={Object.keys(selectedAnswers).length === 0}
-                  className="w-full bg-primary text-on-primary py-3 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40 cursor-pointer"
+                  className="bg-primary text-on-primary w-full cursor-pointer rounded-lg py-3 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
                   Nộp bài & kết thúc
                 </button>
-                <div className="flex items-center justify-center gap-1.5 text-secondary mt-3 text-sm font-semibold">
+                <div className="text-secondary mt-3 flex items-center justify-center gap-1.5 text-sm font-semibold">
                   <span className="material-symbols-outlined text-lg">schedule</span>
                   <span>Thời gian: {formatTime(timeLeft)}</span>
                 </div>
@@ -451,7 +462,7 @@ export default function DoTestPage() {
             ) : (
               <button
                 onClick={handleResetQuiz}
-                className="w-full bg-primary-container text-on-primary py-3 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity cursor-pointer"
+                className="bg-primary-container text-on-primary w-full cursor-pointer rounded-lg py-3 text-sm font-bold transition-opacity hover:opacity-90"
               >
                 Làm lại bài thi
               </button>
@@ -463,7 +474,7 @@ export default function DoTestPage() {
         {mobileSidebarOpen && (
           <div
             onClick={() => setMobileSidebarOpen(false)}
-            className="fixed inset-0 bg-black/50 z-30 backdrop-blur-sm md:hidden"
+            className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden"
           ></div>
         )}
       </div>

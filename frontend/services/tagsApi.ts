@@ -21,13 +21,13 @@ interface CreateTagResponse {
 }
 
 export const tagsApi = {
-  getTags: async (): Promise<TagsResponse> => {
-    const response = await axiosClient.get<TagsResponse>('/tags');
+  getTags: async (): Promise<Tag[]> => {
+    const response = await axiosClient.get<Tag[]>('/tags');
     return response.data;
   },
 
-  createTag: async (name: string): Promise<CreateTagResponse> => {
-    const response = await axiosClient.post<CreateTagResponse>('/tags', { name });
+  createTag: async (name: string): Promise<Tag> => {
+    const response = await axiosClient.post<Tag>('/tags', { name });
     return response.data;
   },
 };

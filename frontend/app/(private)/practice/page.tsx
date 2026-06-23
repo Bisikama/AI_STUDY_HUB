@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
+import Link from 'next/link';
 
 type Subject = {
   id: number;
@@ -59,12 +60,7 @@ type ExploreAiCache = {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-    },
-  });
+  const response = await fetch(url, { credentials: 'include' });
   if (!response.ok) {
     throw new Error('Failed to fetch explore documents');
   }
@@ -73,12 +69,7 @@ const fetcher = async (url: string): Promise<ExploreDocument[]> => {
 };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-    },
-  });
+  const response = await fetch(url, { credentials: 'include' });
   if (!response.ok) {
     throw new Error('Failed to fetch AI Cache');
   }
@@ -179,6 +170,34 @@ export default function PracticePage() {
   const [search, setSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(docParam);
+  const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
+  const [userFullName, setUserFullName] = useState('User');
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser && storedUser !== 'undefined') {
+      try {
+        const userObj = JSON.parse(storedUser);
+        if (userObj && userObj.fullName) {
+          setUserFullName(userObj.fullName);
+        }
+      } catch (e) {
+        console.error('Error parsing user info:', e);
+      }
+    }
+  }, []);
+
+  const handleLogout = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    try {
+      await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+  };
 
   // States cho Flashcards
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
@@ -204,7 +223,6 @@ export default function PracticePage() {
   // Đồng bộ param URL
   useEffect(() => {
     if (docParam) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedDocId(docParam);
     }
   }, [docParam]);
@@ -253,12 +271,9 @@ export default function PracticePage() {
     setAnalyzeError(null);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const response = await fetch(`${API_BASE_URL}/api/documents/analyze/${selectedDocId}`, {
         method: 'POST',
-        headers: {
-          Authorization: token ? `Bearer ${token}` : '',
-        },
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -303,14 +318,16 @@ export default function PracticePage() {
           mobileMenuOpen ? 'flex' : 'hidden'
         } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
-        <div className="mb-8 flex items-center justify-between px-4">
+        <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
               <h1 className="font-headline-md text-headline-md text-primary font-bold">
                 ScholarHub
               </h1>
-              <p className="font-label-sm text-label-sm text-secondary">Academic Excellence</p>
+              <p className="font-label-sm text-label-sm text-secondary text-[10px] tracking-wider uppercase">
+                Academic Excellence
+              </p>
             </div>
           </div>
           <button
@@ -322,50 +339,40 @@ export default function PracticePage() {
         </div>
 
         <div className="mb-6 px-4">
-          <button
-            onClick={() => router.push('/explore')}
-            className="bg-primary-container text-on-primary font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold transition-opacity hover:opacity-90"
+          <Link
+            href="/explore"
+            className="font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-3 text-white shadow-sm transition-opacity hover:opacity-90"
           >
             <span className="material-symbols-outlined">add</span> New Research
-          </button>
+          </Link>
         </div>
 
         <ul className="flex flex-grow flex-col gap-2">
           <li>
-            <button
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-              onClick={() => router.push('/dashboard')}
+            <Link
+              href="/dashboard"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
             >
-              <span className="material-symbols-outlined">explore</span> Discover
-            </button>
+              <span className="material-symbols-outlined">search</span> Discover
+            </Link>
           </li>
           <li>
-            <button
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-              onClick={() => router.push('/dashboard')}
+            <Link
+              href="/dashboard/documents"
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
             >
               <span className="material-symbols-outlined">description</span> My Documents
-            </button>
+            </Link>
           </li>
           <li>
-            <button
-              className="text-primary bg-secondary-container text-on-secondary-container font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold transition-transform active:scale-95"
-              onClick={() => {
-                setSelectedDocId(null);
-                router.push('/practice');
-              }}
+            <Link
+              href="/practice"
+              className="bg-surface-container-low text-primary font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 font-semibold transition-transform active:scale-95"
             >
-              <span className="material-symbols-outlined filled">school</span> Practice Mode
-            </button>
+              <span className="material-symbols-outlined">lightbulb</span> Practice Mode
+            </Link>
           </li>
-          <li>
-            <button
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-              onClick={() => alert('AI Assistant clicked (Simulated)')}
-            >
-              <span className="material-symbols-outlined">psychology</span> AI Assistant
-            </button>
-          </li>
+          
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
@@ -386,15 +393,13 @@ export default function PracticePage() {
             </button>
           </li>
           <li>
-            <button
-              className="text-error font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
-              onClick={() => {
-                localStorage.removeItem('token');
-                router.replace('/');
-              }}
+            <a
+              className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
+              href="#"
+              onClick={handleLogout}
             >
               <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
-            </button>
+            </a>
           </li>
         </ul>
       </nav>
@@ -402,43 +407,111 @@ export default function PracticePage() {
       {/* Main Content Area */}
       <div className="flex min-h-screen flex-grow flex-col md:ml-64">
         {/* Top Header */}
-        <header className="bg-surface-container-lowest border-outline-variant flex h-16 w-full items-center justify-between border-b px-6 shadow-sm">
-          <div className="flex max-w-xl flex-grow items-center gap-4">
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="text-secondary hover:text-primary p-1 md:hidden"
+        <header className="bg-surface sticky top-0 z-10 w-full shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
+          <div className="px-container-margin-desktop max-w-max-width mx-auto flex h-16 w-full items-center justify-between">
+            <div className="flex items-center gap-4 md:hidden">
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="text-primary hover:text-secondary cursor-pointer p-2 transition-colors"
+              >
+                <span className="material-symbols-outlined">menu</span>
+              </button>
+              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
+            </div>
+
+            {/* Search Form */}
+            <form
+              onSubmit={(e) => e.preventDefault()}
+              className="relative mx-8 hidden max-w-2xl flex-1 md:flex"
             >
-              <span className="material-symbols-outlined">menu</span>
-            </button>
-            <div className="relative w-full">
-              <span className="material-symbols-outlined text-on-surface-variant absolute top-1/2 left-3 -translate-y-1/2">
+              <span className="material-symbols-outlined text-secondary absolute top-1/2 left-4 -translate-y-1/2">
                 search
               </span>
               <input
-                className="bg-surface-container-low focus:ring-primary text-body-md w-full rounded-lg border-none py-2 pr-4 pl-10 focus:ring-1"
-                placeholder="Tìm kiếm tài liệu học tập..."
-                type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                className="bg-surface-container-low text-on-surface focus:ring-primary focus:bg-surface-container-lowest font-body-md text-body-md w-full rounded-full border-none py-2.5 pr-4 pl-12 transition-all outline-none focus:ring-2"
+                placeholder="Tìm kiếm tài liệu học tập..."
+                type="text"
               />
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="material-symbols-outlined hover:bg-surface-container cursor-pointer rounded-full p-2 transition-colors">
-              notifications
-            </span>
-            <div className="border-outline bg-surface-variant h-8 w-8 overflow-hidden rounded-full border">
-              <img
-                alt="User profile"
-                className="h-full w-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmRIQIc6LO9lV5rVtojZ7Vh-4aAm0za_O0i5ayKA2xj5hmmtTyNfQvFCZNPhEfrXG_1djLfBLkYl-oRMknt4VMjwDxAHTLWyqk3U8mvXoulTPKmZi_lPoDe5yP9DJa1_HnZhUWZF8pI3XxjStB2JqRcoeuyOfo7DSOd9-q8HaWShAn_Rqgu1w26jKT2gX7DqpcPd3kC4Uam3KP7ywqZsOefPY_o9YIMdPmCJHLvDhiQBVe4ou63D8uVWKJY3uShYdVn9kYtYeSsJg"
-              />
+            </form>
+
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/upload')}
+                className="font-label-md text-label-md hidden h-10 cursor-pointer items-center gap-2 rounded-full bg-[#212529] px-4 py-2 text-white transition-opacity hover:opacity-90 md:flex"
+              >
+                <span className="material-symbols-outlined text-[20px]">upload</span> Upload
+              </button>
+
+              <button className="text-secondary hover:text-primary relative cursor-pointer p-2 transition-colors">
+                <span className="material-symbols-outlined">notifications</span>
+                <span className="bg-error absolute top-2 right-2 h-2 w-2 rounded-full"></span>
+              </button>
+
+              <div className="relative">
+                <button
+                  onClick={() => setShowAvatarDropdown(!showAvatarDropdown)}
+                  className="border-outline-variant hover:border-primary focus:ring-primary flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border transition-colors focus:ring-2 focus:ring-offset-2"
+                >
+                  <img
+                    alt="User profile avatar"
+                    className="h-full w-full object-cover"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYqSMGF3Z3oHdYhn5TKuHMKRLqgbBxxxtoRNxnakx4QY5gEAylvvaC7DqnO-6wRdWbBIdm8lN9SEhMxCbp8hakT47O6vbJLl91-97D8pkJXLj50c3nW8qB-8avFTT50YGPsF-9s6SN75_vCxKk31GsSz7WxQH4X-qlX6XGkFSqpq9alyYCX-ZxYLwHMCljNf0kwH5AertyqfjrTSYFBaxqzh-1604Hz7HFbNugFP3ndIVAs_2OpIbQSJgwvDs5Kcf11UWU6_PEEOQ"
+                  />
+                </button>
+
+                {showAvatarDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setShowAvatarDropdown(false)}
+                    />
+                    <div className="bg-surface-container-lowest border-outline-variant absolute right-0 z-40 mt-2 w-48 rounded-xl border py-2 shadow-lg">
+                      <div className="border-outline-variant border-b px-4 py-2">
+                        <p className="font-body-md text-on-surface truncate font-semibold">
+                          {userFullName}
+                        </p>
+                      </div>
+                      <button
+                        className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
+                        onClick={() => {
+                          setShowAvatarDropdown(false);
+                        }}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">person</span>{' '}
+                        Profile
+                      </button>
+                      <hr className="border-outline-variant my-1" />
+                      <button
+                        onClick={handleLogout}
+                        className="hover:bg-error-container/10 text-error font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">logout</span> Logout
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </header>
 
         {/* Content Body */}
         <main className="mx-auto w-full max-w-5xl flex-grow p-6 md:p-8">
+          {/* Mobile Search Form */}
+          <form onSubmit={(e) => e.preventDefault()} className="relative mb-6 md:hidden">
+            <span className="material-symbols-outlined text-secondary absolute top-1/2 left-4 -translate-y-1/2">
+              search
+            </span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-surface-container-low text-on-surface focus:ring-primary focus:bg-surface-container-lowest font-body-md text-body-md w-full rounded-full border-none py-2.5 pr-4 pl-12 transition-all outline-none focus:ring-2"
+              placeholder="Tìm kiếm tài liệu học tập..."
+              type="text"
+            />
+          </form>
           {!selectedDocId ? (
             /* =======================================================
                DS TÀI LIỆU CẦN ÔN TẬP

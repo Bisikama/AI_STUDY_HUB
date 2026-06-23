@@ -2,14 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { authApi } from '@/services/authApi';
 
 /**
  * Layout guard cho tất cả các trang trong (private).
- * Kiểm tra token trong localStorage, nếu không có → redirect về /login.
- *
- * Khi tích hợp Backend thật:
- * - Thay localStorage.getItem("token") bằng call API verify token
- * - Hoặc dùng NextAuth / middleware.ts để xử lý ở server-side
+ * Gọi API verify profile để kiểm tra phiên đăng nhập Cookie.
  */
 export default function PrivateLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -19,13 +16,17 @@ export default function PrivateLayout({ children }: { children: React.ReactNode 
   );
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setAuthStatus('unauthenticated');
-      router.replace('/login');
-    } else {
-      setAuthStatus('authenticated');
-    }
+    const verifyAuth = async () => {
+      try {
+        await authApi.getProfile();
+        setAuthStatus('authenticated');
+      } catch (err) {
+        setAuthStatus('unauthenticated');
+        localStorage.removeItem('user');
+        router.replace('/login');
+      }
+    };
+    verifyAuth();
   }, [router]);
 
   // Hiển thị spinner trong khi đang kiểm tra auth

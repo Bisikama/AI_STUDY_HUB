@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, User } from '@/hooks/useAuth';
 import { dashboardApi, ExploreDocument, Contributor } from '@/services/dashboardApi';
+import { documentsApi } from '@/services/documentsApi';
 import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
+import Link from 'next/link';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
@@ -54,13 +56,13 @@ type ExploreAiCache = {
 type ApiResponse<T> =
   | T
   | {
-    statusCode: number;
-    message: string;
-    data: T;
-  };
+      statusCode: number;
+      message: string;
+      data: T;
+    };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
-  const response = await fetch(url);
+  const response = await fetch(url, { credentials: 'include' });
 
   if (!response.ok) {
     throw new Error('Failed to fetch AI cache');
@@ -223,7 +225,32 @@ function DashboardPage() {
     }
     return null;
   });
-  const { getProfile } = useAuth();
+  const { getProfile, logout } = useAuth();
+
+  const { data: myDocuments = [], mutate: mutateMyDocuments } = useSWR('/documents/me', () =>
+    documentsApi.getMyDocuments(),
+  );
+
+  const isDocumentOwner = myDocuments.some((d) => d.id === selectedDocumentId && d.isOwner);
+  const isDocumentFollowed = myDocuments.some((d) => d.id === selectedDocumentId && d.isFollowed);
+
+  const handleFollowDocument = async (docId: string) => {
+    try {
+      await documentsApi.followDocument(docId);
+      mutateMyDocuments();
+    } catch (err) {
+      console.error('Failed to follow document:', err);
+    }
+  };
+
+  const handleUnfollowDocument = async (docId: string) => {
+    try {
+      await documentsApi.unfollowDocument(docId);
+      mutateMyDocuments();
+    } catch (err) {
+      console.error('Failed to unfollow document:', err);
+    }
+  };
 
   const aiCacheUrl = selectedDocumentId
     ? `${API_BASE_URL}/api/explore/${selectedDocumentId}/ai-cache`
@@ -262,7 +289,6 @@ function DashboardPage() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDashboardData();
 
     // Fetch từ API để đồng bộ dữ liệu mới nhất từ database
@@ -279,6 +305,7 @@ function DashboardPage() {
       .catch((err) => {
         // eslint-disable-next-line no-console
         console.error('Failed to sync profile:', err);
+        logout();
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -309,10 +336,15 @@ function DashboardPage() {
     );
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.reload();
+  const handleLogout = async () => {
+    try {
+      await axiosClient.post('/auth/logout');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -352,15 +384,20 @@ function DashboardPage() {
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${mobileMenuOpen ? 'flex' : 'hidden'
-          } md:flex fixed left-0 top-0 h-full flex-col p-4 border-r border-outline-variant bg-surface-container-lowest shadow-[0px_4px_12px_rgba(0,0,0,0.03)] w-64 z-20 transition-all`}
+        className={`${
+          mobileMenuOpen ? 'flex' : 'hidden'
+        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
-        <div className="mb-8 flex items-center justify-between px-4">
+        <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
-              <h1 className="font-headline-md text-headline-md text-primary">ScholarHub</h1>
-              <p className="font-label-sm text-label-sm text-secondary">Academic Excellence</p>
+              <h1 className="font-headline-md text-headline-md text-primary font-bold">
+                ScholarHub
+              </h1>
+              <p className="font-label-sm text-label-sm text-secondary text-[10px] tracking-wider uppercase">
+                Academic Excellence
+              </p>
             </div>
           </div>
           <button
@@ -372,62 +409,38 @@ function DashboardPage() {
         </div>
 
         <div className="mb-6 px-4">
-          <button
-            onClick={() => router.push('/explore')}
-            className="bg-primary-container text-on-primary font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-3 transition-opacity hover:opacity-90"
+          <Link
+            href="/explore"
+            className="font-label-md text-label-md flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-3 text-white shadow-sm transition-opacity hover:opacity-90"
           >
             <span className="material-symbols-outlined">add</span> New Research
-          </button>
+          </Link>
         </div>
 
         <ul className="flex flex-grow flex-col gap-2">
           <li>
-            <a
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                router.push('/dashboard');
-              }}
+            <Link
+              href="/dashboard"
+              className="bg-surface-container-low text-primary font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 font-semibold transition-transform active:scale-95"
             >
-              <span className="material-symbols-outlined">explore</span> Discover
-            </a>
+              <span className="material-symbols-outlined">search</span> Discover
+            </Link>
           </li>
           <li>
-            <a
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
+            <Link
               href="/dashboard/documents"
-              onClick={(e) => {
-                e.preventDefault();
-                router.push('/dashboard/documents');
-              }}
+              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
             >
               <span className="material-symbols-outlined">description</span> My Documents
-            </a>
+            </Link>
           </li>
           <li>
-            <a
+            <Link
+              href="/practice"
               className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                router.push('/practice');
-              }}
             >
-              <span className="material-symbols-outlined">school</span> Practice Mode
-            </a>
-          </li>
-          <li>
-            <a
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('AI Assistant clicked (Simulated)');
-              }}
-            >
-              <span className="material-symbols-outlined">psychology</span> AI Assistant
-            </a>
+              <span className="material-symbols-outlined">lightbulb</span> Practice Mode
+            </Link>
           </li>
           {user?.role === 'ADMIN' && (
             <li>
@@ -475,11 +488,7 @@ function DashboardPage() {
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
               href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                localStorage.removeItem('token');
-                router.replace('/');
-              }}
+              onClick={handleLogout}
             >
               <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
             </a>
@@ -641,7 +650,7 @@ function DashboardPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-outline-variant -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
+                  <div className="scrollbar-thumb-rounded scrollbar-thumb-outline-variant -mx-4 flex snap-x snap-mandatory scrollbar-thin gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
                     {recentlyViewed.slice(0, 8).map((doc) => (
                       <div
                         key={doc.id}
@@ -813,10 +822,11 @@ function DashboardPage() {
                           </div>
                           <button
                             onClick={(e) => toggleSaveDoc(doc.id, e)}
-                            className={`hidden sm:block px-4 py-2 border rounded-full font-label-sm text-label-sm transition-colors cursor-pointer ${savedDocIds.includes(doc.id)
-                                ? 'bg-primary-container text-white border-primary-container'
+                            className={`font-label-sm text-label-sm hidden cursor-pointer rounded-full border px-4 py-2 transition-colors sm:block ${
+                              savedDocIds.includes(doc.id)
+                                ? 'bg-primary-container border-primary-container text-white'
                                 : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
-                              }`}
+                            }`}
                           >
                             {savedDocIds.includes(doc.id) ? 'Saved' : 'Save'}
                           </button>
@@ -860,10 +870,13 @@ function DashboardPage() {
                             </p>
                           </div>
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${idx === 0
-                            ? 'bg-primary-fixed-dim text-on-primary-fixed'
-                            : 'bg-surface-variant text-on-surface-variant'
-                          }`}>
+                        <span
+                          className={`rounded px-2 py-1 text-xs font-bold ${
+                            idx === 0
+                              ? 'bg-primary-fixed-dim text-on-primary-fixed'
+                              : 'bg-surface-variant text-on-surface-variant'
+                          }`}
+                        >
                           #{idx + 1}
                         </span>
                       </div>
@@ -877,8 +890,6 @@ function DashboardPage() {
                   View Leaderboard
                 </button>
               </section>
-
-
             </div>
           </div>
         </main>
@@ -992,8 +1003,9 @@ function DashboardPage() {
                   return (
                     <div
                       key={c.id}
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-all ${rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
-                        }`}
+                      className={`flex items-center justify-between rounded-xl border p-3 transition-all ${
+                        rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
+                      }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -1161,8 +1173,9 @@ function DashboardPage() {
                                     type="button"
                                     disabled={hasAnswered}
                                     onClick={() => handleSelectOption(question.id, option.id)}
-                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${hasAnswered ? 'cursor-default' : 'cursor-pointer'
-                                      }`}
+                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
+                                      hasAnswered ? 'cursor-default' : 'cursor-pointer'
+                                    }`}
                                   >
                                     {option.optionText}
 
@@ -1193,17 +1206,36 @@ function DashboardPage() {
                       Close
                     </button>
 
+                    {!isDocumentOwner && (
+                      <button
+                        onClick={() => {
+                          if (isDocumentFollowed) {
+                            handleUnfollowDocument(aiCache.document.id);
+                          } else {
+                            handleFollowDocument(aiCache.document.id);
+                          }
+                        }}
+                        className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-5 py-2 transition-all hover:shadow-md ${
+                          isDocumentFollowed
+                            ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                            : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          {isDocumentFollowed ? 'bookmark_remove' : 'bookmark'}
+                        </span>
+                        {isDocumentFollowed ? 'Unfollow' : 'Follow'}
+                      </button>
+                    )}
+
                     <button
-                      onClick={() =>
-                        window.open(
-                          getDocumentUrl(aiCache.document.fileUrl),
-                          '_blank',
-                          'noopener,noreferrer',
-                        )
-                      }
+                      onClick={() => {
+                        setSelectedDocumentId(null);
+                        router.push(`/dashboard/documents/${aiCache.document.id}`);
+                      }}
                       className="bg-primary text-on-primary cursor-pointer rounded-lg px-5 py-2 transition-all hover:shadow-md"
                     >
-                      Open File
+                      View Full
                     </button>
                   </div>
                 </div>
@@ -1373,14 +1405,13 @@ export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setIsLoggedIn(false);
+    const user = localStorage.getItem('user');
+    if (!user) {
       router.replace('/login');
-      return;
+      setIsLoggedIn(false);
+    } else {
+      setIsLoggedIn(true);
     }
-
-    setIsLoggedIn(true);
   }, [router]);
 
   if (isLoggedIn === null || isLoggedIn === false) {

@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
+CREATE TYPE "UserRole" AS ENUM ('STUDENT', 'TEACHER', 'ADMIN');
 
 -- CreateEnum
 CREATE TYPE "DocumentStatus" AS ENUM ('PRIVATE', 'PENDING', 'APPROVED');
@@ -16,8 +16,10 @@ CREATE TABLE "users" (
     "email" TEXT NOT NULL,
     "password_hash" TEXT NOT NULL,
     "full_name" TEXT NOT NULL,
+    "username" TEXT,
+    "phone_number" TEXT,
     "avatar_url" TEXT,
-    "role" "Role" NOT NULL DEFAULT 'USER',
+    "role" "UserRole" NOT NULL DEFAULT 'STUDENT',
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -43,9 +45,33 @@ CREATE TABLE "subjects" (
     "name" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "description" TEXT,
+    "is_system" BOOLEAN NOT NULL DEFAULT true,
+    "created_by" UUID,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "subjects_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "tags" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "created_by" UUID,
+    "is_system" BOOLEAN NOT NULL DEFAULT false,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "tags_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "document_tags" (
+    "document_id" UUID NOT NULL,
+    "tag_id" INTEGER NOT NULL,
+
+    CONSTRAINT "document_tags_pkey" PRIMARY KEY ("document_id","tag_id")
 );
 
 -- CreateTable
@@ -64,6 +90,8 @@ CREATE TABLE "documents" (
     "status" "DocumentStatus" NOT NULL DEFAULT 'PRIVATE',
     "full_text" TEXT,
     "is_ai_generated" BOOLEAN NOT NULL DEFAULT false,
+    "rating" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -143,8 +171,31 @@ CREATE TABLE "user_quiz_attempts" (
     CONSTRAINT "user_quiz_attempts_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "user_document_views" (
+    "id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
+    "document_id" UUID NOT NULL,
+    "viewed_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_document_views_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user_followed_documents" (
+    "id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
+    "document_id" UUID NOT NULL,
+    "followed_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_followed_documents_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "password_reset_tokens_token_key" ON "password_reset_tokens"("token");
@@ -154,6 +205,9 @@ CREATE UNIQUE INDEX "subjects_name_key" ON "subjects"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "subjects_code_key" ON "subjects"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "tags_slug_created_by_key" ON "tags"("slug", "created_by");
 
 -- CreateIndex
 CREATE INDEX "documents_subject_id_status_idx" ON "documents"("subject_id", "status");
@@ -173,8 +227,23 @@ CREATE INDEX "quiz_options_question_id_idx" ON "quiz_options"("question_id");
 -- CreateIndex
 CREATE INDEX "user_quiz_attempts_user_id_completed_at_idx" ON "user_quiz_attempts"("user_id", "completed_at" DESC);
 
+-- CreateIndex
+CREATE INDEX "user_document_views_user_id_viewed_at_idx" ON "user_document_views"("user_id", "viewed_at" DESC);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_document_views_user_id_document_id_key" ON "user_document_views"("user_id", "document_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_followed_documents_user_id_document_id_key" ON "user_followed_documents"("user_id", "document_id");
+
 -- AddForeignKey
 ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "document_tags" ADD CONSTRAINT "document_tags_document_id_fkey" FOREIGN KEY ("document_id") REFERENCES "documents"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "document_tags" ADD CONSTRAINT "document_tags_tag_id_fkey" FOREIGN KEY ("tag_id") REFERENCES "tags"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "documents" ADD CONSTRAINT "documents_subject_id_fkey" FOREIGN KEY ("subject_id") REFERENCES "subjects"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -208,3 +277,15 @@ ALTER TABLE "user_quiz_attempts" ADD CONSTRAINT "user_quiz_attempts_user_id_fkey
 
 -- AddForeignKey
 ALTER TABLE "user_quiz_attempts" ADD CONSTRAINT "user_quiz_attempts_quiz_id_fkey" FOREIGN KEY ("quiz_id") REFERENCES "quizzes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_document_views" ADD CONSTRAINT "user_document_views_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_document_views" ADD CONSTRAINT "user_document_views_document_id_fkey" FOREIGN KEY ("document_id") REFERENCES "documents"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_followed_documents" ADD CONSTRAINT "user_followed_documents_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_followed_documents" ADD CONSTRAINT "user_followed_documents_document_id_fkey" FOREIGN KEY ("document_id") REFERENCES "documents"("id") ON DELETE CASCADE ON UPDATE CASCADE;

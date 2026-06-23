@@ -23,11 +23,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [status, setStatus] = useState<'checking' | 'authorized' | 'unauthorized'>('checking');
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const userRaw = localStorage.getItem('user');
 
     // 1. Chưa đăng nhập → về trang login
-    if (!token || !userRaw) {
+    if (!userRaw) {
       router.replace('/login');
       return;
     }
@@ -45,7 +44,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       setStatus('authorized');
     } catch {
       // JSON.parse lỗi → xóa data hỏng và đá về login
-      localStorage.removeItem('token');
       localStorage.removeItem('user');
       router.replace('/login');
     }
@@ -55,15 +53,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (status !== 'authorized') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <svg
-          className="h-6 w-6 animate-spin text-blue-600"
-          viewBox="0 0 24 24"
-          fill="none"
-        >
+        <svg className="h-6 w-6 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
           <circle
             className="opacity-25"
-            cx="12" cy="12" r="10"
-            stroke="currentColor" strokeWidth="4"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
           />
           <path
             className="opacity-75"
@@ -81,9 +78,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <AdminSidebar />
 
       {/* Vùng nội dung chính — cuộn độc lập với sidebar */}
-      <main className="flex-1 overflow-y-auto">
-        {children}
-      </main>
+      <main className="flex-1 overflow-y-auto">{children}</main>
     </div>
   );
 }
