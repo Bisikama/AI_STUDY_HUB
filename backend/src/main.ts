@@ -26,10 +26,31 @@ async function bootstrap() {
   const allowedOrigins =
     configService.get<string>('ALLOWED_ORIGINS') ||
     'http://localhost:3000,http://localhost:5000,https://ai-study-ph9xjpnls-bisikamas-projects.vercel.app/';
-  const originArray = allowedOrigins.split(',').map((origin) => origin.trim());
+  const originArray = allowedOrigins.split(',').map((origin) => origin.trim().replace(/\/$/, ''));
 
   app.enableCors({
-    origin: originArray,
+    origin: (origin, callback) => {
+      // Cho phép các request không có origin (như Mobile App, Postman)
+      if (!origin) {
+        return callback(null, true);
+      }
+      
+      const isAllowed =
+        allowedOrigins === '*' ||
+        originArray.includes('*') ||
+        originArray.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.endsWith('.onrender.com') ||
+        origin.endsWith('.github.dev') ||
+        origin.endsWith('.gitpod.io');
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+      
+      console.warn(`[CORS Blocked] Origin "${origin}" is not allowed. Configured ALLOWED_ORIGINS: "${allowedOrigins}"`);
+      return callback(null, false);
+    },
     credentials: true,
   });
 
