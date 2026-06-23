@@ -30,8 +30,8 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
     setApiError(null);
     try {
-      const res = (await authApi.forgotPassword(data.email)) as unknown as { devOtp?: string };
-      const devOtp = res?.devOtp;
+      const res = await authApi.forgotPassword(data.email);
+      const devOtp = res?.data?.devOtp;
       if (devOtp) {
         alert(`Yêu cầu thành công! (DEV MODE: Mã OTP của bạn là ${devOtp})`);
         router.push(

@@ -186,10 +186,9 @@ export class AuthService {
     // 5. Gửi email
     const mailSent = await this.mailService.sendOtp(email, otp);
 
-    const isDev = process.env.NODE_ENV !== 'production';
     return {
       message: 'Mã OTP khôi phục mật khẩu đã được gửi.',
-      ...(isDev || !mailSent ? { devOtp: otp } : {}),
+      ...(!mailSent ? { devOtp: otp } : {}),
     };
   }
 
