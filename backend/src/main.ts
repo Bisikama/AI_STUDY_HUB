@@ -25,11 +25,23 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const allowedOrigins =
     configService.get<string>('ALLOWED_ORIGINS') ||
-    'http://localhost:3000,http://localhost:5000,https://ai-study-ph9xjpnls-bisikamas-projects.vercel.app/';
-  const originArray = allowedOrigins.split(',').map((origin) => origin.trim());
+    'http://localhost:3000,http://localhost:5000';
+  const originArray = allowedOrigins.split(',').map((origin) => origin.trim().replace(/\/$/, ''));
 
   app.enableCors({
-    origin: originArray,
+    origin: (origin, callback) => {
+      // Cho phép các request không có origin (như Mobile App, Postman)
+      if (!origin) {
+        return callback(null, true);
+      }
+      
+      const isAllowed = originArray.includes(origin) || origin.endsWith('.vercel.app');
+      if (isAllowed) {
+        return callback(null, true);
+      }
+      
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
     credentials: true,
   });
 
