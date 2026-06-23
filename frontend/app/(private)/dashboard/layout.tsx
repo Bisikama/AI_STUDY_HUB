@@ -119,14 +119,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="material-symbols-outlined">lightbulb</span> Practice Mode
             </Link>
           </li>
-          <li>
-            <button
-              onClick={() => alert('AI Assistant clicked (Simulated)')}
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-            >
-              <span className="material-symbols-outlined">computer</span> AI Assistant
-            </button>
-          </li>
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
