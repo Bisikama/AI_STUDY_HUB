@@ -657,16 +657,7 @@ function SearchExplore() {
               >
                 Practice Mode
               </a>
-              <a
-                className="text-secondary font-label-md hover:text-primary transition-colors"
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert('AI Assistant clicked (Simulated)');
-                }}
-              >
-                AI Assistant
-              </a>
+              
             </nav>
 
             <div className="border-outline-variant flex items-center gap-4 border-l pl-6">
