@@ -52,6 +52,7 @@ type DisplayDocument = Omit<Partial<Document>, 'subjectId' | 'subject'> & {
   isLocalFollowed?: boolean;
 };
 
+
 function readFollowedDocumentsFromStorage(): DisplayDocument[] {
   if (typeof window === 'undefined') {
     return [];
