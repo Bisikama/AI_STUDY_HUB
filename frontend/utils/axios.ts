@@ -67,8 +67,9 @@
 import axios from 'axios';
 
 // Tạo instance
+const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 const axiosClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api', // Địa chỉ Backend
+  baseURL: process.env.NEXT_PUBLIC_API_URL || `${apiBase}/api`, // Địa chỉ Backend
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });

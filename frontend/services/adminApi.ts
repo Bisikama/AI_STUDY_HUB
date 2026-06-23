@@ -35,19 +35,19 @@ export const adminApi = {
   /** GET /api/admin/metrics */
   getMetrics: async (): Promise<AdminMetrics> => {
     const response = await axiosClient.get("/admin/metrics");
-    return response.data.data;
+    return response.data;
   },
 
   /** GET /api/admin/users */
   getAllUsers: async (): Promise<AdminUser[]> => {
     const response = await axiosClient.get("/admin/users");
-    return response.data.data;
+    return response.data;
   },
 
   /** GET /api/admin/documents/pending */
   getPendingDocuments: async (): Promise<PendingDocument[]> => {
     const response = await axiosClient.get("/admin/documents/pending");
-    return response.data.data;
+    return response.data;
   },
 
   /** PATCH /api/admin/documents/:id/approve */

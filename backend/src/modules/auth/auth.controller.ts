@@ -18,15 +18,16 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
+    const isProd = process.env.NODE_ENV === 'production';
 
     res.cookie('access_token', result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return { user: result.user };
+    return { user: result.user, token: result.token };
   }
 
   @Post('google')
@@ -35,23 +36,25 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.loginWithGoogle(body.idToken);
+    const isProd = process.env.NODE_ENV === 'production';
 
     res.cookie('access_token', result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return { user: result.user };
+    return { user: result.user, token: result.token };
   }
 
   @Post('logout')
   async logout(@Res({ passthrough: true }) res: Response) {
+    const isProd = process.env.NODE_ENV === 'production';
     res.clearCookie('access_token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
     });
     return { message: 'Đăng xuất thành công!' };
   }
