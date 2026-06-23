@@ -184,9 +184,13 @@ export class AuthService {
     });
 
     // 5. Gửi email
-    await this.mailService.sendOtp(email, otp);
+    const mailSent = await this.mailService.sendOtp(email, otp);
 
-    return { message: 'Mã OTP khôi phục mật khẩu đã được gửi.' };
+    const isDev = process.env.NODE_ENV !== 'production';
+    return {
+      message: 'Mã OTP khôi phục mật khẩu đã được gửi.',
+      ...(isDev || !mailSent ? { devOtp: otp } : {}),
+    };
   }
 
   async resetPassword(dto: any) {
