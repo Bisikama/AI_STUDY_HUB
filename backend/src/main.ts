@@ -24,7 +24,8 @@ async function bootstrap() {
   // Bật CORS (Bắt buộc phải có credentials: true để nhận Cookie)
   const configService = app.get(ConfigService);
   const allowedOrigins =
-    configService.get<string>('ALLOWED_ORIGINS') || 'http://localhost:3000,http://localhost:5000';
+    configService.get<string>('ALLOWED_ORIGINS') ||
+    'http://localhost:3000,http://localhost:5000,https://ai-study-ph9xjpnls-bisikamas-projects.vercel.app/';
   const originArray = allowedOrigins.split(',').map((origin) => origin.trim());
 
   app.enableCors({
