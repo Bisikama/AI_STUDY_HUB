@@ -34,6 +34,12 @@ export const useAuth = () => {
       // nên res.data chính là { user, token }
       const payload = res.data as unknown as { user: User; token: string };
       localStorage.setItem('user', JSON.stringify(payload.user));
+
+      // Lưu cookie ở domain frontend để Next.js middleware đọc được
+      if (payload.token) {
+        document.cookie = `access_token=${payload.token}; path=/; max-age=86400; SameSite=Lax; Secure`;
+      }
+
       return payload.user;
     } catch (err: unknown) {
       const errorMsg = handleError(err);
@@ -68,6 +74,8 @@ export const useAuth = () => {
       console.error('Logout error:', err);
     } finally {
       localStorage.removeItem('user');
+      // Xóa cookie ở domain frontend
+      document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
       window.location.href = '/login';
     }
   };
@@ -107,8 +115,15 @@ export const useAuth = () => {
     setError(null);
     try {
       const res = await authApi.loginWithGoogle(idToken);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-      return res.data.user;
+      const payload = res.data as unknown as { user: User; token: string };
+      localStorage.setItem('user', JSON.stringify(payload.user));
+
+      // Lưu cookie ở domain frontend để Next.js middleware đọc được
+      if (payload.token) {
+        document.cookie = `access_token=${payload.token}; path=/; max-age=86400; SameSite=Lax; Secure`;
+      }
+
+      return payload.user;
     } catch (err: unknown) {
       const errorMsg = handleError(err);
       setError(errorMsg);
