@@ -29,7 +29,7 @@ type FollowedExploreDocument = {
   createdAt: string;
 };
 
-type DisplayDocument = Partial<Document> & {
+type DisplayDocument = Omit<Partial<Document>, 'subjectId' | 'subject'> & {
   id: string;
   title: string;
   fileSize: number;
