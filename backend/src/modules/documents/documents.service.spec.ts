@@ -289,18 +289,38 @@ describe('DocumentsService', () => {
       );
       expect(mockStorageAdapter.deleteObject).toHaveBeenCalledWith('test/path');
     });
-    it('should ignore extraction errors and return document', async () => {
+    it('should ignore extraction errors and return safe document payload', async () => {
       mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, name: 'Subject 1' });
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-id' });
       mockPrisma.document.create.mockResolvedValue({ id: 'doc-1', status: 'PRIVATE' });
-      
-      // extraction fails
-      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
+
+      const mockDate = new Date('2026-01-01T00:00:00Z');
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-1',
+        title: 'Title',
+        description: 'Desc',
+        subjectId: 1,
+        fileType: 'application/pdf',
+        fileSize: BigInt(123),
+        visibilityStatus: 'PRIVATE',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'FAILED',
+        aiStatus: 'READY',
+        pageCount: 1,
+        createdAt: mockDate,
+        storagePath: 'secret/path',
+        fileUrl: 'http://secret.url',
+        fullText: 'secret text'
+      });
       (parseDocument as jest.Mock).mockRejectedValueOnce(new Error('Extract error'));
 
       const result = await service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id');
       expect(result.id).toBe('doc-1');
+      expect(result.createdAt).toBe('2026-01-01T00:00:00.000Z');
+      expect(result.fileSize).toBe(123);
       expect(result).not.toHaveProperty('fullText');
+      expect(result).not.toHaveProperty('storagePath');
+      expect(result).not.toHaveProperty('fileUrl');
     });
   });
 
@@ -564,35 +584,79 @@ describe('DocumentsService', () => {
       await expect(service.getDetails('invalid-id')).rejects.toThrow(NotFoundException);
     });
 
-    it('should return document structure with summary and quizzes', async () => {
+    it('should return safe document structure and omit forbidden fields', async () => {
+      const ownerId = 'user-1';
+      const mockDate = new Date('2026-01-01T00:00:00Z');
       mockPrisma.document.findUnique.mockResolvedValue({
         id: 'doc-id',
         title: 'Title',
+        description: 'Desc',
+        subjectId: 1,
+        subject: { id: 1, name: 'Math', code: 'MATH101', isSystem: true },
+        fileType: 'application/pdf',
         fileSize: BigInt(999),
-        storagePath: 'documents/user-id/doc-id/test.pdf',
+        visibilityStatus: 'PRIVATE',
         deletionStatus: 'ACTIVE',
-        summary: { id: 's-1' },
-        quizzes: [{ id: 'q-1' }],
-        deletedAt: null,
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+        pageCount: 10,
+        createdAt: mockDate,
+        updatedAt: mockDate,
+        requestedAt: null,
+        // Forbidden fields
+        uploadedBy: ownerId,
+        storagePath: 'documents/user-id/doc-id/test.pdf',
+        fileUrl: 'http://example.com/file',
+        previewUrl: 'http://example.com/preview',
         status: 'APPROVED',
         fullText: 'secret text',
-      });
-
-      const result = await service.getDetails('doc-id');
-      expect(result).toEqual({
-        id: 'doc-id',
-        title: 'Title',
-        fileSize: 999,
-        storagePath: 'documents/user-id/doc-id/test.pdf',
-        deletionStatus: 'ACTIVE',
         summary: { id: 's-1' },
         quizzes: [{ id: 'q-1' }],
+        tags: [{ id: 't-1' }],
+        aiRunId: 'run-1',
+        aiProcessingStartedAt: mockDate,
+        aiGeneratedAt: mockDate,
+        aiAttemptCount: 1,
+        aiFailureReason: 'none',
         deletedAt: null,
-        status: 'APPROVED',
-        isFollowed: false,
-        isOwner: false,
       });
-      expect(result).not.toHaveProperty('fullText');
+
+      const result = await service.getDetails('doc-id', ownerId);
+
+      // Safe fields exist
+      expect(result).toEqual(expect.objectContaining({
+        id: 'doc-id',
+        title: 'Title',
+        description: 'Desc',
+        subjectId: 1,
+        subject: { id: 1, name: 'Math', code: 'MATH101', isSystem: true },
+        fileType: 'application/pdf',
+        fileSize: 999,
+        visibilityStatus: 'PRIVATE',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+        pageCount: 10,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        requestedAt: null,
+        isOwner: true,
+        isFollowed: false,
+      }));
+
+      // Timestamps serialize to ISO strings
+      expect(typeof result.createdAt).toBe('string');
+      expect(typeof result.updatedAt).toBe('string');
+
+      // Forbidden fields absent
+      const forbiddenFields = [
+        'uploadedBy', 'fileUrl', 'previewUrl', 'storagePath', 'status',
+        'fullText', 'summary', 'quizzes', 'tags', 'aiRunId',
+        'aiProcessingStartedAt', 'aiGeneratedAt', 'aiAttemptCount', 'aiFailureReason'
+      ];
+      forbiddenFields.forEach(field => {
+        expect(result).not.toHaveProperty(field);
+      });
     });
   });
 
@@ -648,7 +712,7 @@ describe('DocumentsService', () => {
       const validText = 'a'.repeat(100);
       mockParseDocument.mockResolvedValueOnce({ text: validText, pageCount: 1 });
       const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
-      
+
       expect(res.extractionStatus).toBe('READY');
       expect(res.chunkCount).toBe(1);
       expect(mockPrisma.documentChunk.createMany).toHaveBeenCalledWith({
@@ -676,11 +740,11 @@ describe('DocumentsService', () => {
       const validText = 'a'.repeat(1500) + 'b'.repeat(500);
       mockParseDocument.mockResolvedValueOnce({ text: validText, pageCount: 3 });
       const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
-      
+
       expect(res.extractionStatus).toBe('READY');
       expect(res.chunkCount).toBe(2);
       expect(res.pageCount).toBe(3);
-      
+
       const calls = mockPrisma.documentChunk.createMany.mock.calls[0][0].data;
       expect(calls[0]).toEqual({ documentId: 'doc-1', chunkIndex: 0, content: validText.slice(0, 1500), charStart: 0, charEnd: 1500 });
       // Next chunk starts at 1500 - 200 = 1300
@@ -699,9 +763,9 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
       const validText = 'a'.repeat(100);
       mockParseDocument.mockResolvedValueOnce({ text: validText, pageCount: 1 });
-      
+
       mockPrisma.$transaction.mockRejectedValueOnce(new Error('DB Failed'));
-      
+
       const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
       expect(res.extractionStatus).toBe('FAILED');
       expect(mockPrisma.document.update).toHaveBeenCalledWith({
@@ -737,7 +801,7 @@ describe('DocumentsService', () => {
       const res = await service.getDocumentsByUser('user-1', { page: 1, limit: 10 });
       expect(res).toHaveLength(1);
       expect(mockPrisma.userFollowedDocument.findMany).not.toHaveBeenCalled();
-      
+
       const returnedDoc = res[0] as any;
       expect(returnedDoc.fileType).toBe('application/pdf');
       expect(returnedDoc.fileUrl).toBeUndefined();
@@ -922,6 +986,69 @@ describe('DocumentsService', () => {
         visibilityStatus: 'PUBLIC',
       });
       await expect(service.withdrawPublic('doc-pub', 'user-B')).rejects.toThrow('permission');
+    });
+  });
+
+  describe('updateDocument', () => {
+    it('should return safe mapped response and omit forbidden fields', async () => {
+      const mockDate = new Date('2026-01-01T00:00:00Z');
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id',
+        uploadedBy: 'user-1',
+        deletedAt: null,
+        deletionStatus: 'ACTIVE',
+        storagePath: 'path'
+      });
+      mockPrisma.document.update.mockResolvedValue({
+        id: 'doc-id',
+        title: 'New Title',
+        description: 'New Desc',
+        subjectId: 2,
+        subject: { id: 2, name: 'Science', code: 'SCI101', isSystem: false },
+        fileType: 'application/pdf',
+        fileSize: BigInt(123),
+        visibilityStatus: 'PRIVATE',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+        pageCount: 5,
+        createdAt: mockDate,
+        updatedAt: mockDate,
+        requestedAt: null,
+        // forbidden
+        uploadedBy: 'user-1',
+        storagePath: 'path',
+        fileUrl: 'url',
+        fullText: 'text',
+      });
+
+      const result = await service.updateDocument('doc-id', 'user-1', { title: 'New Title' });
+      expect(result.id).toBe('doc-id');
+      expect(result.isOwner).toBe(true);
+      expect(result.isFollowed).toBe(false);
+      expect(result.updatedAt).toBe('2026-01-01T00:00:00.000Z');
+      expect(result).not.toHaveProperty('fullText');
+      expect(result).not.toHaveProperty('storagePath');
+      expect(result).not.toHaveProperty('uploadedBy');
+    });
+  });
+
+  describe('sanitizeData', () => {
+    it('should serialize Date to ISO string and BigInt to Number', () => {
+      const input = {
+        dateField: new Date('2026-01-01T00:00:00Z'),
+        bigIntField: BigInt(100),
+        nested: {
+          date: new Date('2026-01-02T00:00:00Z')
+        },
+        arr: [BigInt(50), new Date('2026-01-03T00:00:00Z')]
+      };
+      const result = (service as any).sanitizeData(input);
+      expect(result.dateField).toBe('2026-01-01T00:00:00.000Z');
+      expect(result.bigIntField).toBe(100);
+      expect(result.nested.date).toBe('2026-01-02T00:00:00.000Z');
+      expect(result.arr[0]).toBe(50);
+      expect(result.arr[1]).toBe('2026-01-03T00:00:00.000Z');
     });
   });
 });

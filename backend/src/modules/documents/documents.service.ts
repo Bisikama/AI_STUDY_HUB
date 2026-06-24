@@ -44,6 +44,7 @@ export class DocumentsService {
    */
   private sanitizeData<T>(data: unknown): T {
     if (data === null || data === undefined) return data as unknown as T;
+    if (data instanceof Date) return data.toISOString() as unknown as T;
     if (typeof data === 'bigint') return Number(data) as unknown as T;
     if (Array.isArray(data)) {
       return data.map((item: unknown) => this.sanitizeData<unknown>(item)) as unknown as T;
@@ -57,6 +58,51 @@ export class DocumentsService {
       return copy as unknown as T;
     }
     return data as T;
+  }
+
+  private mapSafeDocumentResponse(document: any, isOwner: boolean = false, isFollowed: boolean = false): any {
+    return {
+      id: document.id,
+      title: document.title,
+      description: document.description,
+      subjectId: document.subjectId,
+      subject: document.subject ? {
+        id: document.subject.id,
+        name: document.subject.name,
+        code: document.subject.code,
+        isSystem: document.subject.isSystem,
+      } : null,
+      fileType: document.fileType,
+      fileSize: document.fileSize !== undefined && document.fileSize !== null ? Number(document.fileSize) : undefined,
+      visibilityStatus: document.visibilityStatus,
+      deletionStatus: document.deletionStatus,
+      extractionStatus: document.extractionStatus,
+      aiStatus: document.aiStatus,
+      pageCount: document.pageCount,
+      createdAt: document.createdAt ? (document.createdAt instanceof Date ? document.createdAt.toISOString() : new Date(document.createdAt).toISOString()) : null,
+      updatedAt: document.updatedAt ? (document.updatedAt instanceof Date ? document.updatedAt.toISOString() : new Date(document.updatedAt).toISOString()) : null,
+      requestedAt: document.requestedAt ? (document.requestedAt instanceof Date ? document.requestedAt.toISOString() : new Date(document.requestedAt).toISOString()) : null,
+      isOwner,
+      isFollowed,
+    };
+  }
+
+  private mapSafeUploadResponse(document: any): any {
+    return {
+      id: document.id,
+      title: document.title,
+      description: document.description,
+      subjectId: document.subjectId,
+      fileName: document.fileName,
+      fileType: document.fileType,
+      fileSize: document.fileSize !== undefined && document.fileSize !== null ? Number(document.fileSize) : undefined,
+      visibilityStatus: document.visibilityStatus,
+      deletionStatus: document.deletionStatus,
+      extractionStatus: document.extractionStatus,
+      aiStatus: document.aiStatus,
+      pageCount: document.pageCount,
+      createdAt: document.createdAt ? (document.createdAt instanceof Date ? document.createdAt.toISOString() : new Date(document.createdAt).toISOString()) : null,
+    };
   }
 
   /**
@@ -309,22 +355,9 @@ export class DocumentsService {
     }
 
     // Return safe 201 response payload
-    const sanitizedDoc = this.sanitizeData<any>(finalDoc);
-    return {
-      id: sanitizedDoc.id,
-      title: sanitizedDoc.title,
-      description: sanitizedDoc.description,
-      subjectId: sanitizedDoc.subjectId,
-      fileName: file.originalname,
-      fileType: sanitizedDoc.fileType,
-      fileSize: sanitizedDoc.fileSize,
-      visibilityStatus: sanitizedDoc.visibilityStatus,
-      deletionStatus: sanitizedDoc.deletionStatus,
-      extractionStatus: sanitizedDoc.extractionStatus,
-      aiStatus: sanitizedDoc.aiStatus,
-      pageCount: sanitizedDoc.pageCount,
-      createdAt: sanitizedDoc.createdAt,
-    } as any;
+    const safeResponse = this.mapSafeUploadResponse(finalDoc);
+    safeResponse.fileName = file.originalname;
+    return safeResponse;
   }
 
   /**
@@ -605,19 +638,32 @@ Quy định chặt chẽ:
   async getDetails(documentId: string, userId?: string): Promise<SanitizedDocumentDetails> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
-      include: {
-        subject: true,
-        tags: { include: { tag: true } },
-        summary: true,
-        quizzes: {
-          include: {
-            questions: {
-              include: {
-                options: true,
-              },
-            },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        subjectId: true,
+        subject: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            isSystem: true,
           },
         },
+        fileType: true,
+        fileSize: true,
+        visibilityStatus: true,
+        deletionStatus: true,
+        extractionStatus: true,
+        aiStatus: true,
+        pageCount: true,
+        createdAt: true,
+        updatedAt: true,
+        requestedAt: true,
+        uploadedBy: true,
+        deletedAt: true,
+        storagePath: true,
       },
     });
 
@@ -645,8 +691,7 @@ Quy định chặt chẽ:
       throw new ForbiddenException('You do not have permission to view this document');
     }
 
-    const sanitized = this.sanitizeData<any>(document);
-    sanitized.isOwner = userId ? document.uploadedBy === userId : false;
+    const isOwner = userId ? document.uploadedBy === userId : false;
 
     let isFollowed = false;
     if (userId) {
@@ -660,10 +705,8 @@ Quy định chặt chẽ:
       });
       isFollowed = !!followRecord;
     }
-    sanitized.isFollowed = isFollowed;
-    delete sanitized.fullText;
 
-    return sanitized as SanitizedDocumentDetails;
+    return this.mapSafeDocumentResponse(document, isOwner, isFollowed);
   }
 
   /**
@@ -860,15 +903,36 @@ Quy định chặt chẽ:
         ...(description !== undefined && { description }),
         ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
       },
-      include: { subject: true },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        subjectId: true,
+        subject: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            isSystem: true,
+          },
+        },
+        fileType: true,
+        fileSize: true,
+        visibilityStatus: true,
+        deletionStatus: true,
+        extractionStatus: true,
+        aiStatus: true,
+        pageCount: true,
+        createdAt: true,
+        updatedAt: true,
+        requestedAt: true,
+        uploadedBy: true,
+        deletedAt: true,
+        storagePath: true,
+      },
     });
 
-    const sanitized = this.sanitizeData<any>(updatedDocument);
-    sanitized.isOwner = true;
-    sanitized.isFollowed = false;
-    delete sanitized.fullText;
-
-    return sanitized as SanitizedDocument;
+    return this.mapSafeDocumentResponse(updatedDocument, true, false);
   }
 
   /**
@@ -1088,7 +1152,7 @@ Quy định chặt chẽ:
       throw new ForbiddenException('You do not have permission to request public visibility for this document');
     }
 
-    if (!document.subject.isSystem) {
+    if (!document.subject?.isSystem) {
       throw new UnprocessableEntityException('DOCUMENT_PUBLIC_SUBJECT_REQUIRED');
     }
 
@@ -1106,6 +1170,7 @@ Quy định chặt chẽ:
     const updateResult = await this.prisma.document.updateMany({
       where: {
         id: documentId,
+        uploadedBy: userId,
         visibilityStatus: 'PRIVATE',
         deletionStatus: 'ACTIVE',
         deletedAt: null,
@@ -1168,6 +1233,7 @@ Quy định chặt chẽ:
     const updateResult = await this.prisma.document.updateMany({
       where: {
         id: documentId,
+        uploadedBy: userId,
         visibilityStatus: 'PUBLIC',
         deletionStatus: 'ACTIVE',
         deletedAt: null,
