@@ -172,6 +172,7 @@ model Document {
   viewCount     Int            @default(0) @map("view_count")
   status        DocumentStatus @default(PRIVATE)
   fullText      String?        @map("full_text") @db.Text
+  pageCount     Int?           @map("page_count")
   isAIGenerated Boolean        @default(false) @map("is_ai_generated")
   rating        Float          @default(0.0) @map("rating")
   deletedAt     DateTime?      @map("deleted_at")

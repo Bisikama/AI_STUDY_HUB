@@ -20,9 +20,15 @@ export class SubjectsService {
       where: {
         OR: [{ isSystem: true }, { createdBy: userId }],
       },
-      orderBy: [{ isSystem: 'desc' }, { name: 'asc' }],
+      orderBy: [{ isSystem: 'desc' }, { name: 'asc' }, { id: 'asc' }],
     });
-    return subjects;
+    
+    return subjects.map((subject) => ({
+      id: subject.id,
+      name: subject.name,
+      code: subject.code,
+      isSystem: subject.isSystem,
+    }));
   }
 
   /**
@@ -42,44 +48,40 @@ export class SubjectsService {
       .replace(/\s+/g, '-')
       .slice(0, 50);
 
-    // Check if system subject with same name already exists → return it
-    const systemMatch = await this.prisma.subject.findFirst({
-      where: {
-        isSystem: true,
-        name: { equals: trimmedName, mode: 'insensitive' },
-      },
-    });
-    if (systemMatch) return systemMatch;
+    if (!code) {
+      throw new BadRequestException('Subject name is invalid');
+    }
 
-    // Check if user already has a personal subject with same name → return it
-    const personalMatch = await this.prisma.subject.findFirst({
-      where: {
-        isSystem: false,
-        createdBy: userId,
-        name: { equals: trimmedName, mode: 'insensitive' },
-      },
+    const existingName = await this.prisma.subject.findFirst({
+      where: { name: { equals: trimmedName, mode: 'insensitive' } },
     });
-    if (personalMatch) return personalMatch;
+    if (existingName) {
+      throw new BadRequestException('Subject name already exists');
+    }
 
-    // Try to create; handle unique constraint on code by appending userId suffix
-    let finalCode = code;
-    const codeExists = await this.prisma.subject.findUnique({ where: { code } });
-    if (codeExists) {
-      // Append short userId suffix to make code unique
-      finalCode = `${code}-${userId.slice(0, 8)}`;
+    const existingCode = await this.prisma.subject.findUnique({
+      where: { code },
+    });
+    if (existingCode) {
+      throw new BadRequestException('Subject code already exists');
     }
 
     const newSubject = await this.prisma.subject.create({
       data: {
         name: trimmedName,
-        code: finalCode,
+        code,
         description: dto.description?.trim() || null,
         isSystem: false,
         createdBy: userId,
       },
     });
 
-    return newSubject;
+    return {
+      id: newSubject.id,
+      name: newSubject.name,
+      code: newSubject.code,
+      isSystem: newSubject.isSystem,
+    };
   }
 
   /**

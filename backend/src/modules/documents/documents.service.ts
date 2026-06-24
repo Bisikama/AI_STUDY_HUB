@@ -114,26 +114,7 @@ export class DocumentsService {
       }
     }
 
-    // 3. Extract text from file using Document Parser Utility
-    let extractedText = '';
-    try {
-      extractedText = await parseDocument(file.buffer, file.originalname, file.mimetype);
-    } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : String(error));
-    }
 
-    //Chặn file ảnh / file trống
-    const cleanText = extractedText.trim();
-    if (!cleanText || cleanText.length < 50) {
-      throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.EMPTY_TEXT);
-    }
-
-    //Chặn file rác / lỗi font (Heuristic check)
-    const weirdChars = cleanText.match(/[^\w\s\\.,;:!?'"()\\[\]{}\-\u00C0-\u1EF9]/g) || [];
-    if (weirdChars.length / cleanText.length > 0.15) {
-      // Ngưỡng 15%
-      throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.INVALID_FONT);
-    }
 
     // 4. Upload file to Supabase Storage
     let fileUrl: string;
@@ -160,7 +141,8 @@ export class DocumentsService {
         fileSize: BigInt(file.size),
         fileType: file.mimetype,
         status: 'PRIVATE',
-        fullText: extractedText,
+        fullText: null,
+        extractionStatus: 'PENDING',
       },
     });
 
@@ -215,7 +197,21 @@ export class DocumentsService {
       );
     }
 
-    return this.sanitizeData(document);
+    // Extract and persist chunks asynchronously (but waited here, catching errors to not crash upload)
+    try {
+      await this.extractAndPersist({
+        documentId: document.id,
+        pdfBuffer: file.buffer,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+      });
+    } catch (error) {
+      // Intentionally ignore so upload succeeds but extractionStatus becomes FAILED (handled inside extractAndPersist)
+    }
+
+    const sanitized = this.sanitizeData<any>(document);
+    delete sanitized.fullText;
+    return sanitized;
   }
 
   /**
@@ -524,7 +520,7 @@ Quy định chặt chẽ:
       throw new ForbiddenException('You do not have permission to view this document');
     }
 
-    const sanitized = this.sanitizeData<SanitizedDocumentDetails>(document);
+    const sanitized = this.sanitizeData<any>(document);
     sanitized.isOwner = userId ? document.uploadedBy === userId : false;
 
     let isFollowed = false;
@@ -540,8 +536,9 @@ Quy định chặt chẽ:
       isFollowed = !!followRecord;
     }
     sanitized.isFollowed = isFollowed;
+    delete sanitized.fullText;
 
-    return sanitized;
+    return sanitized as SanitizedDocumentDetails;
   }
 
   /**
@@ -574,17 +571,17 @@ Quy định chặt chẽ:
       .map((rel) => rel.document)
       .filter((doc) => doc.deletedAt === null);
 
-    const sanitizedOwned = this.sanitizeData<any[]>(ownedDocuments).map((doc) => ({
-      ...doc,
-      isOwner: true,
-      isFollowed: false,
-    }));
+    const sanitizedOwned = this.sanitizeData<any[]>(ownedDocuments).map((doc) => {
+      const d = { ...doc, isOwner: true, isFollowed: false };
+      delete d.fullText;
+      return d;
+    });
 
-    const sanitizedFollowed = this.sanitizeData<any[]>(followedDocuments).map((doc) => ({
-      ...doc,
-      isOwner: false,
-      isFollowed: true,
-    }));
+    const sanitizedFollowed = this.sanitizeData<any[]>(followedDocuments).map((doc) => {
+      const d = { ...doc, isOwner: false, isFollowed: true };
+      delete d.fullText;
+      return d;
+    });
 
     return [...sanitizedOwned, ...sanitizedFollowed];
   }
@@ -805,7 +802,6 @@ Quy định chặt chẽ:
             ),
           );
         }
-
         return tx.document.findUnique({
           where: { id: documentId },
           include: { subject: true, tags: { include: { tag: true } } },
@@ -823,7 +819,171 @@ Quy định chặt chẽ:
       });
     }
 
-    return this.sanitizeData<SanitizedDocument>(updatedDocument);
+    const sanitized = this.sanitizeData<any>(updatedDocument);
+    delete sanitized.fullText;
+    return sanitized;
+  }
+
+  /**
+   * Internal extraction service for Q4.
+   * Extracts text, normalizes it, chunks it, and saves to the database.
+   */
+  async extractAndPersist(input: {
+    documentId: string;
+    pdfBuffer: Buffer;
+    originalName: string;
+    mimeType: string;
+  }): Promise<{
+    extractionStatus: 'READY' | 'FAILED';
+    chunkCount: number;
+    pageCount?: number;
+  }> {
+    const document = await this.prisma.document.findUnique({
+      where: { id: input.documentId },
+    });
+
+    if (!document) {
+      return { extractionStatus: 'FAILED', chunkCount: 0 };
+    }
+
+    if (document.extractionStatus !== 'PENDING') {
+      return { extractionStatus: document.extractionStatus, chunkCount: 0 }; // Do not re-extract
+    }
+
+    if (input.mimeType !== 'application/pdf') {
+      await this.prisma.document.update({
+        where: { id: input.documentId },
+        data: { extractionStatus: 'FAILED' },
+      });
+      return { extractionStatus: 'FAILED', chunkCount: 0 };
+    }
+
+    let rawText = '';
+    let pageCount = 0;
+    try {
+      const parsed = await parseDocument(input.pdfBuffer, input.originalName, input.mimeType);
+      if (typeof parsed !== 'object' || !parsed.text) {
+        throw new Error('Invalid parser result');
+      }
+      rawText = parsed.text;
+      pageCount = parsed.pageCount || 1;
+    } catch (error) {
+      // Log sanitized message
+      console.error(`Document extraction failed for ${input.documentId}: Parser error`);
+      await this.prisma.document.update({
+        where: { id: input.documentId },
+        data: { extractionStatus: 'FAILED' },
+      });
+      return { extractionStatus: 'FAILED', chunkCount: 0 };
+    }
+
+    const normalizedText = rawText.replace(/\s+/g, ' ').trim();
+    if (normalizedText.length < 20) {
+      console.warn(`Document extraction failed for ${input.documentId}: Text too short`);
+      await this.prisma.document.update({
+        where: { id: input.documentId },
+        data: { extractionStatus: 'FAILED' },
+      });
+      return { extractionStatus: 'FAILED', chunkCount: 0 };
+    }
+
+    const MAX_CHUNK_CHARS = 1500;
+    const CHUNK_OVERLAP_CHARS = 200;
+
+    type ExtractedChunk = {
+      chunkIndex: number;
+      content: string;
+      charStart: number;
+      charEnd: number;
+    };
+    const chunks: ExtractedChunk[] = [];
+    let charStart = 0;
+
+    if (normalizedText.length <= MAX_CHUNK_CHARS) {
+      chunks.push({
+        chunkIndex: 0,
+        content: normalizedText,
+        charStart: 0,
+        charEnd: normalizedText.length,
+      });
+    } else {
+      while (charStart < normalizedText.length) {
+        let charEnd = charStart + MAX_CHUNK_CHARS;
+        if (charEnd > normalizedText.length) {
+          charEnd = normalizedText.length;
+        }
+
+        chunks.push({
+          chunkIndex: chunks.length,
+          content: normalizedText.slice(charStart, charEnd),
+          charStart,
+          charEnd,
+        });
+
+        if (charEnd === normalizedText.length) break;
+        charStart = charEnd - CHUNK_OVERLAP_CHARS;
+      }
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.documentChunk.createMany({
+          data: chunks.map(chunk => ({
+            documentId: input.documentId,
+            chunkIndex: chunk.chunkIndex,
+            content: chunk.content,
+            charStart: chunk.charStart,
+            charEnd: chunk.charEnd,
+          })),
+        });
+
+        await tx.document.update({
+          where: { id: input.documentId },
+          data: {
+            extractionStatus: 'READY',
+            fullText: normalizedText,
+            pageCount: pageCount,
+          },
+        });
+      });
+    } catch (error) {
+      console.error(`Document extraction failed for ${input.documentId}: Transaction error`);
+      // Best-effort update to FAILED
+      await this.prisma.document.update({
+        where: { id: input.documentId },
+        data: { extractionStatus: 'FAILED' },
+      }).catch(() => {});
+      return { extractionStatus: 'FAILED', chunkCount: 0 };
+    }
+
+    return { extractionStatus: 'READY', chunkCount: chunks.length, pageCount };
+  }
+
+  async getReadyChunksForAI(documentId: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document with ID ${documentId} not found`);
+    }
+
+    if (document.extractionStatus !== 'READY') {
+      throw new BadRequestException('Document extraction is not READY');
+    }
+
+    const chunks = await this.prisma.documentChunk.findMany({
+      where: { documentId },
+      orderBy: { chunkIndex: 'asc' },
+      select: {
+        chunkIndex: true,
+        content: true,
+        charStart: true,
+        charEnd: true,
+      },
+    });
+
+    return chunks;
   }
 
   /**

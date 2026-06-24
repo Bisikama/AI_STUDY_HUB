@@ -14,7 +14,7 @@ export async function parseDocument(
   fileBuffer: Buffer,
   originalName: string,
   mimeType: string,
-): Promise<string> {
+): Promise<string | { text: string; pageCount: number }> {
   const extension = originalName.split('.').pop()?.toLowerCase();
   const mime = mimeType.toLowerCase();
 
@@ -29,7 +29,7 @@ export async function parseDocument(
     try {
       parser = new PDFParse({ data: fileBuffer });
       const data = await parser.getText();
-      return data.text || '';
+      return { text: data.text || '', pageCount: data.total || 1 };
     } catch (error) {
       throw new Error(
         `Failed to parse PDF file: ${error instanceof Error ? error.message : String(error)}`,
@@ -71,7 +71,4 @@ export async function parseDocument(
   }
 
   throw new Error(`Unsupported file format: ${extension} (${mimeType})`);
-}
-declare module 'pdf-parse' {
-  export default function pdfParse(dataBuffer: Buffer, options?: any): Promise<{ text: string }>;
 }

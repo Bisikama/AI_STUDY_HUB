@@ -44,14 +44,14 @@ describe('DocumentParser Utility', () => {
   describe('PDF Parser', () => {
     it('should call pdf-parse and return extracted text', async () => {
       const buffer = Buffer.from('pdf data dummy');
-      mockGetText.mockResolvedValueOnce({ text: 'Extracted PDF text content' });
+      mockGetText.mockResolvedValueOnce({ text: 'Extracted PDF text content', total: 5 });
 
       const result = await parseDocument(buffer, 'test.pdf', 'application/pdf');
 
       expect(PDFParse).toHaveBeenCalledWith({ data: buffer });
       expect(mockGetText).toHaveBeenCalled();
       expect(mockDestroy).toHaveBeenCalled();
-      expect(result).toBe('Extracted PDF text content');
+      expect(result).toEqual({ text: 'Extracted PDF text content', pageCount: 5 });
     });
 
     it('should throw error when pdf-parse fails', async () => {

@@ -22,11 +22,7 @@ interface ServiceWithPrivateMethods {
 }
 
 jest.mock('./utils/documentParser', () => ({
-  parseDocument: jest
-    .fn()
-    .mockResolvedValue(
-      'Extracted plain text contents for test. This content must be longer than fifty characters to pass validation.',
-    ),
+  parseDocument: jest.fn(),
 }));
 
 jest.mock('fs', () => ({
@@ -38,6 +34,7 @@ jest.mock('fs', () => ({
 }));
 
 import { parseDocument } from './utils/documentParser';
+const mockParseDocument = parseDocument as jest.MockedFunction<typeof parseDocument>;
 
 // Mock GoogleGenerativeAI
 const mockCountTokens = jest.fn();
@@ -75,6 +72,10 @@ describe('DocumentsService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
       deleteMany: jest.fn(),
+      findMany: jest.fn(),
+    },
+    documentChunk: {
+      createMany: jest.fn(),
       findMany: jest.fn(),
     },
     userFollowedDocument: {
@@ -126,6 +127,12 @@ describe('DocumentsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockParseDocument.mockReset();
+    mockParseDocument.mockResolvedValue({
+      text: 'Default valid extracted PDF text with at least twenty characters.',
+      pageCount: 1,
+    });
+
     mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-id', role: 'STUDENT' });
 
     const module: TestingModule = await Test.createTestingModule({
@@ -235,20 +242,26 @@ describe('DocumentsService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             uploadedBy: 'fallback-user-id',
+            extractionStatus: 'PENDING',
           }),
         }),
       );
       expect(result).toEqual({ id: 'doc-id', title: 'Title', fileSize: 100 });
+      expect(result).not.toHaveProperty('fullText');
     });
 
-    it('should throw BadRequestException if parsing fails', async () => {
+    it('should ignore extraction errors and return document', async () => {
       mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, name: 'Subject 1' });
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-id' });
+      mockPrisma.document.create.mockResolvedValue({ id: 'doc-1', status: 'PRIVATE' });
+      
+      // extraction fails
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
       (parseDocument as jest.Mock).mockRejectedValueOnce(new Error('Extract error'));
 
-      await expect(service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id')).rejects.toThrow(
-        BadRequestException,
-      );
+      const result = await service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id');
+      expect(result.id).toBe('doc-1');
+      expect(result).not.toHaveProperty('fullText');
     });
   });
 
@@ -521,6 +534,7 @@ describe('DocumentsService', () => {
         quizzes: [{ id: 'q-1' }],
         deletedAt: null,
         status: 'APPROVED',
+        fullText: 'secret text',
       });
 
       const result = await service.getDetails('doc-id');
@@ -535,6 +549,140 @@ describe('DocumentsService', () => {
         isFollowed: false,
         isOwner: false,
       });
+      expect(result).not.toHaveProperty('fullText');
+    });
+  });
+
+  describe('extractAndPersist', () => {
+    it('should skip if document does not exist', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(null);
+      const res = await service.extractAndPersist({ documentId: 'invalid', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'app/pdf' });
+      expect(res).toEqual({ extractionStatus: 'FAILED', chunkCount: 0 });
+    });
+
+    it('should skip if mimeType is not application/pdf', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.txt', mimeType: 'text/plain' });
+      expect(res).toEqual({ extractionStatus: 'FAILED', chunkCount: 0 });
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: { extractionStatus: 'FAILED' }
+      });
+    });
+
+    it('should skip if already READY or FAILED', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'READY' });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'app/pdf' });
+      expect(res).toEqual({ extractionStatus: 'READY', chunkCount: 0 });
+    });
+
+    it('should update to FAILED if parseDocument throws', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
+      mockParseDocument.mockRejectedValueOnce(new Error('Parser error'));
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
+      expect(res).toEqual({ extractionStatus: 'FAILED', chunkCount: 0 });
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: { extractionStatus: 'FAILED' },
+      });
+    });
+
+    it('should update to FAILED if normalized text < 20 chars', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
+      mockParseDocument.mockResolvedValueOnce({ text: '  short   ', pageCount: 1 });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
+      expect(res).toEqual({ extractionStatus: 'FAILED', chunkCount: 0 });
+    });
+
+    it('should chunk correctly for exactly 1 chunk <= 1500 chars', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-1',
+        extractionStatus: 'PENDING',
+        aiStatus: 'NOT_REQUESTED',
+        fullText: null,
+        pageCount: null,
+      });
+      const validText = 'a'.repeat(100);
+      mockParseDocument.mockResolvedValueOnce({ text: validText, pageCount: 1 });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
+      
+      expect(res.extractionStatus).toBe('READY');
+      expect(res.chunkCount).toBe(1);
+      expect(mockPrisma.documentChunk.createMany).toHaveBeenCalledWith({
+        data: [{ documentId: 'doc-1', chunkIndex: 0, content: validText, charStart: 0, charEnd: 100 }]
+      });
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: {
+          extractionStatus: 'READY',
+          fullText: validText,
+          pageCount: 1,
+        }
+      });
+    });
+
+    it('should chunk multiple times for > 1500 chars and respect 200 char overlap', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-1',
+        extractionStatus: 'PENDING',
+        aiStatus: 'NOT_REQUESTED',
+        fullText: null,
+        pageCount: null,
+      });
+      // text is 2000 long
+      const validText = 'a'.repeat(1500) + 'b'.repeat(500);
+      mockParseDocument.mockResolvedValueOnce({ text: validText, pageCount: 3 });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
+      
+      expect(res.extractionStatus).toBe('READY');
+      expect(res.chunkCount).toBe(2);
+      expect(res.pageCount).toBe(3);
+      
+      const calls = mockPrisma.documentChunk.createMany.mock.calls[0][0].data;
+      expect(calls[0]).toEqual({ documentId: 'doc-1', chunkIndex: 0, content: validText.slice(0, 1500), charStart: 0, charEnd: 1500 });
+      // Next chunk starts at 1500 - 200 = 1300
+      expect(calls[1]).toEqual({ documentId: 'doc-1', chunkIndex: 1, content: validText.slice(1300, 2000), charStart: 1300, charEnd: 2000 });
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: {
+          extractionStatus: 'READY',
+          fullText: validText,
+          pageCount: 3,
+        }
+      });
+    });
+
+    it('should fallback to FAILED if transaction throws', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
+      const validText = 'a'.repeat(100);
+      mockParseDocument.mockResolvedValueOnce({ text: validText, pageCount: 1 });
+      
+      mockPrisma.$transaction.mockRejectedValueOnce(new Error('DB Failed'));
+      
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
+      expect(res.extractionStatus).toBe('FAILED');
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: { extractionStatus: 'FAILED' }
+      });
+    });
+  });
+
+  describe('getReadyChunksForAI', () => {
+    it('returns ordered chunks if READY', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'READY' });
+      mockPrisma.documentChunk.findMany.mockResolvedValue([
+        { chunkIndex: 0, content: 'A', charStart: 0, charEnd: 1 },
+        { chunkIndex: 1, content: 'B', charStart: 1, charEnd: 2 },
+      ]);
+
+      const res = await service.getReadyChunksForAI('doc-1');
+      expect(res).toHaveLength(2);
+    });
+
+    it('throws BadRequestException if PENDING or FAILED', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'FAILED' });
+      await expect(service.getReadyChunksForAI('doc-1')).rejects.toThrow(BadRequestException);
     });
   });
 });
