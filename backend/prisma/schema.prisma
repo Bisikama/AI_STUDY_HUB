@@ -184,6 +184,7 @@ model Document {
   deletionStatus   DeletionStatus   @default(ACTIVE) @map("deletion_status")
   extractionStatus ExtractionStatus @default(PENDING) @map("extraction_status")
   storagePath      String?          @map("storage_path") @db.VarChar(512)
+  requestedAt      DateTime?        @map("requested_at")
 
   // AI Fields
   aiStatus              AIStatus  @default(NOT_REQUESTED) @map("ai_status")

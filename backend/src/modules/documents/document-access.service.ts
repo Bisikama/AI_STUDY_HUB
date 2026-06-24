@@ -1,8 +1,24 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { VisibilityStatus, DeletionStatus } from '../../../generated/prisma/client';
+import { VisibilityStatus, DeletionStatus, Prisma } from '../../../generated/prisma/client';
 
 export type DocumentAccessPurpose = 'SIGNED_PREVIEW' | 'SIGNED_DOWNLOAD';
+
+export const getPublicEligibilityFilter = (): Prisma.DocumentWhereInput => ({
+  visibilityStatus: 'PUBLIC',
+  deletionStatus: 'ACTIVE',
+  deletedAt: null,
+  storagePath: { not: null },
+  extractionStatus: 'READY',
+  aiStatus: 'READY',
+});
+
+export const getModerationPendingFilter = (): Prisma.DocumentWhereInput => ({
+  visibilityStatus: 'PENDING_REVIEW',
+  deletionStatus: 'ACTIVE',
+  deletedAt: null,
+  storagePath: { not: null },
+});
 
 export interface SafeDocumentAccessRecord {
   id: string;

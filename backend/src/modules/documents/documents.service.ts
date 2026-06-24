@@ -7,6 +7,8 @@ import {
   ForbiddenException,
   UnauthorizedException,
   BadGatewayException,
+  ConflictException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
@@ -1068,5 +1070,135 @@ Quy định chặt chẽ:
         documentId,
       },
     });
+  }
+
+  async requestPublic(documentId: string, userId: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      include: {
+        subject: { select: { isSystem: true } },
+      },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    if (document.uploadedBy !== userId) {
+      throw new ForbiddenException('You do not have permission to request public visibility for this document');
+    }
+
+    if (!document.subject.isSystem) {
+      throw new UnprocessableEntityException('DOCUMENT_PUBLIC_SUBJECT_REQUIRED');
+    }
+
+    if (
+      document.deletionStatus !== 'ACTIVE' ||
+      document.deletedAt !== null ||
+      !document.storagePath ||
+      document.visibilityStatus !== 'PRIVATE' ||
+      document.extractionStatus !== 'READY' ||
+      document.aiStatus !== 'READY'
+    ) {
+      throw new ConflictException('DOCUMENT_INVALID_STATE');
+    }
+
+    const updateResult = await this.prisma.document.updateMany({
+      where: {
+        id: documentId,
+        visibilityStatus: 'PRIVATE',
+        deletionStatus: 'ACTIVE',
+        deletedAt: null,
+        storagePath: { not: null },
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+      },
+      data: {
+        visibilityStatus: 'PENDING_REVIEW',
+        requestedAt: new Date(),
+      },
+    });
+
+    if (updateResult.count === 0) {
+      throw new ConflictException('DOCUMENT_INVALID_STATE');
+    }
+
+    const updatedDocument = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      select: {
+        id: true,
+        visibilityStatus: true,
+        deletionStatus: true,
+        extractionStatus: true,
+        aiStatus: true,
+        requestedAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!updatedDocument) {
+      throw new ConflictException('DOCUMENT_INVALID_STATE');
+    }
+
+    return updatedDocument;
+  }
+
+  async withdrawPublic(documentId: string, userId: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    if (document.uploadedBy !== userId) {
+      throw new ForbiddenException('You do not have permission to withdraw public visibility for this document');
+    }
+
+    if (
+      document.deletionStatus !== 'ACTIVE' ||
+      document.deletedAt !== null ||
+      !document.storagePath ||
+      document.visibilityStatus !== 'PUBLIC'
+    ) {
+      throw new ConflictException('DOCUMENT_INVALID_STATE');
+    }
+
+    const updateResult = await this.prisma.document.updateMany({
+      where: {
+        id: documentId,
+        visibilityStatus: 'PUBLIC',
+        deletionStatus: 'ACTIVE',
+        deletedAt: null,
+        storagePath: { not: null },
+      },
+      data: {
+        visibilityStatus: 'PRIVATE',
+      },
+    });
+
+    if (updateResult.count === 0) {
+      throw new ConflictException('DOCUMENT_INVALID_STATE');
+    }
+
+    const updatedDocument = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      select: {
+        id: true,
+        visibilityStatus: true,
+        deletionStatus: true,
+        extractionStatus: true,
+        aiStatus: true,
+        requestedAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!updatedDocument) {
+      throw new ConflictException('DOCUMENT_INVALID_STATE');
+    }
+
+    return updatedDocument;
   }
 }

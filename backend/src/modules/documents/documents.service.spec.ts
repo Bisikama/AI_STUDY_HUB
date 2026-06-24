@@ -72,6 +72,7 @@ describe('DocumentsService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       delete: jest.fn(),
       deleteMany: jest.fn(),
       findMany: jest.fn(),
@@ -753,6 +754,174 @@ describe('DocumentsService', () => {
         where: { id: 'doc-1' },
         data: expect.objectContaining({ deletionStatus: 'SOFT_DELETED', visibilityStatus: 'PRIVATE' }),
       });
+    });
+  });
+
+  describe('Q9 - requestPublic', () => {
+    it('1. Owner requests public on valid PRIVATE document with system subject', async () => {
+      mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.document.findUnique
+        .mockResolvedValueOnce({
+          id: 'doc-1',
+          uploadedBy: 'user-1',
+          visibilityStatus: 'PRIVATE',
+          deletionStatus: 'ACTIVE',
+          deletedAt: null,
+          storagePath: 'path/to/file.pdf',
+          extractionStatus: 'READY',
+          aiStatus: 'READY',
+          subject: { isSystem: true },
+        })
+        .mockResolvedValueOnce({
+          id: 'doc-1',
+          visibilityStatus: 'PENDING_REVIEW',
+        });
+
+      const res = await service.requestPublic('doc-1', 'user-1');
+      expect(res.visibilityStatus).toBe('PENDING_REVIEW');
+      expect(mockPrisma.document.updateMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          id: 'doc-1',
+          visibilityStatus: 'PRIVATE',
+          deletionStatus: 'ACTIVE',
+        }),
+        data: expect.objectContaining({
+          visibilityStatus: 'PENDING_REVIEW',
+          requestedAt: expect.any(Date),
+        }),
+      });
+    });
+
+    it('2. Personal Subject -> 422 DOCUMENT_PUBLIC_SUBJECT_REQUIRED', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-2',
+        uploadedBy: 'user-1',
+        subject: { isSystem: false },
+      });
+      await expect(service.requestPublic('doc-2', 'user-1')).rejects.toThrow('DOCUMENT_PUBLIC_SUBJECT_REQUIRED');
+    });
+
+    it('3. Invalid lifecycle -> 409 DOCUMENT_INVALID_STATE', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-3',
+        uploadedBy: 'user-1',
+        subject: { isSystem: true },
+        visibilityStatus: 'PENDING_REVIEW', // Already pending
+        deletionStatus: 'ACTIVE',
+        deletedAt: null,
+        storagePath: 'path',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-3', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3a. Owner, extractionStatus = FAILED -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-4', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'FAILED', aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-4', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3b. Owner, aiStatus = NOT_REQUESTED -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-5', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'NOT_REQUESTED',
+      });
+      await expect(service.requestPublic('doc-5', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3c. Owner, aiStatus = FAILED -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-6', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'FAILED',
+      });
+      await expect(service.requestPublic('doc-6', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3d. Owner, storagePath = null -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-7', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: null, extractionStatus: 'READY', aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-7', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3e. Owner, already PENDING_REVIEW -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-8', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PENDING_REVIEW', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-8', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3f. Owner, already PUBLIC -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-9', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PUBLIC', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-9', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3g. Owner, SOFT_DELETED / non-ACTIVE -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-10', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'SOFT_DELETED', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-10', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3h. Race condition handled by updateMany returning 0 count -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-1', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+      });
+      mockPrisma.document.updateMany.mockResolvedValue({ count: 0 }); // State changed concurrently
+      await expect(service.requestPublic('doc-1', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('4. Owner-only: User B cannot request public for User A document', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-1',
+        uploadedBy: 'user-A',
+      });
+      await expect(service.requestPublic('doc-1', 'user-B')).rejects.toThrow('permission');
+    });
+  });
+
+  describe('Q9 - withdrawPublic', () => {
+    it('5. Withdraw success: PUBLIC -> PRIVATE', async () => {
+      mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.document.findUnique
+        .mockResolvedValueOnce({
+          id: 'doc-pub',
+          uploadedBy: 'user-1',
+          visibilityStatus: 'PUBLIC',
+          deletionStatus: 'ACTIVE',
+          deletedAt: null,
+          storagePath: 'documents/user-1/doc-pub/example.pdf',
+        })
+        .mockResolvedValueOnce({
+          id: 'doc-pub',
+          visibilityStatus: 'PRIVATE',
+        });
+
+      const res = await service.withdrawPublic('doc-pub', 'user-1');
+      expect(res.visibilityStatus).toBe('PRIVATE');
+    });
+
+    it('6. Withdraw invalid state -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-priv',
+        uploadedBy: 'user-1',
+        visibilityStatus: 'PRIVATE', // Not public
+        deletionStatus: 'ACTIVE',
+        deletedAt: null,
+        storagePath: 'path',
+      });
+      await expect(service.withdrawPublic('doc-priv', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('7. User B cannot withdraw User A PUBLIC document', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-pub',
+        uploadedBy: 'user-A',
+        visibilityStatus: 'PUBLIC',
+      });
+      await expect(service.withdrawPublic('doc-pub', 'user-B')).rejects.toThrow('permission');
     });
   });
 });

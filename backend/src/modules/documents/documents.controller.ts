@@ -218,4 +218,32 @@ export class DocumentsController {
       message: 'Document unfollowed successfully',
     };
   }
+
+  @Post(':id/request-public')
+  @UseGuards(JwtAuthGuard)
+  async requestPublic(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const document = await this.documentsService.requestPublic(id, userId);
+    return {
+      statusCode: 200,
+      message: 'Document public visibility requested successfully',
+      data: document,
+    };
+  }
+
+  @Post(':id/withdraw-public')
+  @UseGuards(JwtAuthGuard)
+  async withdrawPublic(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const document = await this.documentsService.withdrawPublic(id, userId);
+    return {
+      statusCode: 200,
+      message: 'Document public visibility withdrawn successfully',
+      data: document,
+    };
+  }
 }
