@@ -15,6 +15,8 @@ export default function DocumentDetailPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | undefined>();
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [viewType, setViewType] = useState<'text' | 'summary'>('text');
 
   // Toast notifications state
@@ -66,12 +68,51 @@ export default function DocumentDetailPage() {
 
   const handleOpenOriginal = async () => {
     if (!id) return;
+    const newTab = window.open('', '_blank');
+    if (!newTab) {
+      addToast('Popup blocker prevented opening the document.', 'error');
+      return;
+    }
     try {
       const data = await documentsApi.getDownloadSignedUrl(id);
-      window.open(data.url, '_blank', 'noopener,noreferrer');
+      newTab.location.href = data.url;
     } catch (err: any) {
-      const errMsg = err.response?.data?.message || err.message || 'Could not load original document';
-      addToast(`Error: ${errMsg}`, 'error');
+      newTab.close();
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
+    }
+  };
+
+  const handleRequestPublic = async () => {
+    try {
+      addToast('Đang xử lý yêu cầu...', 'info');
+      await documentsApi.requestDocumentPublic(id);
+      addToast('Đã gửi yêu cầu duyệt công khai.', 'success');
+      mutate();
+      import('swr').then(({ mutate: globalMutate }) => {
+        globalMutate((key: any) => Array.isArray(key) && key[0] === '/documents/me');
+      });
+    } catch (err: any) {
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
+    }
+  };
+
+  const handleWithdrawPublic = async () => {
+    try {
+      setIsWithdrawing(true);
+      await documentsApi.withdrawDocumentPublic(id);
+      addToast('Đã rút tài liệu khỏi Explore.', 'success');
+      mutate();
+      setIsWithdrawModalOpen(false);
+      import('swr').then(({ mutate: globalMutate }) => {
+        globalMutate((key: any) => Array.isArray(key) && key[0] === '/documents/me');
+      });
+    } catch (err: any) {
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
+    } finally {
+      setIsWithdrawing(false);
     }
   };
 
@@ -272,21 +313,6 @@ export default function DocumentDetailPage() {
             </button>
           )}
 
-          <button
-            onClick={handleOpenOriginal}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-          >
-            <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-            Original
-          </button>
-
-          <Link
-            href={`/dashboard/documents/${document.id}/preview`}
-            className="flex items-center gap-2 rounded-lg bg-[#1a1c23] px-5 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-black"
-          >
-            <span className="material-symbols-outlined text-[18px]">preview</span>
-            Preview
-          </Link>
         </div>
       </div>
 
@@ -399,6 +425,92 @@ export default function DocumentDetailPage() {
 
         {/* Right Column (Sidebar) */}
         <div className="flex flex-col gap-6">
+          {/* Actions Card */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
+              Thao tác tài liệu
+            </h3>
+            
+            <div className="flex flex-col gap-3">
+              {document.deletionStatus !== 'ACTIVE' ? (
+                <p className="text-sm text-gray-500">Tài liệu không còn khả dụng để thực hiện thao tác này.</p>
+              ) : document.isOwner === false ? (
+                <p className="text-sm text-gray-500">Bạn không có quyền thực hiện thao tác trên tài liệu này.</p>
+              ) : (
+                <>
+                  <Link
+                    href={`/dashboard/documents/${document.id}/preview`}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">preview</span>
+                    Preview PDF
+                  </Link>
+
+                  <button
+                    onClick={handleOpenOriginal}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                    Download / Open Original
+                  </button>
+
+                  {document.visibilityStatus === 'PRIVATE' && (
+                    <div className="mt-2 border-t border-gray-100 pt-3">
+                      {document.extractionStatus !== 'READY' ? (
+                        <div className="group relative">
+                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
+                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                          </button>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">PDF cần trích xuất thành công trước khi gửi duyệt.</p>
+                        </div>
+                      ) : document.aiStatus !== 'READY' ? (
+                        <div className="group relative">
+                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
+                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                          </button>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">Cần hoàn tất AI processing trước khi gửi duyệt.</p>
+                        </div>
+                      ) : !document.subject ? (
+                        <div className="group relative">
+                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
+                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                          </button>
+                          <p className="mt-1.5 text-xs text-gray-500 text-center">Đang kiểm tra điều kiện Subject.</p>
+                        </div>
+                      ) : !document.subject.isSystem ? (
+                        <div className="group relative">
+                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
+                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                          </button>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">Chỉ System Subject mới có thể gửi duyệt công khai.</p>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleRequestPublic}
+                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">public</span>
+                          Request Public
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {document.visibilityStatus === 'PUBLIC' && (
+                    <div className="mt-2 border-t border-gray-100 pt-3">
+                      <button
+                        onClick={() => setIsWithdrawModalOpen(true)}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">public_off</span>
+                        Withdraw from Explore
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
           {/* Tags Card */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
@@ -562,6 +674,9 @@ export default function DocumentDetailPage() {
             setIsDeleting(true);
             setDeleteError(undefined);
             await documentsApi.deleteDocument(id);
+            import('swr').then(({ mutate: globalMutate }) => {
+              globalMutate((key: any) => Array.isArray(key) && key[0] === '/documents/me');
+            });
             router.push('/dashboard/documents');
           } catch (err: any) {
             setDeleteError(
@@ -572,6 +687,34 @@ export default function DocumentDetailPage() {
           }
         }}
       />
+
+      {isWithdrawModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-xl font-bold text-gray-900">Withdraw from Explore</h3>
+            <p className="mb-6 text-sm text-gray-500">
+              Bạn có chắc chắn muốn rút tài liệu này khỏi Explore? Tài liệu sẽ trở về trạng thái PRIVATE.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsWithdrawModalOpen(false)}
+                disabled={isWithdrawing}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleWithdrawPublic}
+                disabled={isWithdrawing}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {isWithdrawing ? 'Đang xử lý...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ToastNotification toasts={toasts} />
     </div>
   );

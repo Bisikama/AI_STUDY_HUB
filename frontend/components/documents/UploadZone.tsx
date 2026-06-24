@@ -11,9 +11,8 @@ import { tagsApi, Tag } from '@/services/tagsApi';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ACCEPTED_TYPES: Record<string, string[]> = {
   'application/pdf': ['.pdf'],
-  'text/plain': ['.txt'],
 };
-const ACCEPTED_EXTENSIONS = ['.pdf', '.txt'];
+const ACCEPTED_EXTENSIONS = ['.pdf'];
 
 //  Toast types
 type ToastVariant = 'success' | 'error';
@@ -341,7 +340,7 @@ export default function UploadZone() {
         if (err?.code === 'file-too-large') {
           addToast('File quá lớn! Kích thước tối đa là 10MB.', 'error');
         } else if (err?.code === 'file-invalid-type') {
-          addToast('Chỉ chấp nhận file PDF (.pdf) hoặc TXT (.txt).', 'error');
+          addToast('Chỉ chấp nhận file PDF (.pdf).', 'error');
         } else {
           addToast('File không hợp lệ. Vui lòng thử lại.', 'error');
         }
@@ -449,8 +448,8 @@ export default function UploadZone() {
       addToast('Vui lòng chọn một file để upload.', 'error');
       return;
     }
-    if (!title.trim()) {
-      addToast('Tiêu đề tài liệu là bắt buộc.', 'error');
+    if (!title.trim() || title.trim().length > 150) {
+      addToast('Tiêu đề tài liệu là bắt buộc và tối đa 150 ký tự.', 'error');
       return;
     }
     if (!selectedSubjectId) {
@@ -471,23 +470,28 @@ export default function UploadZone() {
         payload.tags = JSON.stringify(selectedTags.map((t) => t.name));
       }
 
-      await trigger(payload);
+      const result = await trigger(payload);
 
       stopProgress(true);
-      addToast('Tài liệu đã được upload thành công!', 'success');
+      
+      if (result.extractionStatus === 'READY') {
+        addToast('Tài liệu đã được upload thành công! PDF đã được trích xuất thành công.', 'success');
+      } else if (result.extractionStatus === 'FAILED') {
+        addToast('Upload thành công! Không thể trích xuất text nhưng file PDF vẫn được lưu riêng tư và có thể preview.', 'success');
+      } else {
+        addToast('Tài liệu đã được upload thành công!', 'success');
+      }
+
+      // Revalidate documents list (wildcard)
+      // trigger should handle mutation, or we can use SWR mutate directly if needed
+      mutate((key) => Array.isArray(key) && key[0] === '/documents/me');
 
       // Reset after short delay so user sees 100%
       setTimeout(() => handleCancel(), 1500);
     } catch (err: any) {
       stopProgress(false);
-      const errorCode = err?.response?.data?.message || err?.response?.data?.code;
-      if (errorCode === 'DOCUMENT_INVALID_FILE') {
-        addToast('File không hợp lệ. Chỉ chấp nhận file PDF dưới 10MB.', 'error');
-      } else if (err?.response?.status === 401) {
-        addToast('Please login to upload documents.', 'error');
-      } else {
-        addToast('Upload thất bại. Vui lòng thử lại.', 'error');
-      }
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
     }
   };
 
@@ -686,52 +690,19 @@ export default function UploadZone() {
                   className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <option value="">-- Select a folder --</option>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}{!s.isSystem ? ' (personal)' : ''}
-                    </option>
-                  ))}
+                  <optgroup label="System Subjects">
+                    {subjects.filter(s => s.isSystem).map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="My Personal Subjects">
+                    {subjects.filter(s => !s.isSystem).map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </optgroup>
                 </select>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateFolder((v) => !v)}
-                  disabled={isMutating}
-                  className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-60"
-                  title="Create new folder"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
+                {/* Create folder UI hidden per Q10 requirements until P1 API exists */}
               </div>
-              {showCreateFolder && (
-                <div className="mt-2 flex gap-2">
-                  <input
-                    type="text"
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleCreateFolder(); } }}
-                    placeholder="New folder name..."
-                    disabled={isCreatingFolder}
-                    className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white disabled:opacity-60"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void handleCreateFolder()}
-                    disabled={isCreatingFolder || !newFolderName.trim()}
-                    className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    {isCreatingFolder ? '...' : 'Create'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowCreateFolder(false); setNewFolderName(''); }}
-                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-500 hover:bg-gray-100"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Description */}

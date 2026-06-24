@@ -21,7 +21,6 @@ export interface Document {
   description: string | null;
   subjectId: number;
   subject?: { id: number; name: string; code: string; isSystem: boolean } | null;
-  uploadedBy: string;
   fileSize: number;
   fileType: string;
   downloadCount: number;
@@ -38,6 +37,7 @@ export interface Document {
   quizzes?: any[];
   createdAt: string;
   updatedAt: string;
+  requestedAt?: string | null;
   tags?: Array<{ documentId: string; tagId: number; tag: { id: number; name: string; slug: string; isSystem: boolean } }>;
 }
 
@@ -79,8 +79,23 @@ export const documentsApi = {
   /**
    * Get all documents uploaded by the current user.
    */
-  getMyDocuments: async (): Promise<Document[]> => {
-    const response = await axiosClient.get("/documents/me");
+  getMyDocuments: async (params?: {
+    page?: number;
+    limit?: number;
+    q?: string;
+    subjectId?: number;
+    visibilityStatus?: string;
+  }): Promise<{ data: Document[]; meta: { total: number; page: number; limit: number; totalPages: number } }> => {
+    // Clean up undefined/empty params
+    const cleanParams: any = {};
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') {
+          cleanParams[key] = value;
+        }
+      });
+    }
+    const response = await axiosClient.get("/documents/me", { params: cleanParams });
     return response.data;
   },
 
@@ -146,5 +161,21 @@ export const documentsApi = {
   getDownloadSignedUrl: async (id: string): Promise<SignedDocumentUrlResponse> => {
     const response = await axiosClient.get(`/documents/${id}/download`);
     return response.data.data || response.data;
+  },
+
+  /**
+   * Request to make a document public.
+   */
+  requestDocumentPublic: async (id: string): Promise<any> => {
+    const response = await axiosClient.post(`/documents/${id}/request-public`);
+    return response.data;
+  },
+
+  /**
+   * Withdraw a public document.
+   */
+  withdrawDocumentPublic: async (id: string): Promise<any> => {
+    const response = await axiosClient.post(`/documents/${id}/withdraw-public`);
+    return response.data;
   },
 };
