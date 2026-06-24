@@ -18,6 +18,7 @@ import type {
   SanitizedDocument,
   SanitizedDocumentDetails,
   AnalyzeResult,
+  MyDocumentListItem,
 } from './types/document.types';
 import { STORAGE_ADAPTER } from 'src/supabase/storage-adapter.interface';
 import type { StorageAdapter } from 'src/supabase/storage-adapter.interface'; import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constant';
@@ -586,7 +587,15 @@ Quy định chặt chẽ:
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
-    if (document.uploadedBy !== userId && document.status !== 'APPROVED') {
+    let userRole = 'STUDENT';
+    if (userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+      if (user) {
+        userRole = user.role;
+      }
+    }
+
+    if (document.uploadedBy !== userId && userRole !== 'ADMIN') {
       throw new ForbiddenException('You do not have permission to view this document');
     }
 
@@ -614,56 +623,63 @@ Quy định chặt chẽ:
   /**
    * Get all documents uploaded by a specific user.
    */
-  async getDocumentsByUser(userId: string): Promise<SanitizedDocument[]> {
+  async getDocumentsByUser(userId: string, query?: any): Promise<MyDocumentListItem[]> {
+    const page = query?.page || 1;
+    const limit = query?.limit || 50;
+    if (limit > 50) {
+      throw new BadRequestException('Limit cannot exceed 50');
+    }
+    const skip = (page - 1) * limit;
+
+    const whereClause: any = {
+      uploadedBy: userId,
+      deletedAt: null,
+      storagePath: { not: null },
+      deletionStatus: 'ACTIVE',
+    };
+
+    if (query?.q) {
+      whereClause.OR = [
+        { title: { contains: query.q, mode: 'insensitive' } },
+        { description: { contains: query.q, mode: 'insensitive' } },
+      ];
+    }
+    if (query?.subjectId) {
+      whereClause.subjectId = query.subjectId;
+    }
+    if (query?.visibilityStatus) {
+      whereClause.visibilityStatus = query.visibilityStatus;
+    }
+
     const ownedDocuments = await this.prisma.document.findMany({
-      where: {
-        uploadedBy: userId,
-        deletedAt: null,
-        storagePath: { not: null },
-        deletionStatus: { not: 'DELETE_FAILED' },
-      },
+      where: whereClause,
       include: {
         subject: true,
-        tags: { include: { tag: true } },
       },
       orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
     });
 
-    const followedRelations = await this.prisma.userFollowedDocument.findMany({
-      where: {
-        userId,
-        document: {
-          deletedAt: null,
-          storagePath: { not: null },
-          deletionStatus: { not: 'DELETE_FAILED' },
-        },
-      },
-      include: {
-        document: {
-          include: {
-            subject: true,
-            tags: { include: { tag: true } },
-          },
-        },
-      },
-      orderBy: { followedAt: 'desc' },
-    });
-
-    const followedDocuments = followedRelations.map((rel) => rel.document);
-
-    const sanitizedOwned = this.sanitizeData<any[]>(ownedDocuments).map((doc) => {
-      const d = { ...doc, isOwner: true, isFollowed: false };
-      delete d.fullText;
+    const sanitizedOwned: MyDocumentListItem[] = ownedDocuments.map((doc) => {
+      const d = {
+        id: doc.id,
+        title: doc.title,
+        description: doc.description,
+        subjectId: doc.subjectId,
+        fileType: doc.fileType,
+        visibilityStatus: doc.visibilityStatus,
+        deletionStatus: doc.deletionStatus,
+        extractionStatus: doc.extractionStatus,
+        aiStatus: doc.aiStatus,
+        pageCount: doc.pageCount,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+      };
       return d;
     });
 
-    const sanitizedFollowed = this.sanitizeData<any[]>(followedDocuments).map((doc) => {
-      const d = { ...doc, isOwner: false, isFollowed: true };
-      delete d.fullText;
-      return d;
-    });
-
-    return [...sanitizedOwned, ...sanitizedFollowed];
+    return sanitizedOwned;
   }
 
   /**
@@ -729,7 +745,7 @@ Quy định chặt chẽ:
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
-    if (document.deletedAt !== null) {
+    if (document.deletionStatus !== 'ACTIVE' || document.deletedAt !== null) {
       throw new NotFoundException(`Document with ID ${documentId} has already been deleted`);
     }
 
@@ -739,7 +755,11 @@ Quy định chặt chẽ:
 
     await this.prisma.document.update({
       where: { id: documentId },
-      data: { deletedAt: new Date() },
+      data: {
+        deletedAt: new Date(),
+        deletionStatus: 'SOFT_DELETED',
+        visibilityStatus: 'PRIVATE',
+      },
     });
 
     return { message: 'Document deleted successfully' };
@@ -751,7 +771,7 @@ Quy định chặt chẽ:
   async updateDocument(
     documentId: string,
     userId: string,
-    dto: { title?: string; description?: string; subjectId?: number; tags?: string },
+    dto: { title?: string; description?: string; subjectId?: number },
   ): Promise<SanitizedDocument> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
@@ -761,8 +781,8 @@ Quy định chặt chẽ:
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
-    if (document.deletedAt !== null) {
-      throw new NotFoundException(`Document with ID ${documentId} has been deleted`);
+    if (document.deletedAt !== null || document.deletionStatus !== 'ACTIVE' || !document.storagePath) {
+      throw new NotFoundException(`Document with ID ${documentId} has been deleted or is unavailable`);
     }
 
     if (document.uploadedBy !== userId) {
@@ -787,121 +807,22 @@ Quy định chặt chẽ:
       await this.subjectsService.validateSubjectAccess(dto.subjectId, userId);
     }
 
-    // Handle tags if provided
-    let tagIds: number[] | undefined;
-    if (dto.tags !== undefined) {
-      let parsedTags: string[] = [];
-      try {
-        const parsed = JSON.parse(dto.tags);
-        if (Array.isArray(parsed)) {
-          parsedTags = parsed
-            .map((t) => String(t).trim())
-            .filter((t) => t.length > 0)
-            .map((t) =>
-              t
-                .toLowerCase()
-                .replace(/[\s_]+/g, '-')
-                .replace(/[^\w-]/g, ''),
-            );
-          // Remove duplicates
-          parsedTags = [...new Set(parsedTags)].filter((t) => t.length > 0);
-
-          if (parsedTags.length > 10) {
-            throw new BadRequestException('Maximum 10 tags allowed per document');
-          }
-        }
-      } catch (e) {
-        if (e instanceof BadRequestException) throw e;
-        throw new BadRequestException('Invalid tags format');
-      }
-
-      tagIds = [];
-      for (const tagSlug of parsedTags) {
-        let existingTag = await this.prisma.tag.findFirst({
-          where: {
-            slug: tagSlug,
-            OR: [{ isSystem: true }, { createdBy: userId }],
-          },
-        });
-
-        if (!existingTag) {
-          const originalName =
-            JSON.parse(dto.tags)
-              .find(
-                (t: string) =>
-                  t
-                    .trim()
-                    .toLowerCase()
-                    .replace(/[\s_]+/g, '-')
-                    .replace(/[^\w-]/g, '') === tagSlug,
-              )
-              ?.trim() || tagSlug;
-
-          existingTag = await this.prisma.tag.create({
-            data: {
-              name: originalName,
-              slug: tagSlug,
-              createdBy: userId,
-              isSystem: false,
-            },
-          });
-        }
-        tagIds.push(existingTag.id);
-      }
-    }
-
-    // Use transaction if updating tags
-    let updatedDocument;
-    if (tagIds !== undefined) {
-      updatedDocument = await this.prisma.$transaction(async (tx) => {
-        // Update basic fields
-        const updated = await tx.document.update({
-          where: { id: documentId },
-          data: {
-            ...(title !== undefined && { title }),
-            ...(description !== undefined && { description }),
-            ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
-          },
-        });
-
-        // Delete old tags
-        await tx.documentTag.deleteMany({
-          where: { documentId },
-        });
-
-        // Insert new tags
-        if (tagIds!.length > 0) {
-          await Promise.all(
-            tagIds!.map((tagId) =>
-              tx.documentTag.create({
-                data: {
-                  documentId,
-                  tagId,
-                },
-              }),
-            ),
-          );
-        }
-        return tx.document.findUnique({
-          where: { id: documentId },
-          include: { subject: true, tags: { include: { tag: true } } },
-        });
-      });
-    } else {
-      updatedDocument = await this.prisma.document.update({
-        where: { id: documentId },
-        data: {
-          ...(title !== undefined && { title }),
-          ...(description !== undefined && { description }),
-          ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
-        },
-        include: { subject: true, tags: { include: { tag: true } } },
-      });
-    }
+    const updatedDocument = await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+        ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
+      },
+      include: { subject: true },
+    });
 
     const sanitized = this.sanitizeData<any>(updatedDocument);
+    sanitized.isOwner = true;
+    sanitized.isFollowed = false;
     delete sanitized.fullText;
-    return sanitized;
+
+    return sanitized as SanitizedDocument;
   }
 
   /**

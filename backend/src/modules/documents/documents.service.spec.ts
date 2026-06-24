@@ -721,4 +721,32 @@ describe('DocumentsService', () => {
       await expect(service.getReadyChunksForAI('doc-1')).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('getDocumentsByUser', () => {
+    it('returns only owned active documents without followed docs and includes fileType but no sensitive fields', async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        { id: 'doc-1', uploadedBy: 'user-1', deletionStatus: 'ACTIVE', fileType: 'application/pdf', fileUrl: 'secret.url' },
+      ]);
+      const res = await service.getDocumentsByUser('user-1', { page: 1, limit: 10 });
+      expect(res).toHaveLength(1);
+      expect(mockPrisma.userFollowedDocument.findMany).not.toHaveBeenCalled();
+      
+      const returnedDoc = res[0] as any;
+      expect(returnedDoc.fileType).toBe('application/pdf');
+      expect(returnedDoc.fileUrl).toBeUndefined();
+      expect(returnedDoc.uploadedBy).toBeUndefined();
+      expect(returnedDoc.storagePath).toBeUndefined();
+    });
+  });
+
+  describe('softDeleteDocument', () => {
+    it('soft deletes active owned document', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-1', deletionStatus: 'ACTIVE', deletedAt: null });
+      await service.softDeleteDocument('doc-1', 'user-1');
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: expect.objectContaining({ deletionStatus: 'SOFT_DELETED', visibilityStatus: 'PRIVATE' }),
+      });
+    });
+  });
 });

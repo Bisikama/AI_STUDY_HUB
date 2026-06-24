@@ -12,7 +12,10 @@ export class ExploreService {
 
     const documents = await this.prisma.document.findMany({
       where: {
-        status: 'APPROVED',
+        deletionStatus: 'ACTIVE',
+        deletedAt: null,
+        visibilityStatus: 'PUBLIC',
+        storagePath: { not: null },
         ...(search
           ? {
               OR: [
@@ -89,7 +92,10 @@ export class ExploreService {
     const document = await this.prisma.document.findFirst({
       where: {
         id: documentId,
-        status: 'APPROVED',
+        deletionStatus: 'ACTIVE',
+        deletedAt: null,
+        visibilityStatus: 'PUBLIC',
+        storagePath: { not: null },
       },
       include: {
         subject: true,

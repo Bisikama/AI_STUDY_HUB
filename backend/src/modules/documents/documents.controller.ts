@@ -13,6 +13,7 @@ import {
   Req,
   Delete,
   Patch,
+  BadRequestException,
 } from '@nestjs/common';
 
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
@@ -21,11 +22,12 @@ import { DocumentsService } from './documents.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ValidateFilePipe } from './pipes';
-import { UploadDocumentDto, UpdateDocumentDto } from './dto';
+import { UploadDocumentDto, UpdateDocumentDto, GetDocumentsDto } from './dto';
 import type {
   SanitizedDocument,
   SanitizedDocumentDetails,
   AnalyzeResult,
+  MyDocumentListItem,
 } from './types/document.types';
 
 @Controller('documents')
@@ -75,8 +77,19 @@ export class DocumentsController {
   @UseGuards(JwtAuthGuard)
   async getMyDocuments(
     @CurrentUser('id') userId: string,
-  ): Promise<{ statusCode: number; message: string; data: SanitizedDocument[] }> {
-    const documents = await this.documentsService.getDocumentsByUser(userId);
+    @Req() req: any,
+  ): Promise<{ statusCode: number; message: string; data: MyDocumentListItem[] }> {
+    if ('status' in req.query) {
+      throw new BadRequestException('The "status" query parameter is not supported. Use "visibilityStatus" instead.');
+    }
+    const query = {
+      page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
+      q: req.query.q as string,
+      subjectId: req.query.subjectId ? parseInt(req.query.subjectId as string, 10) : undefined,
+      visibilityStatus: req.query.visibilityStatus as any,
+    };
+    const documents = await this.documentsService.getDocumentsByUser(userId, query);
     return {
       statusCode: 200,
       message: 'Get user documents successfully',
@@ -85,10 +98,10 @@ export class DocumentsController {
   }
 
   @Get(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getDetails(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @CurrentUser('id') userId?: string,
+    @CurrentUser('id') userId: string,
   ): Promise<{ statusCode: number; message: string; data: SanitizedDocumentDetails }> {
     const document = await this.documentsService.getDetails(id, userId);
     return {
@@ -132,7 +145,13 @@ export class DocumentsController {
     @Body() dto: UpdateDocumentDto,
     @CurrentUser('id') userId: string,
   ): Promise<{ statusCode: number; message: string; data: SanitizedDocument }> {
-    const document = await this.documentsService.updateDocument(id, userId, dto);
+    // Only allow title, description, subjectId
+    const safeDto = {
+      title: dto.title,
+      description: dto.description,
+      subjectId: dto.subjectId,
+    };
+    const document = await this.documentsService.updateDocument(id, userId, safeDto);
     return {
       statusCode: 200,
       message: 'Document updated successfully',
