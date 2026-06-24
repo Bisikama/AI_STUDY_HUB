@@ -42,10 +42,10 @@ export default function DocumentDetailPage() {
   const handleAnalyze = async () => {
     if (!id) return;
     setIsAnalyzing(true);
-    
+
     // Toast 1: Loading
     addToast('Loading document data...', 'info');
-    
+
     // Transition Toast 2
     const timer = setTimeout(() => {
       addToast('AI is analyzing and generating questions...', 'info');
@@ -300,11 +300,10 @@ export default function DocumentDetailPage() {
                   console.error('Follow toggle failed:', err);
                 }
               }}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold shadow-sm transition-colors border ${
-                document.isFollowed
+              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold shadow-sm transition-colors border ${document.isFollowed
                   ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
                   : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined text-[18px]">
                 {document.isFollowed ? 'bookmark_remove' : 'bookmark'}
@@ -346,7 +345,7 @@ export default function DocumentDetailPage() {
                   <div>
                     <h4 className={`font-bold ${extractionUI.color}`}>{extractionUI.title}</h4>
                     {extractionUI.detail && <p className="mt-1 text-sm text-gray-700">{extractionUI.detail}</p>}
-                    
+
                     <div className="mt-4">
                       <Link
                         href={`/dashboard/documents/${document.id}/preview`}
@@ -430,7 +429,7 @@ export default function DocumentDetailPage() {
             <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
               Thao tác tài liệu
             </h3>
-            
+
             <div className="flex flex-col gap-3">
               {document.deletionStatus !== 'ACTIVE' ? (
                 <p className="text-sm text-gray-500">Tài liệu không còn khả dụng để thực hiện thao tác này.</p>
@@ -734,13 +733,12 @@ function ToastNotification({ toasts }: { toasts: Toast[] }) {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${
-            t.variant === 'success'
+          className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${t.variant === 'success'
               ? 'bg-emerald-600'
               : t.variant === 'error'
-              ? 'bg-red-600'
-              : 'bg-blue-600'
-          }`}
+                ? 'bg-red-600'
+                : 'bg-blue-600'
+            }`}
         >
           {t.variant === 'success' && (
             <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
