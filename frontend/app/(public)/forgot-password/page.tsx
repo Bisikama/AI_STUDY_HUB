@@ -30,9 +30,17 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
     setApiError(null);
     try {
-      await authApi.forgotPassword(data.email);
-      alert('Yêu cầu thành công! Vui lòng kiểm tra mã OTP.');
-      router.push(`/reset-password?email=${encodeURIComponent(data.email)}`);
+      const res = await authApi.forgotPassword(data.email);
+      const devOtp = res?.data?.devOtp;
+      if (devOtp) {
+        alert(`Yêu cầu thành công! (DEV MODE: Mã OTP của bạn là ${devOtp})`);
+        router.push(
+          `/reset-password?email=${encodeURIComponent(data.email)}&otp=${encodeURIComponent(devOtp)}`,
+        );
+      } else {
+        alert('Yêu cầu thành công! Vui lòng kiểm tra mã OTP.');
+        router.push(`/reset-password?email=${encodeURIComponent(data.email)}`);
+      }
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { message?: string } } };
       const errorMsg = axiosError.response?.data?.message || 'Đã có lỗi xảy ra!';
