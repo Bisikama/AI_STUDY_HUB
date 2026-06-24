@@ -480,7 +480,10 @@ export default function UploadZone() {
       setTimeout(() => handleCancel(), 1500);
     } catch (err: any) {
       stopProgress(false);
-      if (err?.response?.status === 401) {
+      const errorCode = err?.response?.data?.message || err?.response?.data?.code;
+      if (errorCode === 'DOCUMENT_INVALID_FILE') {
+        addToast('File không hợp lệ. Chỉ chấp nhận file PDF dưới 10MB.', 'error');
+      } else if (err?.response?.status === 401) {
         addToast('Please login to upload documents.', 'error');
       } else {
         addToast('Upload thất bại. Vui lòng thử lại.', 'error');

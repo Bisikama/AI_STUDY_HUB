@@ -14,6 +14,7 @@ import {
   Delete,
   Patch,
 } from '@nestjs/common';
+
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentsService } from './documents.service';
@@ -48,6 +49,7 @@ export class DocumentsController {
   @Post('/upload')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
+
   async upload(
     @UploadedFile(new ValidateFilePipe()) file: Express.Multer.File,
     @Body() dto: UploadDocumentDto,

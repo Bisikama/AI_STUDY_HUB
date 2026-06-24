@@ -18,8 +18,8 @@ import type {
   SanitizedDocumentDetails,
   AnalyzeResult,
 } from './types/document.types';
-import { SupabaseService } from 'src/supabase/supabase.service';
-import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constant';
+import { STORAGE_ADAPTER } from 'src/supabase/storage-adapter.interface';
+import type { StorageAdapter } from 'src/supabase/storage-adapter.interface'; import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constant';
 import { SubjectsService } from '../subjects/subjects.service';
 import { TagsService } from '../tags/tags.service';
 
@@ -28,10 +28,10 @@ export class DocumentsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(ConfigService) private readonly configService: ConfigService,
-    @Inject(SupabaseService) private readonly supabaseService: SupabaseService,
+    @Inject(STORAGE_ADAPTER) private readonly storageAdapter: StorageAdapter,
     private readonly subjectsService: SubjectsService,
     private readonly tagsService: TagsService,
-  ) {}
+  ) { }
 
   /**
    * Helper function to convert BigInt to Number/String in objects to prevent serialization crashes.
@@ -138,7 +138,7 @@ export class DocumentsService {
     // 4. Upload file to Supabase Storage
     let fileUrl: string;
     try {
-      fileUrl = await this.supabaseService.uploadToSupabase(
+      fileUrl = await this.storageAdapter.uploadToSupabase(
         file.buffer, //Nội dung file dưới dạng Buffer
         file.originalname, //Tên file gốc
         file.mimetype, // Tên file gốc

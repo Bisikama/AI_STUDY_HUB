@@ -7,7 +7,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentsService } from './documents.service';
 import { PrismaService } from '../../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { SupabaseService } from '../../supabase/supabase.service';
+import { STORAGE_ADAPTER } from '../../supabase/storage-adapter.interface';
+import type { StorageAdapter } from '../../supabase/storage-adapter.interface';
 import { SubjectsService } from '../subjects/subjects.service';
 import { TagsService } from '../tags/tags.service';
 import {
@@ -104,8 +105,13 @@ describe('DocumentsService', () => {
     get: jest.fn().mockReturnValue('mock-api-key-123'),
   };
 
-  const mockSupabase = {
+  const mockStorageAdapter = {
+    uploadPrivate: jest.fn(),
+    createPreviewUrl: jest.fn(),
+    createDownloadUrl: jest.fn(),
+    deleteObject: jest.fn(),
     uploadToSupabase: jest.fn().mockResolvedValue('http://mock-supabase-url.com/file.pdf'),
+    deleteFromSupabase: jest.fn(),
   };
 
   const mockSubjectsService = {
@@ -127,7 +133,7 @@ describe('DocumentsService', () => {
         DocumentsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfig },
-        { provide: SupabaseService, useValue: mockSupabase },
+        { provide: STORAGE_ADAPTER, useValue: mockStorageAdapter },
         { provide: SubjectsService, useValue: mockSubjectsService },
         { provide: TagsService, useValue: mockTagsService },
       ],
