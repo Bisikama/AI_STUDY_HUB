@@ -21,7 +21,7 @@ export interface Document {
   fileType: string;
   downloadCount: number;
   viewCount: number;
-  status: 'PRIVATE' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  visibilityStatus: 'PRIVATE' | 'PENDING' | 'APPROVED' | 'REJECTED';
   fullText: string | null;
   isAIGenerated: boolean;
   isOwner?: boolean;
@@ -41,7 +41,7 @@ export interface UploadDocumentResponse {
   fileUrl: string;
   fileSize: number;
   fileType: string;
-  status: string;
+  visibilityStatus: string;
   createdAt: string;
 }
 

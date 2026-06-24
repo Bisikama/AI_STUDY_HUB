@@ -245,8 +245,8 @@ export default function MyDocumentsPage() {
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'grid'
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
                     }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">grid_view</span>
@@ -255,8 +255,8 @@ export default function MyDocumentsPage() {
                 <button
                   onClick={() => setViewMode('list')}
                   className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'list'
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
                     }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">view_list</span>
@@ -282,7 +282,8 @@ export default function MyDocumentsPage() {
             }
           >
             {documents.map((doc) => {
-              const isPdf = doc.fileType.toLowerCase().includes('pdf');
+              const fileType = typeof doc.fileType === 'string' ? doc.fileType : '';
+              const isPdf = fileType.toLowerCase().includes('pdf');
               const isFollowed = Boolean(doc.isFollowed || doc.isLocalFollowed);
 
               return (
