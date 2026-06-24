@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone, FileRejection } from 'react-dropzone';
 import { useUploadDocument } from '@/hooks/useUploadDocument';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import { subjectsApi, Subject } from '@/services/subjectsApi';
 import { tagsApi, Tag } from '@/services/tagsApi';
 

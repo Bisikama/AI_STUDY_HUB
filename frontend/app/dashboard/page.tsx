@@ -227,12 +227,14 @@ function DashboardPage() {
   });
   const { getProfile, logout } = useAuth();
 
-  const { data: myDocuments = [], mutate: mutateMyDocuments } = useSWR('/documents/me', () =>
+  const { data: myDocumentsResponse, mutate: mutateMyDocuments } = useSWR('/documents/me', () =>
     documentsApi.getMyDocuments(),
   );
 
-  const isDocumentOwner = myDocuments.some((d) => d.id === selectedDocumentId && d.isOwner);
-  const isDocumentFollowed = myDocuments.some((d) => d.id === selectedDocumentId && d.isFollowed);
+  const myDocumentItems = myDocumentsResponse?.data ?? [];
+
+  const isDocumentOwner = myDocumentItems.some((d: any) => d.id === selectedDocumentId && d.isOwner);
+  const isDocumentFollowed = myDocumentItems.some((d: any) => d.id === selectedDocumentId && d.isFollowed);
 
   const handleFollowDocument = async (docId: string) => {
     try {

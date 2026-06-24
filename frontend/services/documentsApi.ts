@@ -49,6 +49,10 @@ export interface UploadDocumentResponse {
   fileSize: number;
   fileType: string;
   visibilityStatus: string;
+  deletionStatus: string;
+  extractionStatus: string;
+  aiStatus: string;
+  pageCount: number | null;
   createdAt: string;
 }
 

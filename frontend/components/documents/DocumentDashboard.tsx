@@ -23,6 +23,7 @@ const StatusBadge = ({ visibilityStatus }: { visibilityStatus?: string }) => {
 
 export default function DocumentDashboard() {
   const { documents, isLoading, isError } = useMyDocuments();
+  const documentItems = Array.isArray(documents) ? documents : (documents?.data ?? []);
 
   if (isLoading) {
     return (
@@ -53,7 +54,7 @@ export default function DocumentDashboard() {
           </p>
         </div>
         <div className="bg-primary-container text-on-primary px-3 py-1 rounded-full text-sm font-semibold">
-          {documents.length} Files
+          {documentItems.length} Files
         </div>
       </div>
 
@@ -69,7 +70,7 @@ export default function DocumentDashboard() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
-            {documents.length === 0 ? (
+            {documentItems.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-2">
@@ -79,7 +80,7 @@ export default function DocumentDashboard() {
                 </td>
               </tr>
             ) : (
-              documents.map((doc: any) => (
+              documentItems.map((doc: any) => (
                 <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
