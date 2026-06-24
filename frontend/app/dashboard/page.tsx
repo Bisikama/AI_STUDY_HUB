@@ -665,7 +665,7 @@ function DashboardPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.open(doc.fileUrl, '_blank');
+                                router.push(`/dashboard/documents/${doc.id}/preview`);
                               }}
                               className="text-secondary hover:text-primary cursor-pointer p-1 opacity-0 transition-opacity group-hover:opacity-100"
                             >
@@ -738,7 +738,7 @@ function DashboardPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.open(doc.fileUrl, '_blank');
+                                router.push(`/dashboard/documents/${doc.id}/preview`);
                               }}
                               className="text-secondary hover:text-primary cursor-pointer p-1 opacity-0 transition-opacity group-hover:opacity-100"
                             >
@@ -932,7 +932,7 @@ function DashboardPage() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              window.open(doc.fileUrl, '_blank');
+                              router.push(`/dashboard/documents/${doc.id}/preview`);
                             }}
                             className="text-secondary hover:text-primary cursor-pointer p-1 opacity-0 transition-opacity group-hover:opacity-100"
                           >

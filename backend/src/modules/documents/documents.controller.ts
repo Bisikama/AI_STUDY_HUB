@@ -12,17 +12,21 @@ import {
   UseGuards,
   Req,
   Delete,
-  Patch,
   BadRequestException,
+  Inject,
+  Header,
+  Patch,
 } from '@nestjs/common';
 
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { DocumentsService } from './documents.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ValidateFilePipe } from './pipes';
 import { UploadDocumentDto, UpdateDocumentDto, GetDocumentsDto } from './dto';
+import { DocumentsService } from './documents.service';
+import { DocumentAccessService } from './document-access.service';
+import type { StorageAdapter } from '../../supabase/storage-adapter.interface';
 import type {
   SanitizedDocument,
   SanitizedDocumentDetails,
@@ -108,6 +112,36 @@ export class DocumentsController {
       statusCode: 200,
       message: 'Get document details successfully',
       data: document,
+    };
+  }
+
+  @Get(':id/preview')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  async getPreviewUrl(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const result = await this.documentsService.getSignedDocumentAccess(id, userId, 'SIGNED_PREVIEW');
+    return {
+      statusCode: 200,
+      message: 'Preview URL generated successfully',
+      data: result,
+    };
+  }
+
+  @Get(':id/download')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  async getDownloadUrl(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const result = await this.documentsService.getSignedDocumentAccess(id, userId, 'SIGNED_DOWNLOAD');
+    return {
+      statusCode: 200,
+      message: 'Download URL generated successfully',
+      data: result,
     };
   }
 

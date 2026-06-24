@@ -11,6 +11,7 @@ import { STORAGE_ADAPTER } from '../../supabase/storage-adapter.interface';
 import type { StorageAdapter } from '../../supabase/storage-adapter.interface';
 import { SubjectsService } from '../subjects/subjects.service';
 import { TagsService } from '../tags/tags.service';
+import { DocumentAccessService } from './document-access.service';
 import {
   NotFoundException,
   BadRequestException,
@@ -126,6 +127,10 @@ describe('DocumentsService', () => {
     getTags: jest.fn(),
   };
 
+  const mockDocumentAccessService = {
+    authorizeAccess: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     mockParseDocument.mockReset();
@@ -144,6 +149,7 @@ describe('DocumentsService', () => {
         { provide: STORAGE_ADAPTER, useValue: mockStorageAdapter },
         { provide: SubjectsService, useValue: mockSubjectsService },
         { provide: TagsService, useValue: mockTagsService },
+        { provide: DocumentAccessService, useValue: mockDocumentAccessService },
       ],
     }).compile();
 

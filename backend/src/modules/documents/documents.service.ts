@@ -24,6 +24,7 @@ import { STORAGE_ADAPTER } from 'src/supabase/storage-adapter.interface';
 import type { StorageAdapter } from 'src/supabase/storage-adapter.interface'; import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constant';
 import { SubjectsService } from '../subjects/subjects.service';
 import { TagsService } from '../tags/tags.service';
+import { DocumentAccessService, DocumentAccessPurpose } from './document-access.service';
 
 @Injectable()
 export class DocumentsService {
@@ -33,6 +34,7 @@ export class DocumentsService {
     @Inject(STORAGE_ADAPTER) private readonly storageAdapter: StorageAdapter,
     private readonly subjectsService: SubjectsService,
     private readonly tagsService: TagsService,
+    private readonly documentAccessService: DocumentAccessService,
   ) { }
 
   /**
@@ -53,6 +55,48 @@ export class DocumentsService {
       return copy as unknown as T;
     }
     return data as T;
+  }
+
+  /**
+   * Generates secure signed URL for preview or download.
+   */
+  async getSignedDocumentAccess(
+    documentId: string,
+    userId: string,
+    purpose: DocumentAccessPurpose,
+  ): Promise<{ url: string; expiresAt: string; fileName: string; disposition: string }> {
+    // 1. Authorize via DocumentAccessService. Will throw 401/403/404/409 properly.
+    const access = await this.documentAccessService.authorizeAccess(documentId, userId, purpose);
+    
+    // 2. Call Storage Adapter to generate the URL
+    try {
+      if (purpose === 'SIGNED_PREVIEW') {
+        const result = await this.storageAdapter.createPreviewUrl({
+          storagePath: access.document.storagePath,
+          expiresInSeconds: 300,
+        });
+        return {
+          url: result.url,
+          expiresAt: result.expiresAt.toISOString(),
+          fileName: access.document.fileName,
+          disposition: 'inline',
+        };
+      } else {
+        const result = await this.storageAdapter.createDownloadUrl({
+          storagePath: access.document.storagePath,
+          fileName: access.document.fileName,
+          expiresInSeconds: 300,
+        });
+        return {
+          url: result.url,
+          expiresAt: result.expiresAt.toISOString(),
+          fileName: result.fileName,
+          disposition: 'attachment',
+        };
+      }
+    } catch (error: any) {
+      throw new BadGatewayException('STORAGE_OPERATION_FAILED');
+    }
   }
 
   /**

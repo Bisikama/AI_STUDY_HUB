@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DocumentsService } from './documents.service';
 import { DocumentsController } from './documents.controller';
+import { DocumentAccessService } from './document-access.service';
 
 import { SupabaseModule } from 'src/supabase/supabase.module';
 import { PrismaModule } from 'src/database/prisma.module';
@@ -10,7 +11,7 @@ import { TagsModule } from '../tags/tags.module';
 @Module({
   imports: [PrismaModule, SupabaseModule, SubjectsModule, TagsModule],
   controllers: [DocumentsController],
-  providers: [DocumentsService],
-  exports: [DocumentsService],
+  providers: [DocumentsService, DocumentAccessService],
+  exports: [DocumentsService, DocumentAccessService],
 })
 export class DocumentsModule {}

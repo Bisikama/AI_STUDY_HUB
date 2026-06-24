@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
 import { useMyDocuments } from '@/hooks/useMyDocuments';
+import { getVisibilityPresentation } from '@/utils/visibility-status';
 const formatSize = (bytes: number): string => {
   if (bytes === 0) return '0 B';
   const k = 1024;
@@ -11,18 +11,12 @@ const formatSize = (bytes: number): string => {
 };
 
 // Helper component for Status Badge
-const StatusBadge = ({ status }: { status: string }) => {
-  let bgColor = 'bg-gray-100 text-gray-800'; // PRIVATE default
-  
-  if (status === 'PENDING') {
-    bgColor = 'bg-yellow-100 text-yellow-800';
-  } else if (status === 'APPROVED') {
-    bgColor = 'bg-green-100 text-green-800';
-  }
+const StatusBadge = ({ visibilityStatus }: { visibilityStatus?: string }) => {
+  const { label, className } = getVisibilityPresentation(visibilityStatus);
 
   return (
-    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${bgColor}`}>
-      {status}
+    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${className}`}>
+      {label}
     </span>
   );
 };
@@ -114,7 +108,7 @@ export default function DocumentDashboard() {
                     {new Date(doc.createdAt).toLocaleDateString('vi-VN')}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <StatusBadge status={doc.status} />
+                    <StatusBadge visibilityStatus={doc.visibilityStatus} />
                   </td>
                 </tr>
               ))

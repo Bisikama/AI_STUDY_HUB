@@ -18,8 +18,6 @@ type FollowedExploreDocument = {
     name: string;
     code: string;
   } | null;
-  fileUrl: string;
-  previewUrl: string | null;
   fileType: string;
   fileSize: string;
   downloadCount: number;

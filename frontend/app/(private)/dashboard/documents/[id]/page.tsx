@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { documentsApi } from '@/services/documentsApi';
 import DeleteDocumentModal from '@/components/documents/DeleteDocumentModal';
+import { getVisibilityPresentation } from '@/utils/visibility-status';
 
 export default function DocumentDetailPage() {
   const { id } = useParams() as { id: string };
@@ -63,6 +64,17 @@ export default function DocumentDetailPage() {
     }
   };
 
+  const handleOpenOriginal = async () => {
+    if (!id) return;
+    try {
+      const data = await documentsApi.getDownloadSignedUrl(id);
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || err.message || 'Could not load original document';
+      addToast(`Error: ${errMsg}`, 'error');
+    }
+  };
+
   const formatSize = (bytes: number): string => {
     if (!bytes) return '0 B';
     if (bytes < 1024) return `${bytes} B`;
@@ -71,7 +83,8 @@ export default function DocumentDetailPage() {
   };
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -106,11 +119,49 @@ export default function DocumentDetailPage() {
     );
   }
 
-  const truncatedText = document.fullText
-    ? document.fullText.length > 3000
-      ? document.fullText.substring(0, 3000) + '...'
-      : document.fullText
-    : 'No text content available for this document.';
+  // Extract status presentation logic
+  const getExtractionStatusUI = () => {
+    switch (document.extractionStatus) {
+      case 'READY':
+        return {
+          title: 'PDF đã được trích xuất thành công',
+          icon: 'check_circle',
+          color: 'text-green-600',
+          bg: 'bg-green-50',
+          border: 'border-green-200',
+          detail: document.pageCount ? `Tài liệu gồm ${document.pageCount} trang.` : '',
+        };
+      case 'FAILED':
+        return {
+          title: 'Không thể trích xuất text từ tài liệu này.',
+          icon: 'error',
+          color: 'text-red-600',
+          bg: 'bg-red-50',
+          border: 'border-red-200',
+          detail: 'Bạn vẫn có thể xem PDF gốc.',
+        };
+      case 'PENDING':
+        return {
+          title: 'Tài liệu đang được xử lý.',
+          icon: 'hourglass_empty',
+          color: 'text-yellow-600',
+          bg: 'bg-yellow-50',
+          border: 'border-yellow-200',
+          detail: 'Vui lòng quay lại sau ít phút.',
+        };
+      default:
+        return {
+          title: 'Chưa có thông tin trích xuất.',
+          icon: 'info',
+          color: 'text-gray-600',
+          bg: 'bg-gray-50',
+          border: 'border-gray-200',
+          detail: '',
+        };
+    }
+  };
+
+  const extractionUI = getExtractionStatusUI();
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-6xl bg-[#F8F9FA] p-6 font-sans md:p-8">
@@ -138,17 +189,9 @@ export default function DocumentDetailPage() {
               </span>
             )}
             <span
-              className={`rounded px-2.5 py-1 text-xs font-bold uppercase ${
-                document.status === 'APPROVED'
-                  ? 'bg-green-100 text-green-700'
-                  : document.status === 'PENDING'
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : document.status === 'REJECTED'
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-gray-200 text-gray-700'
-              }`}
+              className={`rounded px-2.5 py-1 text-xs font-bold uppercase ${getVisibilityPresentation(document.visibilityStatus).className}`}
             >
-              {document.status}
+              {getVisibilityPresentation(document.visibilityStatus).label}
             </span>
           </div>
 
@@ -229,15 +272,13 @@ export default function DocumentDetailPage() {
             </button>
           )}
 
-          <a
-            href={document.fileUrl || document.previewUrl || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={handleOpenOriginal}
             className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
           >
             <span className="material-symbols-outlined text-[18px]">open_in_new</span>
             Original
-          </a>
+          </button>
 
           <Link
             href={`/dashboard/documents/${document.id}/preview`}
@@ -259,7 +300,7 @@ export default function DocumentDetailPage() {
                 <span className="material-symbols-outlined text-gray-400">
                   {viewType === 'text' ? 'text_snippet' : 'auto_awesome'}
                 </span>
-                {viewType === 'text' ? 'Extracted Text / Description' : 'AI Summary & Key Insights'}
+                {viewType === 'text' ? 'Extraction Status / Description' : 'AI Summary & Key Insights'}
               </h2>
             </div>
 
@@ -272,8 +313,24 @@ export default function DocumentDetailPage() {
                   </div>
                 )}
 
-                <div className="prose prose-sm max-w-none leading-relaxed text-gray-600">
-                  <p className="whitespace-pre-wrap">{truncatedText}</p>
+                <div className={`flex items-start gap-4 rounded-xl border p-5 ${extractionUI.bg} ${extractionUI.border}`}>
+                  <span className={`material-symbols-outlined text-2xl ${extractionUI.color}`}>
+                    {extractionUI.icon}
+                  </span>
+                  <div>
+                    <h4 className={`font-bold ${extractionUI.color}`}>{extractionUI.title}</h4>
+                    {extractionUI.detail && <p className="mt-1 text-sm text-gray-700">{extractionUI.detail}</p>}
+                    
+                    <div className="mt-4">
+                      <Link
+                        href={`/dashboard/documents/${document.id}/preview`}
+                        className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm border border-gray-300 transition-colors hover:bg-gray-50"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">preview</span>
+                        Xem bản gốc
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </>
             ) : (
@@ -432,7 +489,7 @@ export default function DocumentDetailPage() {
           {/* System Info Card */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-bold tracking-wider text-blue-500 uppercase">
-              DOCUMENT STATUS: {document.status}
+              DOCUMENT STATUS: {getVisibilityPresentation(document.visibilityStatus).label}
             </h3>
             {/* <div className="flex flex-col gap-3 text-sm">
               <div className="flex justify-between">

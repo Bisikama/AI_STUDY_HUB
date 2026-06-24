@@ -15,9 +15,8 @@ type ExploreDocument = {
   title: string;
   description: string | null;
   subject: Subject | null;
-  fileUrl: string;
+  fileSize: number;
   fileType: string;
-  fileSize: string;
   quizCount: number;
   hasSummary: boolean;
   createdAt: string;
