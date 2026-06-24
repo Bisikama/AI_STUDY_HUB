@@ -25,6 +25,7 @@ function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emailParam = searchParams.get('email') || '';
+  const otpParam = searchParams.get('otp') || '';
 
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -38,7 +39,7 @@ function ResetPasswordForm() {
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
       email: emailParam,
-      otp: '',
+      otp: otpParam,
       password: '',
       confirmPassword: '',
     },
