@@ -63,7 +63,9 @@ export class MailService {
         this.logger.log(`✅ Mail OTP sent successfully to: ${to}`);
         return true;
       } catch (error) {
-        this.logger.error(`❌ Failed to send SMTP mail to ${to}:`, error);
+        this.logger.warn(
+          `⚠️ Failed to send SMTP mail to ${to} (falling back to console/dev OTP): ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
