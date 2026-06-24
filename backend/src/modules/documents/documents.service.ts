@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
   ForbiddenException,
   UnauthorizedException,
+  BadGatewayException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
@@ -116,37 +117,79 @@ export class DocumentsService {
 
 
 
-    // 4. Upload file to Supabase Storage
-    let fileUrl: string;
-    try {
-      fileUrl = await this.storageAdapter.uploadToSupabase(
-        file.buffer, //Nội dung file dưới dạng Buffer
-        file.originalname, //Tên file gốc
-        file.mimetype, // Tên file gốc
-      );
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to upload file to Supabase Storage: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    // 5. Create document record in database
+    // 4. Create technical staging Document record in database
     const document = await this.prisma.document.create({
       data: {
-        title,
-        description: description || null,
+        title: title.trim(),
+        description: description?.trim() || null,
         subjectId,
         uploadedBy: finalUserId,
-        fileUrl,
+        fileUrl: '', // Dummy value for schema requirement
+        storagePath: null,
         fileSize: BigInt(file.size),
         fileType: file.mimetype,
         status: 'PRIVATE',
-        fullText: null,
+        visibilityStatus: 'PRIVATE',
+        deletionStatus: 'ACTIVE',
         extractionStatus: 'PENDING',
+        aiStatus: 'NOT_REQUESTED',
+        fullText: null,
+        pageCount: null,
       },
     });
 
-    // 6. Handle tags creation and association
+    // 5. Upload file to Supabase Storage using uploadPrivate
+    const sanitizedFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    let storagePath: string;
+    try {
+      const uploadResult = await this.storageAdapter.uploadPrivate({
+        userId: finalUserId,
+        documentId: document.id,
+        fileName: sanitizedFileName,
+        buffer: file.buffer,
+        contentType: file.mimetype,
+      });
+      storagePath = uploadResult.storagePath;
+    } catch (error) {
+      // Compensation: Delete technical stage record on storage failure
+      await this.prisma.document.delete({ where: { id: document.id } });
+      console.error(`Storage upload failed for doc ${document.id}`);
+      throw new BadGatewayException({
+        statusCode: 502,
+        message: 'Storage operation failed',
+        code: 'STORAGE_OPERATION_FAILED',
+      });
+    }
+
+    // 6. DB commit after storage upload succeeds
+    try {
+      await this.prisma.document.update({
+        where: { id: document.id },
+        data: {
+          storagePath,
+          fileUrl: storagePath, // Populate with actual path
+        },
+      });
+    } catch (error) {
+      console.error(`DB commit failed for doc ${document.id} after upload`);
+      try {
+        await this.storageAdapter.deleteObject(storagePath);
+        await this.prisma.document.delete({ where: { id: document.id } });
+      } catch (deleteError) {
+        // If delete object fails, mark DB record for recovery cleanup
+        await this.prisma.document.update({
+          where: { id: document.id },
+          data: { deletionStatus: 'DELETE_FAILED' },
+        });
+      }
+      throw new BadGatewayException({
+        statusCode: 502,
+        message: 'Storage operation failed',
+        code: 'STORAGE_OPERATION_FAILED',
+      });
+    }
+
+    // 7. Handle tags creation and association
     if (parsedTags.length > 0) {
       const tagIds: number[] = [];
       for (const tagSlug of parsedTags) {
@@ -197,7 +240,7 @@ export class DocumentsService {
       );
     }
 
-    // Extract and persist chunks asynchronously (but waited here, catching errors to not crash upload)
+    // 8. Extract and persist chunks synchronously
     try {
       await this.extractAndPersist({
         documentId: document.id,
@@ -206,12 +249,35 @@ export class DocumentsService {
         mimeType: file.mimetype,
       });
     } catch (error) {
-      // Intentionally ignore so upload succeeds but extractionStatus becomes FAILED (handled inside extractAndPersist)
+      // Ignore: upload succeeds but extractionStatus becomes FAILED
     }
 
-    const sanitized = this.sanitizeData<any>(document);
-    delete sanitized.fullText;
-    return sanitized;
+    // Refresh document to get final states
+    const finalDoc = await this.prisma.document.findUnique({
+      where: { id: document.id },
+    });
+
+    if (!finalDoc) {
+      throw new InternalServerErrorException('Failed to retrieve final document state');
+    }
+
+    // Return safe 201 response payload
+    const sanitizedDoc = this.sanitizeData<any>(finalDoc);
+    return {
+      id: sanitizedDoc.id,
+      title: sanitizedDoc.title,
+      description: sanitizedDoc.description,
+      subjectId: sanitizedDoc.subjectId,
+      fileName: file.originalname,
+      fileType: sanitizedDoc.fileType,
+      fileSize: sanitizedDoc.fileSize,
+      visibilityStatus: sanitizedDoc.visibilityStatus,
+      deletionStatus: sanitizedDoc.deletionStatus,
+      extractionStatus: sanitizedDoc.extractionStatus,
+      aiStatus: sanitizedDoc.aiStatus,
+      pageCount: sanitizedDoc.pageCount,
+      createdAt: sanitizedDoc.createdAt,
+    } as any;
   }
 
   /**
@@ -512,7 +578,11 @@ Quy định chặt chẽ:
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
-    if (document.deletedAt !== null) {
+    if (
+      document.deletedAt !== null ||
+      !document.storagePath ||
+      document.deletionStatus === 'DELETE_FAILED'
+    ) {
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
@@ -546,7 +616,12 @@ Quy định chặt chẽ:
    */
   async getDocumentsByUser(userId: string): Promise<SanitizedDocument[]> {
     const ownedDocuments = await this.prisma.document.findMany({
-      where: { uploadedBy: userId, deletedAt: null },
+      where: {
+        uploadedBy: userId,
+        deletedAt: null,
+        storagePath: { not: null },
+        deletionStatus: { not: 'DELETE_FAILED' },
+      },
       include: {
         subject: true,
         tags: { include: { tag: true } },
@@ -555,7 +630,14 @@ Quy định chặt chẽ:
     });
 
     const followedRelations = await this.prisma.userFollowedDocument.findMany({
-      where: { userId },
+      where: {
+        userId,
+        document: {
+          deletedAt: null,
+          storagePath: { not: null },
+          deletionStatus: { not: 'DELETE_FAILED' },
+        },
+      },
       include: {
         document: {
           include: {
@@ -567,9 +649,7 @@ Quy định chặt chẽ:
       orderBy: { followedAt: 'desc' },
     });
 
-    const followedDocuments = followedRelations
-      .map((rel) => rel.document)
-      .filter((doc) => doc.deletedAt === null);
+    const followedDocuments = followedRelations.map((rel) => rel.document);
 
     const sanitizedOwned = this.sanitizeData<any[]>(ownedDocuments).map((doc) => {
       const d = { ...doc, isOwner: true, isFollowed: false };

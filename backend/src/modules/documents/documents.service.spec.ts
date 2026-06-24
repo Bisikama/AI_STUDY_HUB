@@ -71,6 +71,7 @@ describe('DocumentsService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
       deleteMany: jest.fn(),
       findMany: jest.fn(),
     },
@@ -107,11 +108,11 @@ describe('DocumentsService', () => {
   };
 
   const mockStorageAdapter = {
-    uploadPrivate: jest.fn(),
+    uploadPrivate: jest.fn().mockResolvedValue({ storagePath: 'private/path/file.pdf' }),
     createPreviewUrl: jest.fn(),
     createDownloadUrl: jest.fn(),
-    deleteObject: jest.fn(),
-    uploadToSupabase: jest.fn().mockResolvedValue('http://mock-supabase-url.com/file.pdf'),
+    deleteObject: jest.fn().mockResolvedValue(undefined),
+    uploadToSupabase: jest.fn(),
     deleteFromSupabase: jest.fn(),
   };
 
@@ -234,6 +235,14 @@ describe('DocumentsService', () => {
         title: 'Title',
         fileSize: BigInt(100),
       });
+      mockPrisma.document.update.mockResolvedValue({});
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id',
+        title: 'Title',
+        fileSize: BigInt(100),
+        storagePath: 'private/path/file.pdf',
+        extractionStatus: 'PENDING',
+      });
 
       const result = await service.uploadAndParse(mockFile, 'Title', 'Desc', 1);
 
@@ -243,13 +252,36 @@ describe('DocumentsService', () => {
           data: expect.objectContaining({
             uploadedBy: 'fallback-user-id',
             extractionStatus: 'PENDING',
+            fileUrl: '', // Q6 technical staging dummy
           }),
         }),
       );
-      expect(result).toEqual({ id: 'doc-id', title: 'Title', fileSize: 100 });
-      expect(result).not.toHaveProperty('fullText');
+      expect(mockStorageAdapter.uploadPrivate).toHaveBeenCalled();
+      expect(result.id).toEqual('doc-id');
     });
 
+    it('should return 502 (BadGatewayException) if uploadPrivate fails and cleanup staging', async () => {
+      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1 });
+      mockPrisma.document.create.mockResolvedValue({ id: 'doc-fail-upload' });
+      mockStorageAdapter.uploadPrivate.mockRejectedValueOnce(new Error('Storage failure'));
+
+      await expect(service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id')).rejects.toThrow(
+        expect.objectContaining({ status: 502 }) // BadGatewayException
+      );
+      expect(mockPrisma.document.delete).toHaveBeenCalledWith({ where: { id: 'doc-fail-upload' } });
+    });
+
+    it('should return 502 and delete object if DB update fails after uploadPrivate succeeds', async () => {
+      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1 });
+      mockPrisma.document.create.mockResolvedValue({ id: 'doc-fail-db' });
+      mockStorageAdapter.uploadPrivate.mockResolvedValueOnce({ storagePath: 'test/path' });
+      mockPrisma.document.update.mockRejectedValueOnce(new Error('DB failure'));
+
+      await expect(service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id')).rejects.toThrow(
+        expect.objectContaining({ status: 502 })
+      );
+      expect(mockStorageAdapter.deleteObject).toHaveBeenCalledWith('test/path');
+    });
     it('should ignore extraction errors and return document', async () => {
       mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, name: 'Subject 1' });
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-id' });
@@ -530,6 +562,8 @@ describe('DocumentsService', () => {
         id: 'doc-id',
         title: 'Title',
         fileSize: BigInt(999),
+        storagePath: 'documents/user-id/doc-id/test.pdf',
+        deletionStatus: 'ACTIVE',
         summary: { id: 's-1' },
         quizzes: [{ id: 'q-1' }],
         deletedAt: null,
@@ -542,6 +576,8 @@ describe('DocumentsService', () => {
         id: 'doc-id',
         title: 'Title',
         fileSize: 999,
+        storagePath: 'documents/user-id/doc-id/test.pdf',
+        deletionStatus: 'ACTIVE',
         summary: { id: 's-1' },
         quizzes: [{ id: 'q-1' }],
         deletedAt: null,
