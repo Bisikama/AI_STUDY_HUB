@@ -179,11 +179,12 @@ export class DocumentsController {
     @Body() dto: UpdateDocumentDto,
     @CurrentUser('id') userId: string,
   ): Promise<{ statusCode: number; message: string; data: SanitizedDocument }> {
-    // Only allow title, description, subjectId
+    // Only allow title, description, subjectId, tags
     const safeDto = {
       title: dto.title,
       description: dto.description,
       subjectId: dto.subjectId,
+      tags: dto.tags,
     };
     const document = await this.documentsService.updateDocument(id, userId, safeDto);
     return {

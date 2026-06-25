@@ -183,10 +183,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </form>
 
             <div className="flex items-center gap-4">
-              <button className="text-secondary hover:text-primary relative cursor-pointer p-2 transition-colors">
+              {/* <button className="text-secondary hover:text-primary relative cursor-pointer p-2 transition-colors">
                 <span className="material-symbols-outlined">notifications</span>
                 <span className="bg-error absolute top-2 right-2 h-2 w-2 rounded-full"></span>
-              </button>
+              </button> */}
 
               <div className="relative">
                 <button
