@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { CheckQuizAnswerDto } from './dto/checkQuizAnswer.dto';
 import { GetExploreQueryDto } from './dto/getExploreQuery.dto';
 import { ExploreDocumentItem } from './types/exploreDocumentItem.type';
 
@@ -160,6 +161,62 @@ export class ExploreService {
           })),
         })),
       })),
+    };
+  }
+
+  async checkQuizAnswer(documentId: string, body: CheckQuizAnswerDto) {
+    const selectedOption = await this.prisma.quizOption.findFirst({
+      where: {
+        id: body.selectedOptionId,
+        question: {
+          quiz: {
+            id: body.quizId,
+            documentId,
+            document: {
+              visibilityStatus: 'PUBLIC',
+              deletionStatus: 'ACTIVE',
+              extractionStatus: 'READY',
+              aiStatus: 'READY',
+              deletedAt: null,
+              subject: {
+                isSystem: true,
+              },
+            },
+          },
+        },
+      },
+      include: {
+        question: {
+          include: {
+            options: {
+              where: {
+                isCorrect: true,
+              },
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!selectedOption) {
+      throw new NotFoundException('Quiz option not found');
+    }
+
+    const correctOptionId = selectedOption.question.options[0]?.id;
+
+    if (!correctOptionId) {
+      throw new NotFoundException('Correct option not found');
+    }
+
+    return {
+      quizId: body.quizId,
+      questionId: selectedOption.questionId,
+      selectedOptionId: selectedOption.id,
+      isCorrect: selectedOption.isCorrect,
+      correctOptionId,
     };
   }
 }
