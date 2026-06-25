@@ -7,8 +7,6 @@ export type ExploreDocumentItem = {
     name: string;
     code: string;
   };
-  fileUrl: string;
-  previewUrl: string | null;
   fileType: string;
   fileSize: string;
   downloadCount: number;

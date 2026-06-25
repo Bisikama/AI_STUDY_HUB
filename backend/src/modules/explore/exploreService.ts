@@ -2,7 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { GetExploreQueryDto } from './dto/getExploreQuery.dto';
 import { ExploreDocumentItem } from './types/exploreDocumentItem.type';
-import { getPublicEligibilityFilter } from '../documents/document-access.service';
 
 @Injectable()
 export class ExploreService {
@@ -13,8 +12,14 @@ export class ExploreService {
 
     const documents = await this.prisma.document.findMany({
       where: {
-        ...getPublicEligibilityFilter(),
+        visibilityStatus: 'PUBLIC',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
         deletedAt: null,
+        subject: {
+          isSystem: true,
+        },
         ...(search
           ? {
               OR: [
@@ -74,8 +79,6 @@ export class ExploreService {
           name: document.subject.name,
           code: document.subject.code,
         },
-        fileUrl: document.fileUrl,
-        previewUrl: document.previewUrl,
         fileType: document.fileType,
         fileSize: document.fileSize.toString(),
         downloadCount: document.downloadCount,
@@ -91,8 +94,14 @@ export class ExploreService {
     const document = await this.prisma.document.findFirst({
       where: {
         id: documentId,
-        ...getPublicEligibilityFilter(),
+        visibilityStatus: 'PUBLIC',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
         deletedAt: null,
+        subject: {
+          isSystem: true,
+        },
       },
       include: {
         subject: true,
@@ -123,8 +132,6 @@ export class ExploreService {
           name: document.subject.name,
           code: document.subject.code,
         },
-        fileUrl: document.fileUrl,
-        previewUrl: document.previewUrl,
         fileType: document.fileType,
         fileSize: document.fileSize.toString(),
         downloadCount: document.downloadCount,
@@ -132,11 +139,27 @@ export class ExploreService {
         createdAt: document.createdAt,
       },
 
-      // Schema hiện tại là 1 document có 1 summary: summary DocumentSummary?
-      // Nhưng task yêu cầu FE nhận mảng summaries, nên mình trả dạng array.
       summaries: document.summary ? [document.summary] : [],
 
-      quizzes: document.quizzes,
+      quizzes: document.quizzes.map((quiz) => ({
+        id: quiz.id,
+        documentId: quiz.documentId,
+        createdBy: quiz.createdBy,
+        title: quiz.title,
+        createdAt: quiz.createdAt,
+        questions: quiz.questions.map((question) => ({
+          id: question.id,
+          quizId: question.quizId,
+          questionText: question.questionText,
+          createdAt: question.createdAt,
+          options: question.options.map((option) => ({
+            id: option.id,
+            questionId: option.questionId,
+            optionText: option.optionText,
+            createdAt: option.createdAt,
+          })),
+        })),
+      })),
     };
   }
 }
