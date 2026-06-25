@@ -10,6 +10,8 @@ import axiosClient from '@/utils/axios';
 import Link from 'next/link';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
+const FOLLOWED_DOCUMENTS_STORAGE_KEY = 'studyhub_followed_documents';
 
 type DocumentSummary = {
   id: string;
@@ -140,7 +142,18 @@ function DashboardPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [savedDocIds, setSavedDocIds] = useState<string[]>([]);
+  const [followedDocumentIds, setFollowedDocumentIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+    try {
+      const storedIds = window.localStorage.getItem(FOLLOWED_DOCUMENT_IDS_STORAGE_KEY);
+      const parsedIds = storedIds ? (JSON.parse(storedIds) as string[]) : [];
+      return Array.isArray(parsedIds) ? parsedIds : [];
+    } catch {
+      return [];
+    }
+  });
   const [recentlyViewed, setRecentlyViewed] = useState<ExploreDocument[]>([]);
   const [publicDocuments, setPublicDocuments] = useState<ExploreDocument[]>([]);
   const [trendingDocs, setTrendingDocs] = useState<ExploreDocument[]>([]);
@@ -227,6 +240,26 @@ function DashboardPage() {
   });
   const { getProfile, logout } = useAuth();
 
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const storedIds = window.localStorage.getItem(FOLLOWED_DOCUMENT_IDS_STORAGE_KEY);
+        const parsedIds = storedIds ? (JSON.parse(storedIds) as string[]) : [];
+        if (Array.isArray(parsedIds)) {
+          setFollowedDocumentIds(parsedIds);
+        }
+      } catch (err) {
+        // Ignore
+      }
+    };
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('studyhub-followed-documents-change', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('studyhub-followed-documents-change', handleSync);
+    };
+  }, []);
+
   const { data: myDocumentsResponse, mutate: mutateMyDocuments } = useSWR('/documents/me', () =>
     documentsApi.getMyDocuments(),
   );
@@ -234,12 +267,65 @@ function DashboardPage() {
   const myDocumentItems = myDocumentsResponse?.data ?? [];
 
   const isDocumentOwner = myDocumentItems.some((d: any) => d.id === selectedDocumentId && d.isOwner);
-  const isDocumentFollowed = myDocumentItems.some((d: any) => d.id === selectedDocumentId && d.isFollowed);
+  const isDocumentFollowed = selectedDocumentId ? followedDocumentIds.includes(selectedDocumentId) : false;
 
-  const handleFollowDocument = async (docId: string) => {
+  const findDocumentById = (id: string): ExploreDocument | undefined => {
+    return (
+      publicDocuments.find((d) => d.id === id) ||
+      trendingDocs.find((d) => d.id === id) ||
+      recentlyViewed.find((d) => d.id === id)
+    );
+  };
+
+  const saveFollowedDocuments = (nextIds: string[], currentDoc: ExploreDocument) => {
+    try {
+      const storedDocs = window.localStorage.getItem(FOLLOWED_DOCUMENTS_STORAGE_KEY);
+      const parsedDocs = storedDocs ? (JSON.parse(storedDocs) as ExploreDocument[]) : [];
+      const safeDocs = Array.isArray(parsedDocs) ? parsedDocs : [];
+
+      let nextDocs: ExploreDocument[];
+      if (nextIds.includes(currentDoc.id)) {
+        if (currentDoc.title) {
+          nextDocs = [...safeDocs.filter((d) => d.id !== currentDoc.id), currentDoc];
+        } else {
+          nextDocs = safeDocs;
+        }
+      } else {
+        nextDocs = safeDocs.filter((d) => d.id !== currentDoc.id);
+      }
+
+      window.localStorage.setItem(FOLLOWED_DOCUMENT_IDS_STORAGE_KEY, JSON.stringify(nextIds));
+      window.localStorage.setItem(FOLLOWED_DOCUMENTS_STORAGE_KEY, JSON.stringify(nextDocs));
+
+      window.dispatchEvent(
+        new CustomEvent('studyhub-followed-documents-change', {
+          detail: {
+            followedDocumentIds: nextIds,
+            followedDocuments: nextDocs,
+          },
+        }),
+      );
+    } catch (err) {
+      console.error('Failed to save followed documents:', err);
+    }
+  };
+
+  const handleFollowDocument = async (docId: string, docObj?: ExploreDocument) => {
     try {
       await documentsApi.followDocument(docId);
-      mutateMyDocuments();
+      const documentToSave = docObj || findDocumentById(docId) || (aiCache?.document ? ({
+        ...aiCache.document,
+        quizCount: aiCache.quizzes?.length || 0,
+        hasSummary: (aiCache.summaries?.length || 0) > 0,
+      } as ExploreDocument) : undefined);
+
+      if (documentToSave) {
+        setFollowedDocumentIds((prev) => {
+          const nextIds = prev.includes(docId) ? prev : [...prev, docId];
+          saveFollowedDocuments(nextIds, documentToSave);
+          return nextIds;
+        });
+      }
     } catch (err) {
       console.error('Failed to follow document:', err);
     }
@@ -248,7 +334,11 @@ function DashboardPage() {
   const handleUnfollowDocument = async (docId: string) => {
     try {
       await documentsApi.unfollowDocument(docId);
-      mutateMyDocuments();
+      setFollowedDocumentIds((prev) => {
+        const nextIds = prev.filter((id) => id !== docId);
+        saveFollowedDocuments(nextIds, { id: docId } as ExploreDocument);
+        return nextIds;
+      });
     } catch (err) {
       console.error('Failed to unfollow document:', err);
     }
@@ -333,9 +423,11 @@ function DashboardPage() {
 
   const toggleSaveDoc = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSavedDocIds((prev) =>
-      prev.includes(id) ? prev.filter((dId) => dId !== id) : [...prev, id],
-    );
+    if (followedDocumentIds.includes(id)) {
+      handleUnfollowDocument(id);
+    } else {
+      handleFollowDocument(id);
+    }
   };
 
   const handleLogout = async () => {
@@ -823,12 +915,12 @@ function DashboardPage() {
                           </div>
                           <button
                             onClick={(e) => toggleSaveDoc(doc.id, e)}
-                            className={`font-label-sm text-label-sm hidden cursor-pointer rounded-full border px-4 py-2 transition-colors sm:block ${savedDocIds.includes(doc.id)
+                            className={`font-label-sm text-label-sm hidden cursor-pointer rounded-full border px-4 py-2 transition-colors sm:block ${followedDocumentIds.includes(doc.id)
                                 ? 'bg-primary-container border-primary-container text-white'
                                 : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
                               }`}
                           >
-                            {savedDocIds.includes(doc.id) ? 'Saved' : 'Save'}
+                            {followedDocumentIds.includes(doc.id) ? 'Saved' : 'Save'}
                           </button>
                         </div>
                       );
