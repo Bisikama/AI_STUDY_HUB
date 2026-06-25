@@ -23,7 +23,8 @@ import type {
   MyDocumentListItem,
 } from './types/document.types';
 import { STORAGE_ADAPTER } from 'src/supabase/storage-adapter.interface';
-import type { StorageAdapter } from 'src/supabase/storage-adapter.interface'; import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constant';
+import type { StorageAdapter } from 'src/supabase/storage-adapter.interface';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constant';
 import { SubjectsService } from '../subjects/subjects.service';
 import { TagsService } from '../tags/tags.service';
 import { DocumentAccessService, DocumentAccessPurpose } from './document-access.service';
@@ -37,7 +38,7 @@ export class DocumentsService {
     private readonly subjectsService: SubjectsService,
     private readonly tagsService: TagsService,
     private readonly documentAccessService: DocumentAccessService,
-  ) { }
+  ) {}
 
   /**
    * Helper function to convert BigInt to Number/String in objects to prevent serialization crashes.
@@ -60,30 +61,54 @@ export class DocumentsService {
     return data as T;
   }
 
-  private mapSafeDocumentResponse(document: any, isOwner: boolean = false, isFollowed: boolean = false): any {
+  private mapSafeDocumentResponse(
+    document: any,
+    isOwner: boolean = false,
+    isFollowed: boolean = false,
+  ): any {
     return {
       id: document.id,
       title: document.title,
       description: document.description,
       subjectId: document.subjectId,
-      subject: document.subject ? {
-        id: document.subject.id,
-        name: document.subject.name,
-        code: document.subject.code,
-        isSystem: document.subject.isSystem,
-      } : null,
+      subject: document.subject
+        ? {
+            id: document.subject.id,
+            name: document.subject.name,
+            code: document.subject.code,
+            isSystem: document.subject.isSystem,
+          }
+        : null,
       fileType: document.fileType,
-      fileSize: document.fileSize !== undefined && document.fileSize !== null ? Number(document.fileSize) : undefined,
+      fileSize:
+        document.fileSize !== undefined && document.fileSize !== null
+          ? Number(document.fileSize)
+          : undefined,
       visibilityStatus: document.visibilityStatus,
       deletionStatus: document.deletionStatus,
       extractionStatus: document.extractionStatus,
       aiStatus: document.aiStatus,
       pageCount: document.pageCount,
-      createdAt: document.createdAt ? (document.createdAt instanceof Date ? document.createdAt.toISOString() : new Date(document.createdAt).toISOString()) : null,
-      updatedAt: document.updatedAt ? (document.updatedAt instanceof Date ? document.updatedAt.toISOString() : new Date(document.updatedAt).toISOString()) : null,
-      requestedAt: document.requestedAt ? (document.requestedAt instanceof Date ? document.requestedAt.toISOString() : new Date(document.requestedAt).toISOString()) : null,
+      createdAt: document.createdAt
+        ? document.createdAt instanceof Date
+          ? document.createdAt.toISOString()
+          : new Date(document.createdAt).toISOString()
+        : null,
+      updatedAt: document.updatedAt
+        ? document.updatedAt instanceof Date
+          ? document.updatedAt.toISOString()
+          : new Date(document.updatedAt).toISOString()
+        : null,
+      requestedAt: document.requestedAt
+        ? document.requestedAt instanceof Date
+          ? document.requestedAt.toISOString()
+          : new Date(document.requestedAt).toISOString()
+        : null,
       isOwner,
       isFollowed,
+      isAIGenerated: document.isAIGenerated,
+      summary: document.summary || null,
+      quizzes: document.quizzes || [],
     };
   }
 
@@ -95,13 +120,20 @@ export class DocumentsService {
       subjectId: document.subjectId,
       fileName: document.fileName,
       fileType: document.fileType,
-      fileSize: document.fileSize !== undefined && document.fileSize !== null ? Number(document.fileSize) : undefined,
+      fileSize:
+        document.fileSize !== undefined && document.fileSize !== null
+          ? Number(document.fileSize)
+          : undefined,
       visibilityStatus: document.visibilityStatus,
       deletionStatus: document.deletionStatus,
       extractionStatus: document.extractionStatus,
       aiStatus: document.aiStatus,
       pageCount: document.pageCount,
-      createdAt: document.createdAt ? (document.createdAt instanceof Date ? document.createdAt.toISOString() : new Date(document.createdAt).toISOString()) : null,
+      createdAt: document.createdAt
+        ? document.createdAt instanceof Date
+          ? document.createdAt.toISOString()
+          : new Date(document.createdAt).toISOString()
+        : null,
     };
   }
 
@@ -115,7 +147,7 @@ export class DocumentsService {
   ): Promise<{ url: string; expiresAt: string; fileName: string; disposition: string }> {
     // 1. Authorize via DocumentAccessService. Will throw 401/403/404/409 properly.
     const access = await this.documentAccessService.authorizeAccess(documentId, userId, purpose);
-    
+
     // 2. Call Storage Adapter to generate the URL
     try {
       if (purpose === 'SIGNED_PREVIEW') {
@@ -207,8 +239,6 @@ export class DocumentsService {
         throw new BadRequestException('Invalid tags format');
       }
     }
-
-
 
     // 4. Create technical staging Document record in database
     const document = await this.prisma.document.create({
@@ -420,7 +450,7 @@ export class DocumentsService {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     // Use gemini-1.5-flash which is standard and support responseMimeType
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
     let totalTokens = 0;
     try {
@@ -664,6 +694,17 @@ Quy định chặt chẽ:
         uploadedBy: true,
         deletedAt: true,
         storagePath: true,
+        isAIGenerated: true,
+        summary: true,
+        quizzes: {
+          include: {
+            questions: {
+              include: {
+                options: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -681,7 +722,10 @@ Quy định chặt chẽ:
 
     let userRole = 'STUDENT';
     if (userId) {
-      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
       if (user) {
         userRole = user.role;
       }
@@ -870,8 +914,14 @@ Quy định chặt chẽ:
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
-    if (document.deletedAt !== null || document.deletionStatus !== 'ACTIVE' || !document.storagePath) {
-      throw new NotFoundException(`Document with ID ${documentId} has been deleted or is unavailable`);
+    if (
+      document.deletedAt !== null ||
+      document.deletionStatus !== 'ACTIVE' ||
+      !document.storagePath
+    ) {
+      throw new NotFoundException(
+        `Document with ID ${documentId} has been deleted or is unavailable`,
+      );
     }
 
     if (document.uploadedBy !== userId) {
@@ -929,6 +979,7 @@ Quy định chặt chẽ:
         uploadedBy: true,
         deletedAt: true,
         storagePath: true,
+        isAIGenerated: true,
       },
     });
 
@@ -1039,7 +1090,7 @@ Quy định chặt chẽ:
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.documentChunk.createMany({
-          data: chunks.map(chunk => ({
+          data: chunks.map((chunk) => ({
             documentId: input.documentId,
             chunkIndex: chunk.chunkIndex,
             content: chunk.content,
@@ -1060,10 +1111,12 @@ Quy định chặt chẽ:
     } catch (error) {
       console.error(`Document extraction failed for ${input.documentId}: Transaction error`);
       // Best-effort update to FAILED
-      await this.prisma.document.update({
-        where: { id: input.documentId },
-        data: { extractionStatus: 'FAILED' },
-      }).catch(() => {});
+      await this.prisma.document
+        .update({
+          where: { id: input.documentId },
+          data: { extractionStatus: 'FAILED' },
+        })
+        .catch(() => {});
       return { extractionStatus: 'FAILED', chunkCount: 0 };
     }
 
@@ -1149,7 +1202,9 @@ Quy định chặt chẽ:
     }
 
     if (document.uploadedBy !== userId) {
-      throw new ForbiddenException('You do not have permission to request public visibility for this document');
+      throw new ForbiddenException(
+        'You do not have permission to request public visibility for this document',
+      );
     }
 
     if (!document.subject?.isSystem) {
@@ -1218,7 +1273,9 @@ Quy định chặt chẽ:
     }
 
     if (document.uploadedBy !== userId) {
-      throw new ForbiddenException('You do not have permission to withdraw public visibility for this document');
+      throw new ForbiddenException(
+        'You do not have permission to withdraw public visibility for this document',
+      );
     }
 
     if (
