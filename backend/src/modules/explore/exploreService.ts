@@ -14,6 +14,7 @@ export class ExploreService {
     const documents = await this.prisma.document.findMany({
       where: {
         ...getPublicEligibilityFilter(),
+        deletedAt: null,
         ...(search
           ? {
               OR: [
@@ -91,6 +92,7 @@ export class ExploreService {
       where: {
         id: documentId,
         ...getPublicEligibilityFilter(),
+        deletedAt: null,
       },
       include: {
         subject: true,
