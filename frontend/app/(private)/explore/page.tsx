@@ -16,8 +16,6 @@ type ExploreDocument = {
   title: string;
   description: string | null;
   subject: Subject | null;
-  fileUrl: string;
-  previewUrl: string | null;
   fileType: string;
   fileSize: string;
   downloadCount: number;
@@ -50,7 +48,6 @@ type QuizOption = {
   id: string;
   questionId: string;
   optionText: string;
-  isCorrect: boolean;
   createdAt: string;
 };
 
@@ -75,6 +72,14 @@ type ExploreAiCache = {
   document: Omit<ExploreDocument, 'quizCount' | 'hasSummary'>;
   summaries: DocumentSummary[];
   quizzes: Quiz[];
+};
+
+type QuizAnswerCheckResult = {
+  quizId: string;
+  questionId: string;
+  selectedOptionId: string;
+  isCorrect: boolean;
+  correctOptionId: string;
 };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
@@ -127,14 +132,6 @@ function formatFileSize(fileSize: string): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getDocumentUrl(fileUrl: string): string {
-  if (fileUrl.startsWith('http')) {
-    return fileUrl;
-  }
-
-  return `${API_BASE_URL}${fileUrl}`;
-}
-
 const MOCK_DOCUMENTS: ExploreDocument[] = [
   {
     id: 'mock-1',
@@ -142,8 +139,6 @@ const MOCK_DOCUMENTS: ExploreDocument[] = [
     description:
       'A comprehensive study guide covering linked lists, trees, graphs, and basic sorting algorithms.',
     subject: { id: 101, name: 'Stanford University', code: 'CS101' },
-    fileUrl: '#',
-    previewUrl: null,
     fileType: 'application/pdf',
     fileSize: '2457600',
     downloadCount: 1200,
@@ -158,8 +153,6 @@ const MOCK_DOCUMENTS: ExploreDocument[] = [
     description:
       'Complete notes for ECON201 containing aggregate demand, supply, monetary policies, and inflation.',
     subject: { id: 201, name: 'London School of Economics', code: 'ECON201' },
-    fileUrl: '#',
-    previewUrl: null,
     fileType: 'application/pdf',
     fileSize: '3584000',
     downloadCount: 3400,
@@ -174,8 +167,6 @@ const MOCK_DOCUMENTS: ExploreDocument[] = [
     description:
       "Vector fields, line integrals, Green's theorem, Stokes' theorem, and divergence theorem equations.",
     subject: { id: 301, name: 'MIT', code: 'MATH202' },
-    fileUrl: '#',
-    previewUrl: null,
     fileType: 'application/pdf',
     fileSize: '1536000',
     downloadCount: 850,
@@ -190,8 +181,6 @@ const MOCK_DOCUMENTS: ExploreDocument[] = [
     description:
       'Summary sheet of key organic chemistry mechanisms including nucleophilic substitutions and eliminations.',
     subject: { id: 401, name: 'Harvard University', code: 'CHEM101' },
-    fileUrl: '#',
-    previewUrl: null,
     fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     fileSize: '1843200',
     downloadCount: 1900,
@@ -205,8 +194,6 @@ const MOCK_DOCUMENTS: ExploreDocument[] = [
     title: 'Machine Learning Past Exams (2018-2023)',
     description: 'Compilation of midterm and final exams with detailed solutions for CS229.',
     subject: { id: 501, name: 'UC Berkeley', code: 'CS229' },
-    fileUrl: '#',
-    previewUrl: null,
     fileType: 'application/zip',
     fileSize: '12582912',
     downloadCount: 3100,
@@ -304,13 +291,17 @@ function SearchExplore() {
       return [];
     }
   });
+
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [activeAiCacheTab, setActiveAiCacheTab] = useState<'summary' | 'quiz'>('summary');
   const [isQuizSubmitted, setIsQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState<number | null>(null);
   const [quizAuthWarning, setQuizAuthWarning] = useState<string | null>(null);
+  const [quizAnswerResults, setQuizAnswerResults] = useState<Record<string, QuizAnswerCheckResult>>(
+    {},
+  );
+  const [isQuizSubmitting, setIsQuizSubmitting] = useState(false);
 
-  // key = questionId, value = selected optionId
   const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
 
   const aiCacheUrl = selectedDocumentId
@@ -479,6 +470,8 @@ function SearchExplore() {
     setIsQuizSubmitted(false);
     setQuizScore(null);
     setQuizAuthWarning(null);
+    setQuizAnswerResults({});
+    setIsQuizSubmitting(false);
   };
 
   const handleViewFull = (documentId?: string | null) => {
@@ -501,6 +494,8 @@ function SearchExplore() {
     setIsQuizSubmitted(false);
     setQuizScore(null);
     setQuizAuthWarning(null);
+    setQuizAnswerResults({});
+    setIsQuizSubmitting(false);
     setSelectedDocumentId(doc.id);
 
     try {
@@ -547,7 +542,11 @@ function SearchExplore() {
     }));
   };
 
-  const handleSubmitQuiz = (questions: QuizQuestion[]) => {
+  const handleSubmitQuiz = async (questions: QuizQuestion[]) => {
+    if (!selectedDocumentId) {
+      return;
+    }
+
     if (!guardQuizAttempt()) {
       return;
     }
@@ -563,16 +562,46 @@ function SearchExplore() {
       return;
     }
 
-    const score = questions.reduce((total, question) => {
-      const selectedOptionId = selectedOptionIds[question.id];
-      const selectedOption = question.options.find((option) => option.id === selectedOptionId);
-
-      return total + (selectedOption?.isCorrect ? 1 : 0);
-    }, 0);
-
-    setQuizScore(score);
-    setIsQuizSubmitted(true);
+    setIsQuizSubmitting(true);
     setQuizAuthWarning(null);
+
+    try {
+      const results = await Promise.all(
+        questions.map(async (question) => {
+          const selectedOptionId = selectedOptionIds[question.id];
+
+          if (!selectedOptionId) {
+            throw new Error('Missing selected option');
+          }
+
+          const response = await axiosClient.post<ApiResponse<QuizAnswerCheckResult>>(
+            `/explore/${selectedDocumentId}/quiz/check`,
+            {
+              quizId: question.quizId,
+              selectedOptionId,
+            },
+          );
+
+          const result = response.data;
+
+          return 'data' in result ? result.data : result;
+        }),
+      );
+
+      const resultMap = results.reduce<Record<string, QuizAnswerCheckResult>>((acc, result) => {
+        acc[result.questionId] = result;
+        return acc;
+      }, {});
+
+      setQuizAnswerResults(resultMap);
+      setQuizScore(results.filter((result) => result.isCorrect).length);
+      setIsQuizSubmitted(true);
+    } catch (err) {
+      console.error('Failed to submit quiz:', err);
+      setQuizAuthWarning('Could not submit quiz. Please log in again and try later.');
+    } finally {
+      setIsQuizSubmitting(false);
+    }
   };
 
   const handleRetryQuiz = () => {
@@ -580,6 +609,8 @@ function SearchExplore() {
     setIsQuizSubmitted(false);
     setQuizScore(null);
     setQuizAuthWarning(null);
+    setQuizAnswerResults({});
+    setIsQuizSubmitting(false);
   };
 
   const handleSuggestionClick = (discipline: string) => {
@@ -657,7 +688,6 @@ function SearchExplore() {
               >
                 Practice Mode
               </a>
-              
             </nav>
 
             <div className="border-outline-variant flex items-center gap-4 border-l pl-6">
@@ -1284,8 +1314,16 @@ function SearchExplore() {
                                     <div className="grid gap-2">
                                       {question.options.map((option) => {
                                         const selectedOptionId = selectedOptionIds[question.id];
+                                        const answerResult = quizAnswerResults[question.id];
                                         const isSelected = selectedOptionId === option.id;
-                                        const isCorrectAnswer = option.isCorrect;
+                                        const isCorrectAnswer =
+                                          isQuizSubmitted &&
+                                          answerResult?.correctOptionId === option.id;
+                                        const isWrongSelected =
+                                          isQuizSubmitted &&
+                                          Boolean(answerResult) &&
+                                          isSelected &&
+                                          !answerResult?.isCorrect;
 
                                         let optionClass =
                                           'border-outline-variant text-on-surface-variant hover:border-primary hover:bg-surface-container-low';
@@ -1295,12 +1333,12 @@ function SearchExplore() {
                                             'border-primary bg-primary-container/10 text-primary';
                                         }
 
-                                        if (isQuizSubmitted && isCorrectAnswer) {
+                                        if (isCorrectAnswer) {
                                           optionClass =
                                             'border-primary bg-primary-container/20 text-primary';
                                         }
 
-                                        if (isQuizSubmitted && isSelected && !isCorrectAnswer) {
+                                        if (isWrongSelected) {
                                           optionClass =
                                             'border-error bg-error-container text-on-error-container';
                                         }
@@ -1337,7 +1375,7 @@ function SearchExplore() {
                                               <span className="text-xs font-bold">Correct</span>
                                             )}
 
-                                            {isQuizSubmitted && isSelected && !isCorrectAnswer && (
+                                            {isWrongSelected && (
                                               <span className="text-xs font-bold">Your answer</span>
                                             )}
                                           </button>
@@ -1372,10 +1410,10 @@ function SearchExplore() {
                                   ) : (
                                     <button
                                       type="button"
-                                      onClick={() => handleSubmitQuiz(quizQuestions)}
-                                      disabled={!hasAllAnswers}
+                                      onClick={() => void handleSubmitQuiz(quizQuestions)}
+                                      disabled={!hasAllAnswers || isQuizSubmitting}
                                       className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                                        hasAllAnswers
+                                        hasAllAnswers && !isQuizSubmitting
                                           ? 'bg-primary text-on-primary hover:shadow-md'
                                           : 'bg-surface-container-high text-secondary cursor-not-allowed'
                                       }`}
@@ -1383,7 +1421,7 @@ function SearchExplore() {
                                       <span className="material-symbols-outlined text-[18px]">
                                         task_alt
                                       </span>
-                                      Submit Quiz
+                                      {isQuizSubmitting ? 'Submitting...' : 'Submit Quiz'}
                                     </button>
                                   )}
                                 </div>
