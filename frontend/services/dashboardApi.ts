@@ -11,8 +11,6 @@ export interface ExploreDocument {
   title: string;
   description: string | null;
   subject: Subject | null;
-  fileUrl: string;
-  previewUrl: string | null;
   fileType: string;
   fileSize: string;
   downloadCount: number;

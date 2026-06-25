@@ -1,29 +1,35 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  BadGatewayException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import WebSocket from 'ws';
+import * as path from 'path';
+import { StorageAdapter } from './storage-adapter.interface';
+
 @Injectable()
-export class SupabaseService {
-  // Logger giúp theo dõi lỗi mà không cần console.log thủ công
+export class SupabaseService implements StorageAdapter {
   private readonly logger = new Logger(SupabaseService.name);
-
-  // Supabase client sẽ được khởi tạo một lần duy nhất (singleton pattern)
   private readonly supabase: SupabaseClient;
-
-  // Tên bucket lấy từ biến môi trường để dễ thay đổi theo môi trường (dev/prod)
-  private readonly bucketName: string;
+  private readonly legacyBucketName: string;
+  private readonly documentsBucketName: string;
 
   constructor(private readonly configService: ConfigService) {
-    // Đọc các giá trị cấu hình từ biến môi trường
     const supabaseUrl = this.configService.getOrThrow<string>('SUPABASE_URL');
     const supabaseKey = this.configService.getOrThrow<string>('SUPABASE_SERVICE_ROLE_KEY');
-    this.bucketName = this.configService.getOrThrow<string>('SUPABASE_STORAGE_BUCKET');
 
-    // Khởi tạo Supabase client bằng Service Role Key (có quyền cao nhất phía server)
+    // For legacy uploads
+    this.legacyBucketName = this.configService.get<string>('SUPABASE_STORAGE_BUCKET') || 'documents';
+
+    // For private document uploads
+    this.documentsBucketName = this.configService.getOrThrow<string>('SUPABASE_DOCUMENTS_BUCKET');
+
     this.supabase = createClient(supabaseUrl, supabaseKey, {
       auth: {
-        // Tắt auto refresh token vì đây là server-side client, không phải browser
         autoRefreshToken: false,
         persistSession: false,
       },
@@ -33,63 +39,142 @@ export class SupabaseService {
     });
   }
 
-  //   async onModuleInit() {
-  //     this.logger.log('🚀 Đang chạy giả lập Test Upload Supabase...');
-  //     try {
-  //       // Tạo một file text giả (Fake Buffer) ngay trong RAM
-  //       const fakeFileBuffer = Buffer.from('Xin chao AI Study Hub! Day la file test.');
-  //       const testFileName = 'test-ket-noi.txt';
-  //       const testMimeType = 'text/plain';
+  private sanitizeFileName(fileName: string): string {
+    const safeName = fileName.replace(/^.*[\\\/]/, ''); // remove directory paths
+    const ext = path.extname(safeName).toLowerCase();
+    let nameWithoutExt = path.basename(safeName, ext);
 
-  //       // Gọi chính cái hàm upload của ông
-  //       const url = await this.uploadToSupabase(fakeFileBuffer, testFileName, testMimeType);
+    nameWithoutExt = nameWithoutExt
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // remove diacritics
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .replace(/[^a-zA-Z0-9.-]/g, '_')
+      .replace(/_+/g, '_');
 
-  //       this.logger.log(`✅ TEST THÀNH CÔNG RỰC RỠ!`);
-  //       this.logger.log(`🔗 Bấm vào link này để xem thành quả: ${url}`);
-  //     } catch (error) {
-  //       this.logger.error(`❌ TEST THẤT BẠI! Cần kiểm tra lại .env hoặc mạng.`, error);
-  //     }
-  //   }
+    if (!nameWithoutExt) {
+      nameWithoutExt = 'document';
+    }
 
-  /**
-   * Upload một file lên Supabase Storage và trả về public URL của file đó.
-   *
-   * @param fileBuffer - Nội dung file dưới dạng Buffer (từ Multer)
-   * @param originalFileName - Tên file gốc (ví dụ: "bai-giang.pdf")
-   * @param mimetype - Loại MIME của file (ví dụ: "application/pdf")
-   * @returns Promise<string> - Public URL để truy cập file
-   */
+    return `${nameWithoutExt}${ext === '.pdf' ? '.pdf' : ''}`;
+  }
+
+  async uploadPrivate(input: {
+    userId: string;
+    documentId: string;
+    fileName: string;
+    buffer: Buffer;
+    contentType: string;
+  }): Promise<{ storagePath: string }> {
+    const sanitizedFileName = this.sanitizeFileName(input.fileName);
+    const storagePath = `documents/${input.userId}/${input.documentId}/${sanitizedFileName}`;
+
+    this.logger.log(`Start private upload to path: documents/[userId]/[documentId]`);
+
+    const { error } = await this.supabase.storage
+      .from(this.documentsBucketName)
+      .upload(storagePath, input.buffer, {
+        contentType: input.contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      this.logger.error('Private upload failed: STORAGE_OPERATION_FAILED');
+      throw new BadGatewayException('STORAGE_OPERATION_FAILED');
+    }
+
+    return { storagePath };
+  }
+
+  private clampTtl(expiresInSeconds?: number): number {
+    const ttl = expiresInSeconds || 300;
+    return Math.min(ttl, 300);
+  }
+
+  async createPreviewUrl(input: {
+    storagePath: string;
+    expiresInSeconds?: number;
+  }): Promise<{ url: string; expiresAt: Date }> {
+    const ttl = this.clampTtl(input.expiresInSeconds);
+
+    const { data, error } = await this.supabase.storage
+      .from(this.documentsBucketName)
+      .createSignedUrl(input.storagePath, ttl);
+
+    if (error || !data) {
+      this.logger.error('Create preview URL failed: STORAGE_OPERATION_FAILED');
+      throw new BadGatewayException('STORAGE_OPERATION_FAILED');
+    }
+
+    const expiresAt = new Date(Date.now() + ttl * 1000);
+    return { url: data.signedUrl, expiresAt };
+  }
+
+  async createDownloadUrl(input: {
+    storagePath: string;
+    fileName: string;
+    expiresInSeconds?: number;
+  }): Promise<{ url: string; expiresAt: Date; fileName: string }> {
+    const ttl = this.clampTtl(input.expiresInSeconds);
+
+    const { data, error } = await this.supabase.storage
+      .from(this.documentsBucketName)
+      .createSignedUrl(input.storagePath, ttl, {
+        download: input.fileName,
+      });
+
+    if (error || !data) {
+      this.logger.error('Create download URL failed: STORAGE_OPERATION_FAILED');
+      throw new BadGatewayException('STORAGE_OPERATION_FAILED');
+    }
+
+    const expiresAt = new Date(Date.now() + ttl * 1000);
+    return { url: data.signedUrl, expiresAt, fileName: input.fileName };
+  }
+
+  async deleteObject(storagePath: string): Promise<void> {
+    this.logger.log(`Deleting object at path: [redacted]`);
+
+    const { error } = await this.supabase.storage
+      .from(this.documentsBucketName)
+      .remove([storagePath]);
+
+    if (error) {
+      this.logger.error('Delete object failed: STORAGE_OPERATION_FAILED');
+      throw new BadGatewayException('STORAGE_OPERATION_FAILED');
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // LEGACY METHODS (to preserve backward compatibility)
+  // ----------------------------------------------------------------------
+
   async uploadToSupabase(
     fileBuffer: Buffer,
     originalFileName: string,
     mimetype: string,
   ): Promise<string> {
-    // Tạo path duy nhất để tránh ghi đè file cùng tên:
-    // Ví dụ: "documents/1748950000000_a1b2c3d4_bai-giang.pdf"
     const timestamp = Date.now();
-    const uniqueId = uuidv4().substring(0, 8); // Lấy 8 ký tự đầu của UUID cho ngắn gọn
+    const uniqueId = uuidv4().substring(0, 8);
     const safeFileName = originalFileName
-      .normalize('NFD') // Tách dấu ra khỏi chữ cái
-      .replace(/[\u0300-\u036f]/g, '') // Xóa toàn bộ dấu
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
       .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D') // Xử lý riêng chữ Đ của tiếng Việt
-      .replace(/[^a-zA-Z0-9.-]/g, '-') // Biến mọi ký tự không phải chữ, số, dấu chấm thành gạch ngang
-      .replace(/-+/g, '-'); // Gộp các dấu gạch ngang liên tiếp thành 1 dấu duy nhất cho đẹp
+      .replace(/Đ/g, 'D')
+      .replace(/[^a-zA-Z0-9.-]/g, '-')
+      .replace(/-+/g, '-');
 
     const filePath = `documents/${timestamp}_${uniqueId}_${safeFileName}`;
 
-    this.logger.log(`Start uploading files to Supabase Storage: ${filePath}`);
+    this.logger.log(`Start legacy uploading files to Supabase Storage: ${filePath}`);
 
-    // Thực hiện upload lên Supabase Storage
     const { data, error } = await this.supabase.storage
-      .from(this.bucketName)
+      .from(this.legacyBucketName)
       .upload(filePath, fileBuffer, {
         contentType: mimetype,
-        // upsert: false đảm bảo không ghi đè file nếu trùng path (thêm lớp bảo vệ)
         upsert: false,
       });
 
-    // Xử lý lỗi từ Supabase
     if (error) {
       this.logger.error(`Upload failed: ${error.message}`, error.stack);
       throw new InternalServerErrorException(
@@ -97,27 +182,18 @@ export class SupabaseService {
       );
     }
 
-    this.logger.log(`Upload successful. File path: ${data.path}`);
+    this.logger.log(`Upload successful. File path: ${data?.path}`);
 
-    // Lấy Public URL của file vừa upload
     const { data: publicUrlData } = this.supabase.storage
-      .from(this.bucketName)
-      .getPublicUrl(data.path);
+      .from(this.legacyBucketName)
+      .getPublicUrl(data!.path);
 
     return publicUrlData.publicUrl;
   }
 
-  /**
-   * Xóa một file khỏi Supabase Storage dựa vào public URL của nó.
-   *
-   * @param publicUrl - Public URL của file (lấy từ cột fileUrl trong DB)
-   */
   async deleteFromSupabase(publicUrl: string): Promise<void> {
-    // Parse filePath từ URL dạng:
-    // https://<project>.supabase.co/storage/v1/object/public/<bucket>/documents/xxx_file.pdf
-    // → ta cần lấy phần: "documents/xxx_file.pdf"
     const urlObj = new URL(publicUrl);
-    const pathParts = urlObj.pathname.split(`/object/public/${this.bucketName}/`);
+    const pathParts = urlObj.pathname.split(`/object/public/${this.legacyBucketName}/`);
 
     if (pathParts.length < 2 || !pathParts[1]) {
       throw new Error(`Không thể parse file path từ URL: ${publicUrl}`);
@@ -127,10 +203,12 @@ export class SupabaseService {
 
     this.logger.log(`Đang xóa file trên Supabase Storage: ${filePath}`);
 
-    const { error } = await this.supabase.storage.from(this.bucketName).remove([filePath]);
+    const { error } = await this.supabase.storage
+      .from(this.legacyBucketName)
+      .remove([filePath]);
 
     if (error) {
-      this.logger.error(`Xóa file thất bại: ${error.message}`, error);
+      this.logger.error(`Xóa file thất bại: ${error.message}`, error.stack);
       throw new Error(`Supabase Storage xóa thất bại: ${error.message}`);
     }
 

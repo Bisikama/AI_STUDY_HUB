@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { authApi } from '@/services/authApi';
 
 interface NavItem {
   label: string;
@@ -136,6 +137,16 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   /**
    * Xác định item nào đang active:
@@ -176,6 +187,21 @@ export default function AdminSidebar() {
                 <NavLink item={item} isActive={isActive(item.href)} />
               </li>
             ))}
+            <li>
+              <button
+                onClick={handleLogout}
+                className="group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition-all duration-150 hover:bg-red-50 hover:text-red-800"
+              >
+                <span className="flex-shrink-0 text-red-500 group-hover:text-red-700">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                </span>
+                <span>Logout</span>
+              </button>
+            </li>
           </ul>
         </nav>
       </div>

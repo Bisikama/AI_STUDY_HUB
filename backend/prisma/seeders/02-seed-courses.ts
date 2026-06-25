@@ -9,6 +9,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         code: 'SWE102',
         name: 'Web Development with NestJS',
         description: 'Learn modern backend development using NestJS framework',
+        isSystem: true,
       },
     }),
     prisma.subject.create({
@@ -16,6 +17,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         code: 'DBI202',
         name: 'Database Systems & SQL Optimization',
         description: 'Master database design and query optimization techniques',
+        isSystem: true,
       },
     }),
     prisma.subject.create({
@@ -23,6 +25,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         code: 'PRJ301',
         name: 'Project Management & DevOps',
         description: 'Understand CI/CD pipelines and project management best practices',
+        isSystem: true,
       },
     }),
     prisma.subject.create({
@@ -30,6 +33,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         code: 'AI101',
         name: 'Introduction to Machine Learning',
         description: 'Fundamentals of machine learning and neural networks',
+        isSystem: true,
       },
     }),
     prisma.subject.create({
@@ -37,6 +41,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         code: 'WEB101',
         name: 'Web Technologies Fundamentals',
         description: 'HTML, CSS, JavaScript, and responsive design principles',
+        isSystem: true,
       },
     }),
     prisma.subject.create({
@@ -44,6 +49,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         code: 'SEC101',
         name: 'Information Security & Cryptography',
         description: 'Security principles, encryption methods, and secure coding practices',
+        isSystem: true,
       },
     }),
   ]);

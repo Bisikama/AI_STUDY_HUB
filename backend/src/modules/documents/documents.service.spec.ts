@@ -7,9 +7,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentsService } from './documents.service';
 import { PrismaService } from '../../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { SupabaseService } from '../../supabase/supabase.service';
+import { STORAGE_ADAPTER } from '../../supabase/storage-adapter.interface';
+import type { StorageAdapter } from '../../supabase/storage-adapter.interface';
 import { SubjectsService } from '../subjects/subjects.service';
 import { TagsService } from '../tags/tags.service';
+import { DocumentAccessService } from './document-access.service';
 import {
   NotFoundException,
   BadRequestException,
@@ -21,11 +23,7 @@ interface ServiceWithPrivateMethods {
 }
 
 jest.mock('./utils/documentParser', () => ({
-  parseDocument: jest
-    .fn()
-    .mockResolvedValue(
-      'Extracted plain text contents for test. This content must be longer than fifty characters to pass validation.',
-    ),
+  parseDocument: jest.fn(),
 }));
 
 jest.mock('fs', () => ({
@@ -37,6 +35,7 @@ jest.mock('fs', () => ({
 }));
 
 import { parseDocument } from './utils/documentParser';
+const mockParseDocument = parseDocument as jest.MockedFunction<typeof parseDocument>;
 
 // Mock GoogleGenerativeAI
 const mockCountTokens = jest.fn();
@@ -73,7 +72,13 @@ describe('DocumentsService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
+      delete: jest.fn(),
       deleteMany: jest.fn(),
+      findMany: jest.fn(),
+    },
+    documentChunk: {
+      createMany: jest.fn(),
       findMany: jest.fn(),
     },
     userFollowedDocument: {
@@ -104,8 +109,13 @@ describe('DocumentsService', () => {
     get: jest.fn().mockReturnValue('mock-api-key-123'),
   };
 
-  const mockSupabase = {
-    uploadToSupabase: jest.fn().mockResolvedValue('http://mock-supabase-url.com/file.pdf'),
+  const mockStorageAdapter = {
+    uploadPrivate: jest.fn().mockResolvedValue({ storagePath: 'private/path/file.pdf' }),
+    createPreviewUrl: jest.fn(),
+    createDownloadUrl: jest.fn(),
+    deleteObject: jest.fn().mockResolvedValue(undefined),
+    uploadToSupabase: jest.fn(),
+    deleteFromSupabase: jest.fn(),
   };
 
   const mockSubjectsService = {
@@ -118,8 +128,18 @@ describe('DocumentsService', () => {
     getTags: jest.fn(),
   };
 
+  const mockDocumentAccessService = {
+    authorizeAccess: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockParseDocument.mockReset();
+    mockParseDocument.mockResolvedValue({
+      text: 'Default valid extracted PDF text with at least twenty characters.',
+      pageCount: 1,
+    });
+
     mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-id', role: 'STUDENT' });
 
     const module: TestingModule = await Test.createTestingModule({
@@ -127,9 +147,10 @@ describe('DocumentsService', () => {
         DocumentsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfig },
-        { provide: SupabaseService, useValue: mockSupabase },
+        { provide: STORAGE_ADAPTER, useValue: mockStorageAdapter },
         { provide: SubjectsService, useValue: mockSubjectsService },
         { provide: TagsService, useValue: mockTagsService },
+        { provide: DocumentAccessService, useValue: mockDocumentAccessService },
       ],
     }).compile();
 
@@ -221,6 +242,14 @@ describe('DocumentsService', () => {
         title: 'Title',
         fileSize: BigInt(100),
       });
+      mockPrisma.document.update.mockResolvedValue({});
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id',
+        title: 'Title',
+        fileSize: BigInt(100),
+        storagePath: 'private/path/file.pdf',
+        extractionStatus: 'PENDING',
+      });
 
       const result = await service.uploadAndParse(mockFile, 'Title', 'Desc', 1);
 
@@ -229,20 +258,69 @@ describe('DocumentsService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             uploadedBy: 'fallback-user-id',
+            extractionStatus: 'PENDING',
+            fileUrl: '', // Q6 technical staging dummy
           }),
         }),
       );
-      expect(result).toEqual({ id: 'doc-id', title: 'Title', fileSize: 100 });
+      expect(mockStorageAdapter.uploadPrivate).toHaveBeenCalled();
+      expect(result.id).toEqual('doc-id');
     });
 
-    it('should throw BadRequestException if parsing fails', async () => {
-      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, name: 'Subject 1' });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-id' });
-      (parseDocument as jest.Mock).mockRejectedValueOnce(new Error('Extract error'));
+    it('should return 502 (BadGatewayException) if uploadPrivate fails and cleanup staging', async () => {
+      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1 });
+      mockPrisma.document.create.mockResolvedValue({ id: 'doc-fail-upload' });
+      mockStorageAdapter.uploadPrivate.mockRejectedValueOnce(new Error('Storage failure'));
 
       await expect(service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id')).rejects.toThrow(
-        BadRequestException,
+        expect.objectContaining({ status: 502 }) // BadGatewayException
       );
+      expect(mockPrisma.document.delete).toHaveBeenCalledWith({ where: { id: 'doc-fail-upload' } });
+    });
+
+    it('should return 502 and delete object if DB update fails after uploadPrivate succeeds', async () => {
+      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1 });
+      mockPrisma.document.create.mockResolvedValue({ id: 'doc-fail-db' });
+      mockStorageAdapter.uploadPrivate.mockResolvedValueOnce({ storagePath: 'test/path' });
+      mockPrisma.document.update.mockRejectedValueOnce(new Error('DB failure'));
+
+      await expect(service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id')).rejects.toThrow(
+        expect.objectContaining({ status: 502 })
+      );
+      expect(mockStorageAdapter.deleteObject).toHaveBeenCalledWith('test/path');
+    });
+    it('should ignore extraction errors and return safe document payload', async () => {
+      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, name: 'Subject 1' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-id' });
+      mockPrisma.document.create.mockResolvedValue({ id: 'doc-1', status: 'PRIVATE' });
+
+      const mockDate = new Date('2026-01-01T00:00:00Z');
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-1',
+        title: 'Title',
+        description: 'Desc',
+        subjectId: 1,
+        fileType: 'application/pdf',
+        fileSize: BigInt(123),
+        visibilityStatus: 'PRIVATE',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'FAILED',
+        aiStatus: 'READY',
+        pageCount: 1,
+        createdAt: mockDate,
+        storagePath: 'secret/path',
+        fileUrl: 'http://secret.url',
+        fullText: 'secret text'
+      });
+      (parseDocument as jest.Mock).mockRejectedValueOnce(new Error('Extract error'));
+
+      const result = await service.uploadAndParse(mockFile, 'Title', 'Desc', 1, 'user-id');
+      expect(result.id).toBe('doc-1');
+      expect(result.createdAt).toBe('2026-01-01T00:00:00.000Z');
+      expect(result.fileSize).toBe(123);
+      expect(result).not.toHaveProperty('fullText');
+      expect(result).not.toHaveProperty('storagePath');
+      expect(result).not.toHaveProperty('fileUrl');
     });
   });
 
@@ -506,29 +584,471 @@ describe('DocumentsService', () => {
       await expect(service.getDetails('invalid-id')).rejects.toThrow(NotFoundException);
     });
 
-    it('should return document structure with summary and quizzes', async () => {
+    it('should return safe document structure and omit forbidden fields', async () => {
+      const ownerId = 'user-1';
+      const mockDate = new Date('2026-01-01T00:00:00Z');
       mockPrisma.document.findUnique.mockResolvedValue({
         id: 'doc-id',
         title: 'Title',
+        description: 'Desc',
+        subjectId: 1,
+        subject: { id: 1, name: 'Math', code: 'MATH101', isSystem: true },
+        fileType: 'application/pdf',
         fileSize: BigInt(999),
+        visibilityStatus: 'PRIVATE',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+        pageCount: 10,
+        createdAt: mockDate,
+        updatedAt: mockDate,
+        requestedAt: null,
+        // Forbidden fields
+        uploadedBy: ownerId,
+        storagePath: 'documents/user-id/doc-id/test.pdf',
+        fileUrl: 'http://example.com/file',
+        previewUrl: 'http://example.com/preview',
+        status: 'APPROVED',
+        fullText: 'secret text',
         summary: { id: 's-1' },
         quizzes: [{ id: 'q-1' }],
+        tags: [{ id: 't-1' }],
+        aiRunId: 'run-1',
+        aiProcessingStartedAt: mockDate,
+        aiGeneratedAt: mockDate,
+        aiAttemptCount: 1,
+        aiFailureReason: 'none',
         deletedAt: null,
-        status: 'APPROVED',
       });
 
-      const result = await service.getDetails('doc-id');
-      expect(result).toEqual({
+      const result = await service.getDetails('doc-id', ownerId);
+
+      // Safe fields exist
+      expect(result).toEqual(expect.objectContaining({
         id: 'doc-id',
         title: 'Title',
+        description: 'Desc',
+        subjectId: 1,
+        subject: { id: 1, name: 'Math', code: 'MATH101', isSystem: true },
+        fileType: 'application/pdf',
         fileSize: 999,
-        summary: { id: 's-1' },
-        quizzes: [{ id: 'q-1' }],
-        deletedAt: null,
-        status: 'APPROVED',
+        visibilityStatus: 'PRIVATE',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+        pageCount: 10,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        requestedAt: null,
+        isOwner: true,
         isFollowed: false,
-        isOwner: false,
+      }));
+
+      // Timestamps serialize to ISO strings
+      expect(typeof result.createdAt).toBe('string');
+      expect(typeof result.updatedAt).toBe('string');
+
+      // Forbidden fields absent
+      const forbiddenFields = [
+        'uploadedBy', 'fileUrl', 'previewUrl', 'storagePath', 'status',
+        'fullText', 'summary', 'quizzes', 'tags', 'aiRunId',
+        'aiProcessingStartedAt', 'aiGeneratedAt', 'aiAttemptCount', 'aiFailureReason'
+      ];
+      forbiddenFields.forEach(field => {
+        expect(result).not.toHaveProperty(field);
       });
+    });
+  });
+
+  describe('extractAndPersist', () => {
+    it('should skip if document does not exist', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(null);
+      const res = await service.extractAndPersist({ documentId: 'invalid', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'app/pdf' });
+      expect(res).toEqual({ extractionStatus: 'FAILED', chunkCount: 0 });
+    });
+
+    it('should skip if mimeType is not application/pdf', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.txt', mimeType: 'text/plain' });
+      expect(res).toEqual({ extractionStatus: 'FAILED', chunkCount: 0 });
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: { extractionStatus: 'FAILED' }
+      });
+    });
+
+    it('should skip if already READY or FAILED', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'READY' });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'app/pdf' });
+      expect(res).toEqual({ extractionStatus: 'READY', chunkCount: 0 });
+    });
+
+    it('should update to FAILED if parseDocument throws', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
+      mockParseDocument.mockRejectedValueOnce(new Error('Parser error'));
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
+      expect(res).toEqual({ extractionStatus: 'FAILED', chunkCount: 0 });
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: { extractionStatus: 'FAILED' },
+      });
+    });
+
+    it('should update to FAILED if normalized text < 20 chars', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
+      mockParseDocument.mockResolvedValueOnce({ text: '  short   ', pageCount: 1 });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
+      expect(res).toEqual({ extractionStatus: 'FAILED', chunkCount: 0 });
+    });
+
+    it('should chunk correctly for exactly 1 chunk <= 1500 chars', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-1',
+        extractionStatus: 'PENDING',
+        aiStatus: 'NOT_REQUESTED',
+        fullText: null,
+        pageCount: null,
+      });
+      const validText = 'a'.repeat(100);
+      mockParseDocument.mockResolvedValueOnce({ text: validText, pageCount: 1 });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
+
+      expect(res.extractionStatus).toBe('READY');
+      expect(res.chunkCount).toBe(1);
+      expect(mockPrisma.documentChunk.createMany).toHaveBeenCalledWith({
+        data: [{ documentId: 'doc-1', chunkIndex: 0, content: validText, charStart: 0, charEnd: 100 }]
+      });
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: {
+          extractionStatus: 'READY',
+          fullText: validText,
+          pageCount: 1,
+        }
+      });
+    });
+
+    it('should chunk multiple times for > 1500 chars and respect 200 char overlap', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-1',
+        extractionStatus: 'PENDING',
+        aiStatus: 'NOT_REQUESTED',
+        fullText: null,
+        pageCount: null,
+      });
+      // text is 2000 long
+      const validText = 'a'.repeat(1500) + 'b'.repeat(500);
+      mockParseDocument.mockResolvedValueOnce({ text: validText, pageCount: 3 });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
+
+      expect(res.extractionStatus).toBe('READY');
+      expect(res.chunkCount).toBe(2);
+      expect(res.pageCount).toBe(3);
+
+      const calls = mockPrisma.documentChunk.createMany.mock.calls[0][0].data;
+      expect(calls[0]).toEqual({ documentId: 'doc-1', chunkIndex: 0, content: validText.slice(0, 1500), charStart: 0, charEnd: 1500 });
+      // Next chunk starts at 1500 - 200 = 1300
+      expect(calls[1]).toEqual({ documentId: 'doc-1', chunkIndex: 1, content: validText.slice(1300, 2000), charStart: 1300, charEnd: 2000 });
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: {
+          extractionStatus: 'READY',
+          fullText: validText,
+          pageCount: 3,
+        }
+      });
+    });
+
+    it('should fallback to FAILED if transaction throws', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
+      const validText = 'a'.repeat(100);
+      mockParseDocument.mockResolvedValueOnce({ text: validText, pageCount: 1 });
+
+      mockPrisma.$transaction.mockRejectedValueOnce(new Error('DB Failed'));
+
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.pdf', mimeType: 'application/pdf' });
+      expect(res.extractionStatus).toBe('FAILED');
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: { extractionStatus: 'FAILED' }
+      });
+    });
+  });
+
+  describe('getReadyChunksForAI', () => {
+    it('returns ordered chunks if READY', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'READY' });
+      mockPrisma.documentChunk.findMany.mockResolvedValue([
+        { chunkIndex: 0, content: 'A', charStart: 0, charEnd: 1 },
+        { chunkIndex: 1, content: 'B', charStart: 1, charEnd: 2 },
+      ]);
+
+      const res = await service.getReadyChunksForAI('doc-1');
+      expect(res).toHaveLength(2);
+    });
+
+    it('throws BadRequestException if PENDING or FAILED', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'FAILED' });
+      await expect(service.getReadyChunksForAI('doc-1')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('getDocumentsByUser', () => {
+    it('returns only owned active documents without followed docs and includes fileType but no sensitive fields', async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        { id: 'doc-1', uploadedBy: 'user-1', deletionStatus: 'ACTIVE', fileType: 'application/pdf', fileUrl: 'secret.url' },
+      ]);
+      const res = await service.getDocumentsByUser('user-1', { page: 1, limit: 10 });
+      expect(res).toHaveLength(1);
+      expect(mockPrisma.userFollowedDocument.findMany).not.toHaveBeenCalled();
+
+      const returnedDoc = res[0] as any;
+      expect(returnedDoc.fileType).toBe('application/pdf');
+      expect(returnedDoc.fileUrl).toBeUndefined();
+      expect(returnedDoc.uploadedBy).toBeUndefined();
+      expect(returnedDoc.storagePath).toBeUndefined();
+    });
+  });
+
+  describe('softDeleteDocument', () => {
+    it('soft deletes active owned document', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-1', deletionStatus: 'ACTIVE', deletedAt: null });
+      await service.softDeleteDocument('doc-1', 'user-1');
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-1' },
+        data: expect.objectContaining({ deletionStatus: 'SOFT_DELETED', visibilityStatus: 'PRIVATE' }),
+      });
+    });
+  });
+
+  describe('Q9 - requestPublic', () => {
+    it('1. Owner requests public on valid PRIVATE document with system subject', async () => {
+      mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.document.findUnique
+        .mockResolvedValueOnce({
+          id: 'doc-1',
+          uploadedBy: 'user-1',
+          visibilityStatus: 'PRIVATE',
+          deletionStatus: 'ACTIVE',
+          deletedAt: null,
+          storagePath: 'path/to/file.pdf',
+          extractionStatus: 'READY',
+          aiStatus: 'READY',
+          subject: { isSystem: true },
+        })
+        .mockResolvedValueOnce({
+          id: 'doc-1',
+          visibilityStatus: 'PENDING_REVIEW',
+        });
+
+      const res = await service.requestPublic('doc-1', 'user-1');
+      expect(res.visibilityStatus).toBe('PENDING_REVIEW');
+      expect(mockPrisma.document.updateMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          id: 'doc-1',
+          visibilityStatus: 'PRIVATE',
+          deletionStatus: 'ACTIVE',
+        }),
+        data: expect.objectContaining({
+          visibilityStatus: 'PENDING_REVIEW',
+          requestedAt: expect.any(Date),
+        }),
+      });
+    });
+
+    it('2. Personal Subject -> 422 DOCUMENT_PUBLIC_SUBJECT_REQUIRED', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-2',
+        uploadedBy: 'user-1',
+        subject: { isSystem: false },
+      });
+      await expect(service.requestPublic('doc-2', 'user-1')).rejects.toThrow('DOCUMENT_PUBLIC_SUBJECT_REQUIRED');
+    });
+
+    it('3. Invalid lifecycle -> 409 DOCUMENT_INVALID_STATE', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-3',
+        uploadedBy: 'user-1',
+        subject: { isSystem: true },
+        visibilityStatus: 'PENDING_REVIEW', // Already pending
+        deletionStatus: 'ACTIVE',
+        deletedAt: null,
+        storagePath: 'path',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-3', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3a. Owner, extractionStatus = FAILED -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-4', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'FAILED', aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-4', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3b. Owner, aiStatus = NOT_REQUESTED -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-5', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'NOT_REQUESTED',
+      });
+      await expect(service.requestPublic('doc-5', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3c. Owner, aiStatus = FAILED -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-6', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'FAILED',
+      });
+      await expect(service.requestPublic('doc-6', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3d. Owner, storagePath = null -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-7', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: null, extractionStatus: 'READY', aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-7', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3e. Owner, already PENDING_REVIEW -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-8', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PENDING_REVIEW', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-8', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3f. Owner, already PUBLIC -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-9', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PUBLIC', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-9', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3g. Owner, SOFT_DELETED / non-ACTIVE -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-10', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'SOFT_DELETED', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+      });
+      await expect(service.requestPublic('doc-10', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3h. Race condition handled by updateMany returning 0 count -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-1', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+      });
+      mockPrisma.document.updateMany.mockResolvedValue({ count: 0 }); // State changed concurrently
+      await expect(service.requestPublic('doc-1', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('4. Owner-only: User B cannot request public for User A document', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-1',
+        uploadedBy: 'user-A',
+      });
+      await expect(service.requestPublic('doc-1', 'user-B')).rejects.toThrow('permission');
+    });
+  });
+
+  describe('Q9 - withdrawPublic', () => {
+    it('5. Withdraw success: PUBLIC -> PRIVATE', async () => {
+      mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.document.findUnique
+        .mockResolvedValueOnce({
+          id: 'doc-pub',
+          uploadedBy: 'user-1',
+          visibilityStatus: 'PUBLIC',
+          deletionStatus: 'ACTIVE',
+          deletedAt: null,
+          storagePath: 'documents/user-1/doc-pub/example.pdf',
+        })
+        .mockResolvedValueOnce({
+          id: 'doc-pub',
+          visibilityStatus: 'PRIVATE',
+        });
+
+      const res = await service.withdrawPublic('doc-pub', 'user-1');
+      expect(res.visibilityStatus).toBe('PRIVATE');
+    });
+
+    it('6. Withdraw invalid state -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-priv',
+        uploadedBy: 'user-1',
+        visibilityStatus: 'PRIVATE', // Not public
+        deletionStatus: 'ACTIVE',
+        deletedAt: null,
+        storagePath: 'path',
+      });
+      await expect(service.withdrawPublic('doc-priv', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('7. User B cannot withdraw User A PUBLIC document', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-pub',
+        uploadedBy: 'user-A',
+        visibilityStatus: 'PUBLIC',
+      });
+      await expect(service.withdrawPublic('doc-pub', 'user-B')).rejects.toThrow('permission');
+    });
+  });
+
+  describe('updateDocument', () => {
+    it('should return safe mapped response and omit forbidden fields', async () => {
+      const mockDate = new Date('2026-01-01T00:00:00Z');
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id',
+        uploadedBy: 'user-1',
+        deletedAt: null,
+        deletionStatus: 'ACTIVE',
+        storagePath: 'path'
+      });
+      mockPrisma.document.update.mockResolvedValue({
+        id: 'doc-id',
+        title: 'New Title',
+        description: 'New Desc',
+        subjectId: 2,
+        subject: { id: 2, name: 'Science', code: 'SCI101', isSystem: false },
+        fileType: 'application/pdf',
+        fileSize: BigInt(123),
+        visibilityStatus: 'PRIVATE',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+        pageCount: 5,
+        createdAt: mockDate,
+        updatedAt: mockDate,
+        requestedAt: null,
+        // forbidden
+        uploadedBy: 'user-1',
+        storagePath: 'path',
+        fileUrl: 'url',
+        fullText: 'text',
+      });
+
+      const result = await service.updateDocument('doc-id', 'user-1', { title: 'New Title' });
+      expect(result.id).toBe('doc-id');
+      expect(result.isOwner).toBe(true);
+      expect(result.isFollowed).toBe(false);
+      expect(result.updatedAt).toBe('2026-01-01T00:00:00.000Z');
+      expect(result).not.toHaveProperty('fullText');
+      expect(result).not.toHaveProperty('storagePath');
+      expect(result).not.toHaveProperty('uploadedBy');
+    });
+  });
+
+  describe('sanitizeData', () => {
+    it('should serialize Date to ISO string and BigInt to Number', () => {
+      const input = {
+        dateField: new Date('2026-01-01T00:00:00Z'),
+        bigIntField: BigInt(100),
+        nested: {
+          date: new Date('2026-01-02T00:00:00Z')
+        },
+        arr: [BigInt(50), new Date('2026-01-03T00:00:00Z')]
+      };
+      const result = (service as any).sanitizeData(input);
+      expect(result.dateField).toBe('2026-01-01T00:00:00.000Z');
+      expect(result.bigIntField).toBe(100);
+      expect(result.nested.date).toBe('2026-01-02T00:00:00.000Z');
+      expect(result.arr[0]).toBe(50);
+      expect(result.arr[1]).toBe('2026-01-03T00:00:00.000Z');
     });
   });
 });

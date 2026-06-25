@@ -29,9 +29,5 @@ export class UpdateDocumentDto {
   @IsOptional()
   @Type(() => Number)
   subjectId?: number;
-
-  @IsString()
-  @IsOptional()
-  tags?: string; // JSON string of tag names
 }
 

@@ -8,21 +8,28 @@ export interface UploadDocumentPayload {
   tags?: string; // JSON string
 }
 
+export type SignedDocumentUrlResponse = {
+  url: string;
+  expiresAt: string;
+  fileName: string;
+  disposition: 'inline' | 'attachment';
+};
+
 export interface Document {
   id: string;
   title: string;
   description: string | null;
   subjectId: number;
   subject?: { id: number; name: string; code: string; isSystem: boolean } | null;
-  uploadedBy: string;
-  fileUrl: string;
-  previewUrl: string | null;
   fileSize: number;
   fileType: string;
   downloadCount: number;
   viewCount: number;
-  status: 'PRIVATE' | 'PENDING' | 'APPROVED' | 'REJECTED';
-  fullText: string | null;
+  visibilityStatus: 'PUBLIC' | 'PENDING_REVIEW' | 'PRIVATE';
+  deletionStatus?: 'ACTIVE' | 'SOFT_DELETED' | 'DELETING' | 'DELETE_FAILED' | 'REMOVED';
+  extractionStatus?: 'PENDING' | 'READY' | 'FAILED';
+  aiStatus?: 'NOT_REQUESTED' | 'PROCESSING' | 'READY' | 'FAILED';
+  pageCount?: number | null;
   isAIGenerated: boolean;
   isOwner?: boolean;
   isFollowed?: boolean;
@@ -30,6 +37,7 @@ export interface Document {
   quizzes?: any[];
   createdAt: string;
   updatedAt: string;
+  requestedAt?: string | null;
   tags?: Array<{ documentId: string; tagId: number; tag: { id: number; name: string; slug: string; isSystem: boolean } }>;
 }
 
@@ -38,10 +46,13 @@ export interface UploadDocumentResponse {
   title: string;
   description: string | null;
   subjectId: number;
-  fileUrl: string;
   fileSize: number;
   fileType: string;
-  status: string;
+  visibilityStatus: string;
+  deletionStatus: string;
+  extractionStatus: string;
+  aiStatus: string;
+  pageCount: number | null;
   createdAt: string;
 }
 
@@ -72,8 +83,23 @@ export const documentsApi = {
   /**
    * Get all documents uploaded by the current user.
    */
-  getMyDocuments: async (): Promise<Document[]> => {
-    const response = await axiosClient.get("/documents/me");
+  getMyDocuments: async (params?: {
+    page?: number;
+    limit?: number;
+    q?: string;
+    subjectId?: number;
+    visibilityStatus?: string;
+  }): Promise<{ data: Document[]; meta: { total: number; page: number; limit: number; totalPages: number } }> => {
+    // Clean up undefined/empty params
+    const cleanParams: any = {};
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') {
+          cleanParams[key] = value;
+        }
+      });
+    }
+    const response = await axiosClient.get("/documents/me", { params: cleanParams });
     return response.data;
   },
 
@@ -122,6 +148,38 @@ export const documentsApi = {
    */
   unfollowDocument: async (id: string): Promise<any> => {
     const response = await axiosClient.post(`/documents/${id}/unfollow`);
+    return response.data;
+  },
+
+  /**
+   * Get secure signed URL for inline preview.
+   */
+  getPreviewSignedUrl: async (id: string): Promise<SignedDocumentUrlResponse> => {
+    const response = await axiosClient.get(`/documents/${id}/preview`);
+    return response.data.data || response.data;
+  },
+
+  /**
+   * Get secure signed URL for download attachment.
+   */
+  getDownloadSignedUrl: async (id: string): Promise<SignedDocumentUrlResponse> => {
+    const response = await axiosClient.get(`/documents/${id}/download`);
+    return response.data.data || response.data;
+  },
+
+  /**
+   * Request to make a document public.
+   */
+  requestDocumentPublic: async (id: string): Promise<any> => {
+    const response = await axiosClient.post(`/documents/${id}/request-public`);
+    return response.data;
+  },
+
+  /**
+   * Withdraw a public document.
+   */
+  withdrawDocumentPublic: async (id: string): Promise<any> => {
+    const response = await axiosClient.post(`/documents/${id}/withdraw-public`);
     return response.data;
   },
 };

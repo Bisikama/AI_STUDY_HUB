@@ -1,7 +1,8 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DocumentStatus } from '../../../generated/prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SupabaseService } from '../../supabase/supabase.service';
+import { GetAdminQuizzesQueryDto, UpdateQuestionDto } from './dto/admin-quiz.dto';
 
 @Injectable()
 export class AdminService {
@@ -198,5 +199,236 @@ export class AdminService {
       success: true,
       message: 'Tài liệu đã được xóa hoàn toàn khỏi hệ thống',
     };
+  }
+
+  async getQuizzes(query: GetAdminQuizzesQueryDto) {
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const skip = (page - 1) * limit;
+    const search = query.search?.trim();
+    const subjectId = query.subjectId;
+
+    const where: any = {
+      ...(subjectId ? { document: { subjectId } } : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                title: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                document: {
+                  title: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    try {
+      const [quizzes, totalItems] = await Promise.all([
+        this.prisma.quiz.findMany({
+          where,
+          include: {
+            document: {
+              select: {
+                id: true,
+                title: true,
+                subject: {
+                  select: { id: true, name: true, code: true },
+                },
+              },
+            },
+            user: {
+              select: { id: true, fullName: true, email: true },
+            },
+            _count: {
+              select: { questions: true },
+            },
+          },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.quiz.count({ where }),
+      ]);
+
+      const totalPages = Math.ceil(totalItems / limit);
+
+      return {
+        data: this.sanitizeData(quizzes),
+        totalItems,
+        totalPages,
+        page,
+        limit,
+      };
+    } catch (error) {
+      console.error('Lỗi khi lấy danh sách quiz:', error);
+      throw new InternalServerErrorException('Không thể lấy danh sách bộ câu hỏi');
+    }
+  }
+
+  async getQuizById(id: string) {
+    try {
+      const quiz = await this.prisma.quiz.findUnique({
+        where: { id },
+        include: {
+          document: {
+            select: { id: true, title: true },
+          },
+          questions: {
+            include: {
+              options: true,
+            },
+          },
+        },
+      });
+
+      if (!quiz) {
+        throw new NotFoundException('Không tìm thấy bộ câu hỏi với ID đã cho');
+      }
+
+      return this.sanitizeData(quiz);
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      console.error('Lỗi khi lấy chi tiết quiz:', error);
+      throw new InternalServerErrorException('Không thể lấy chi tiết bộ câu hỏi');
+    }
+  }
+
+  async updateQuestion(questionId: string, dto: UpdateQuestionDto) {
+    try {
+      const question = await this.prisma.quizQuestion.findUnique({
+        where: { id: questionId },
+      });
+
+      if (!question) {
+        throw new NotFoundException('Không tìm thấy câu hỏi với ID đã cho');
+      }
+
+      // Nếu có cập nhật options, kiểm tra xem có đúng 1 đáp án chính xác không
+      if (dto.options) {
+        const correctCount = dto.options.filter((opt) => opt.isCorrect).length;
+        if (correctCount !== 1) {
+          throw new BadRequestException('Mỗi câu hỏi phải có chính xác một đáp án đúng');
+        }
+      }
+
+      const updatedQuestion = await this.prisma.$transaction(async (tx) => {
+        // Cập nhật text của câu hỏi
+        if (dto.questionText !== undefined) {
+          await tx.quizQuestion.update({
+            where: { id: questionId },
+            data: { questionText: dto.questionText },
+          });
+        }
+
+        // Cập nhật các options
+        if (dto.options) {
+          for (const opt of dto.options) {
+            await tx.quizOption.update({
+              where: { id: opt.id },
+              data: {
+                optionText: opt.optionText,
+                isCorrect: opt.isCorrect,
+              },
+            });
+          }
+        }
+
+        return tx.quizQuestion.findUnique({
+          where: { id: questionId },
+          include: { options: true },
+        });
+      });
+
+      return this.sanitizeData(updatedQuestion);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      console.error('Lỗi khi cập nhật câu hỏi:', error);
+      throw new InternalServerErrorException('Không thể cập nhật câu hỏi');
+    }
+  }
+
+  async deleteQuiz(id: string) {
+    try {
+      const quiz = await this.prisma.quiz.findUnique({
+        where: { id },
+      });
+
+      if (!quiz) {
+        throw new NotFoundException('Không tìm thấy bộ câu hỏi với ID đã cho');
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        // Xóa quiz (Cascade delete sẽ tự động xóa QuizQuestion, QuizOption, UserQuizAttempt liên quan)
+        await tx.quiz.delete({
+          where: { id },
+        });
+
+        // Cập nhật lại cờ isAIGenerated của Document gốc về false
+        await tx.document.update({
+          where: { id: quiz.documentId },
+          data: { isAIGenerated: false },
+        });
+      });
+
+      return {
+        success: true,
+        message: 'Bộ câu hỏi đã được xóa thành công',
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      console.error('Lỗi khi xóa bộ câu hỏi:', error);
+      throw new InternalServerErrorException('Không thể xóa bộ câu hỏi');
+    }
+  }
+
+  async getQuizAnalytics(id: string) {
+    try {
+      const quiz = await this.prisma.quiz.findUnique({
+        where: { id },
+        include: {
+          document: {
+            select: { id: true, title: true },
+          },
+        },
+      });
+
+      if (!quiz) {
+        throw new NotFoundException('Không tìm thấy bộ câu hỏi với ID đã cho');
+      }
+
+      const attempts = await this.prisma.userQuizAttempt.findMany({
+        where: { quizId: id },
+      });
+
+      const totalAttempts = attempts.length;
+      const averageScore =
+        totalAttempts > 0
+          ? Number((attempts.reduce((sum, item) => sum + item.score, 0) / totalAttempts).toFixed(2))
+          : 0;
+
+      return {
+        quizId: quiz.id,
+        quizTitle: quiz.title,
+        documentTitle: quiz.document.title,
+        totalAttempts,
+        averageScore,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      console.error('Lỗi khi lấy thống kê quiz:', error);
+      throw new InternalServerErrorException('Không thể lấy thống kê bộ câu hỏi');
+    }
   }
 }

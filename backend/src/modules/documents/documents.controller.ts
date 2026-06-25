@@ -12,19 +12,26 @@ import {
   UseGuards,
   Req,
   Delete,
+  BadRequestException,
+  Inject,
+  Header,
   Patch,
 } from '@nestjs/common';
+
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { DocumentsService } from './documents.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ValidateFilePipe } from './pipes';
-import { UploadDocumentDto, UpdateDocumentDto } from './dto';
+import { UploadDocumentDto, UpdateDocumentDto, GetDocumentsDto } from './dto';
+import { DocumentsService } from './documents.service';
+import { DocumentAccessService } from './document-access.service';
+import type { StorageAdapter } from '../../supabase/storage-adapter.interface';
 import type {
   SanitizedDocument,
   SanitizedDocumentDetails,
   AnalyzeResult,
+  MyDocumentListItem,
 } from './types/document.types';
 
 @Controller('documents')
@@ -48,6 +55,7 @@ export class DocumentsController {
   @Post('/upload')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
+
   async upload(
     @UploadedFile(new ValidateFilePipe()) file: Express.Multer.File,
     @Body() dto: UploadDocumentDto,
@@ -73,8 +81,19 @@ export class DocumentsController {
   @UseGuards(JwtAuthGuard)
   async getMyDocuments(
     @CurrentUser('id') userId: string,
-  ): Promise<{ statusCode: number; message: string; data: SanitizedDocument[] }> {
-    const documents = await this.documentsService.getDocumentsByUser(userId);
+    @Req() req: any,
+  ): Promise<{ statusCode: number; message: string; data: MyDocumentListItem[] }> {
+    if ('status' in req.query) {
+      throw new BadRequestException('The "status" query parameter is not supported. Use "visibilityStatus" instead.');
+    }
+    const query = {
+      page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
+      q: req.query.q as string,
+      subjectId: req.query.subjectId ? parseInt(req.query.subjectId as string, 10) : undefined,
+      visibilityStatus: req.query.visibilityStatus as any,
+    };
+    const documents = await this.documentsService.getDocumentsByUser(userId, query);
     return {
       statusCode: 200,
       message: 'Get user documents successfully',
@@ -83,16 +102,46 @@ export class DocumentsController {
   }
 
   @Get(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getDetails(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @CurrentUser('id') userId?: string,
+    @CurrentUser('id') userId: string,
   ): Promise<{ statusCode: number; message: string; data: SanitizedDocumentDetails }> {
     const document = await this.documentsService.getDetails(id, userId);
     return {
       statusCode: 200,
       message: 'Get document details successfully',
       data: document,
+    };
+  }
+
+  @Get(':id/preview')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  async getPreviewUrl(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const result = await this.documentsService.getSignedDocumentAccess(id, userId, 'SIGNED_PREVIEW');
+    return {
+      statusCode: 200,
+      message: 'Preview URL generated successfully',
+      data: result,
+    };
+  }
+
+  @Get(':id/download')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  async getDownloadUrl(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const result = await this.documentsService.getSignedDocumentAccess(id, userId, 'SIGNED_DOWNLOAD');
+    return {
+      statusCode: 200,
+      message: 'Download URL generated successfully',
+      data: result,
     };
   }
 
@@ -130,7 +179,13 @@ export class DocumentsController {
     @Body() dto: UpdateDocumentDto,
     @CurrentUser('id') userId: string,
   ): Promise<{ statusCode: number; message: string; data: SanitizedDocument }> {
-    const document = await this.documentsService.updateDocument(id, userId, dto);
+    // Only allow title, description, subjectId
+    const safeDto = {
+      title: dto.title,
+      description: dto.description,
+      subjectId: dto.subjectId,
+    };
+    const document = await this.documentsService.updateDocument(id, userId, safeDto);
     return {
       statusCode: 200,
       message: 'Document updated successfully',
@@ -161,6 +216,34 @@ export class DocumentsController {
     return {
       statusCode: 200,
       message: 'Document unfollowed successfully',
+    };
+  }
+
+  @Post(':id/request-public')
+  @UseGuards(JwtAuthGuard)
+  async requestPublic(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const document = await this.documentsService.requestPublic(id, userId);
+    return {
+      statusCode: 200,
+      message: 'Document public visibility requested successfully',
+      data: document,
+    };
+  }
+
+  @Post(':id/withdraw-public')
+  @UseGuards(JwtAuthGuard)
+  async withdrawPublic(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const document = await this.documentsService.withdrawPublic(id, userId);
+    return {
+      statusCode: 200,
+      message: 'Document public visibility withdrawn successfully',
+      data: document,
     };
   }
 }

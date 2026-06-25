@@ -18,8 +18,6 @@ type FollowedExploreDocument = {
     name: string;
     code: string;
   } | null;
-  fileUrl: string;
-  previewUrl: string | null;
   fileType: string;
   fileSize: string;
   downloadCount: number;
@@ -77,10 +75,10 @@ function readFollowedDocumentsFromStorage(): DisplayDocument[] {
         createdAt: doc.createdAt,
         subject: doc.subject
           ? {
-              id: doc.subject.id,
-              name: doc.subject.name,
-              code: doc.subject.code,
-            }
+            id: doc.subject.id,
+            name: doc.subject.name,
+            code: doc.subject.code,
+          }
           : null,
         subjectId: doc.subject?.id ?? null,
         isAIGenerated: false,
@@ -158,7 +156,8 @@ export default function MyDocumentsPage() {
   }, []);
 
   const documents = useMemo<DisplayDocument[]>(() => {
-    const ownedDocuments = ((response || []) as DisplayDocument[]).map((doc) => ({
+    const rawDocs = Array.isArray(response) ? response : (response?.data || []);
+    const ownedDocuments = (rawDocs as DisplayDocument[]).map((doc) => ({
       ...doc,
       isLocalFollowed: false,
     }));
@@ -244,22 +243,20 @@ export default function MyDocumentsPage() {
               <div className="flex items-center rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'grid'
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
+                    }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">grid_view</span>
                   Grid
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'list'
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
+                    }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">view_list</span>
                   List
@@ -284,16 +281,16 @@ export default function MyDocumentsPage() {
             }
           >
             {documents.map((doc) => {
-              const isPdf = doc.fileType.toLowerCase().includes('pdf');
+              const fileType = typeof doc.fileType === 'string' ? doc.fileType : '';
+              const isPdf = fileType.toLowerCase().includes('pdf');
               const isFollowed = Boolean(doc.isFollowed || doc.isLocalFollowed);
 
               return (
                 <div
                   key={doc.id}
                   onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
-                  className={`group relative flex cursor-pointer flex-col justify-between rounded-2xl border p-5 shadow-sm transition-all hover:border-gray-400 hover:shadow-md ${
-                    doc.isAIGenerated ? 'border-gray-300 bg-gray-100' : 'border-gray-200 bg-white'
-                  } ${viewMode === 'list' ? 'min-h-[160px]' : ''}`}
+                  className={`group relative flex cursor-pointer flex-col justify-between rounded-2xl border p-5 shadow-sm transition-all hover:border-gray-400 hover:shadow-md ${doc.isAIGenerated ? 'border-gray-300 bg-gray-100' : 'border-gray-200 bg-white'
+                    } ${viewMode === 'list' ? 'min-h-[160px]' : ''}`}
                 >
                   <div>
                     <div className="mb-4">
@@ -529,7 +526,7 @@ export default function MyDocumentsPage() {
 
           <div className="mb-16 flex items-center gap-2 text-sm text-gray-400">
             <span className="material-symbols-outlined text-[16px]">info</span>
-            Supported formats: PDF, DOCX, TXT, and Markdown (Max 50MB)
+            Supported formats: PDF (Max 10MB)
           </div>
 
           <div className="grid w-full max-w-4xl grid-cols-1 gap-6 sm:grid-cols-3">

@@ -45,6 +45,33 @@ enum SummaryStatus {
   FAILED
 }
 
+enum VisibilityStatus {
+  PRIVATE
+  PENDING_REVIEW
+  PUBLIC
+}
+
+enum DeletionStatus {
+  ACTIVE
+  SOFT_DELETED
+  DELETING
+  DELETE_FAILED
+  REMOVED
+}
+
+enum ExtractionStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+enum AIStatus {
+  NOT_REQUESTED
+  PROCESSING
+  READY
+  FAILED
+}
+
 /// Quản lý thông tin tài khoản người dùng
 model User {
   id           String   @id @default(uuid()) @db.Uuid
@@ -90,7 +117,7 @@ model Subject {
   name        String   @unique
   code        String   @unique
   description String?  @db.Text
-  isSystem    Boolean  @default(true) @map("is_system")
+  isSystem    Boolean  @default(false) @map("is_system")
   createdBy   String?  @map("created_by") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
@@ -145,11 +172,27 @@ model Document {
   viewCount     Int            @default(0) @map("view_count")
   status        DocumentStatus @default(PRIVATE)
   fullText      String?        @map("full_text") @db.Text
+  pageCount     Int?           @map("page_count")
   isAIGenerated Boolean        @default(false) @map("is_ai_generated")
   rating        Float          @default(0.0) @map("rating")
   deletedAt     DateTime?      @map("deleted_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Document Lifecycle
+  visibilityStatus VisibilityStatus @default(PRIVATE) @map("visibility_status")
+  deletionStatus   DeletionStatus   @default(ACTIVE) @map("deletion_status")
+  extractionStatus ExtractionStatus @default(PENDING) @map("extraction_status")
+  storagePath      String?          @map("storage_path") @db.VarChar(512)
+  requestedAt      DateTime?        @map("requested_at")
+
+  // AI Fields
+  aiStatus              AIStatus  @default(NOT_REQUESTED) @map("ai_status")
+  aiRunId               String?   @map("ai_run_id")
+  aiProcessingStartedAt DateTime? @map("ai_processing_started_at")
+  aiGeneratedAt         DateTime? @map("ai_generated_at")
+  aiAttemptCount        Int       @default(0) @map("ai_attempt_count")
+  aiFailureReason       String?   @map("ai_failure_reason") @db.Text
 
   // Quan hệ
   summary        DocumentSummary?
@@ -158,6 +201,7 @@ model Document {
   documentViews  UserDocumentView[]
   tags           DocumentTag[]
   followers      UserFollowedDocument[]
+  chunks         DocumentChunk[]
 
   @@index([subjectId, status])
   @@map("documents")
@@ -264,8 +308,8 @@ model UserDocumentView {
   viewedAt   DateTime @default(now()) @map("viewed_at")
 
   // Quan hệ
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@unique([userId, documentId])
   @@index([userId, viewedAt(sort: Desc)])
@@ -280,9 +324,26 @@ model UserFollowedDocument {
   followedAt DateTime @default(now()) @map("followed_at")
 
   // Quan hệ
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@unique([userId, documentId])
   @@map("user_followed_documents")
+}
+
+/// Chia nhỏ nội dung tài liệu để xử lý AI (RAG)
+model DocumentChunk {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  chunkIndex Int      @map("chunk_index")
+  content    String   @db.Text
+  charStart  Int      @map("char_start")
+  charEnd    Int      @map("char_end")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@map("document_chunks")
 }
