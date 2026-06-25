@@ -132,78 +132,6 @@ function formatFileSize(fileSize: string): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const MOCK_DOCUMENTS: ExploreDocument[] = [
-  {
-    id: 'mock-1',
-    title: 'Introduction to Data Structures & Algorithms - Midterm Notes',
-    description:
-      'A comprehensive study guide covering linked lists, trees, graphs, and basic sorting algorithms.',
-    subject: { id: 101, name: 'Stanford University', code: 'CS101' },
-    fileType: 'application/pdf',
-    fileSize: '2457600',
-    downloadCount: 1200,
-    viewCount: 1200,
-    quizCount: 3,
-    hasSummary: true,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'mock-2',
-    title: 'Macroeconomics: Full Semester Study Guide',
-    description:
-      'Complete notes for ECON201 containing aggregate demand, supply, monetary policies, and inflation.',
-    subject: { id: 201, name: 'London School of Economics', code: 'ECON201' },
-    fileType: 'application/pdf',
-    fileSize: '3584000',
-    downloadCount: 3400,
-    viewCount: 3400,
-    quizCount: 5,
-    hasSummary: true,
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'mock-3',
-    title: 'Calculus III: Vector Analysis Cheat Sheet',
-    description:
-      "Vector fields, line integrals, Green's theorem, Stokes' theorem, and divergence theorem equations.",
-    subject: { id: 301, name: 'MIT', code: 'MATH202' },
-    fileType: 'application/pdf',
-    fileSize: '1536000',
-    downloadCount: 850,
-    viewCount: 920,
-    quizCount: 2,
-    hasSummary: false,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'mock-4',
-    title: 'Organic Chemistry Reactions Summary',
-    description:
-      'Summary sheet of key organic chemistry mechanisms including nucleophilic substitutions and eliminations.',
-    subject: { id: 401, name: 'Harvard University', code: 'CHEM101' },
-    fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    fileSize: '1843200',
-    downloadCount: 1900,
-    viewCount: 2100,
-    quizCount: 4,
-    hasSummary: true,
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'mock-5',
-    title: 'Machine Learning Past Exams (2018-2023)',
-    description: 'Compilation of midterm and final exams with detailed solutions for CS229.',
-    subject: { id: 501, name: 'UC Berkeley', code: 'CS229' },
-    fileType: 'application/zip',
-    fileSize: '12582912',
-    downloadCount: 3100,
-    viewCount: 3400,
-    quizCount: 0,
-    hasSummary: false,
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
 function getDocumentCategory(doc: ExploreDocument): string {
   const title = doc.title.toLowerCase();
 
@@ -223,12 +151,8 @@ function getDocumentCategory(doc: ExploreDocument): string {
 }
 
 function getUniversityName(doc: ExploreDocument): string {
-  if (doc.id.startsWith('mock-')) {
-    if (doc.id === 'mock-1') return 'Stanford University';
-    if (doc.id === 'mock-2') return 'London School of Economics';
-    if (doc.id === 'mock-3') return 'MIT';
-    if (doc.id === 'mock-4') return 'Harvard University';
-    return 'UC Berkeley';
+  if (doc.subject?.name) {
+    return doc.subject.name;
   }
 
   const idNum = doc.title.charCodeAt(0) + doc.title.charCodeAt(doc.title.length - 1);
@@ -301,7 +225,6 @@ function SearchExplore() {
     {},
   );
   const [isQuizSubmitting, setIsQuizSubmitting] = useState(false);
-
   const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
 
   const aiCacheUrl = selectedDocumentId
@@ -323,7 +246,8 @@ function SearchExplore() {
       params.delete('search');
     }
 
-    router.replace(`/explore?${params.toString()}`);
+    const queryString = params.toString();
+    router.replace(queryString ? `/explore?${queryString}` : '/explore');
   }, [activeQuery, router]);
 
   useEffect(() => {
@@ -359,25 +283,8 @@ function SearchExplore() {
       return documents;
     }
 
-    if (activeQuery.trim() === '') {
-      return MOCK_DOCUMENTS;
-    }
-
-    if (error) {
-      return MOCK_DOCUMENTS.filter((doc) => {
-        const query = activeQuery.toLowerCase();
-
-        return (
-          doc.title.toLowerCase().includes(query) ||
-          (doc.description && doc.description.toLowerCase().includes(query)) ||
-          getUniversityName(doc).toLowerCase().includes(query) ||
-          doc.subject?.code.toLowerCase().includes(query)
-        );
-      });
-    }
-
     return [];
-  }, [documents, activeQuery, error]);
+  }, [documents]);
 
   const filteredDocuments = useMemo(() => {
     let list = [...displayDocs];
@@ -938,7 +845,7 @@ function SearchExplore() {
                   <div>
                     <p className="font-label-md text-label-md font-semibold">Backend offline</p>
                     <p className="text-xs opacity-80">
-                      Could not load database documents. Showing matching simulated documents.
+                      Could not load database documents. Please check backend server.
                     </p>
                   </div>
                 </div>
@@ -1072,8 +979,8 @@ function SearchExplore() {
                   We couldn&apos;t find any documents matching your search
                 </h1>
                 <p className="font-body-lg text-body-lg text-secondary">
-                  Check your spelling, use more general keywords, or try a different subject.
-                  Sometimes the most specific knowledge is yet to be shared.
+                  No public documents are available yet. Documents will appear here when they pass
+                  the public lifecycle requirements.
                 </p>
               </div>
 
