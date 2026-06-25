@@ -481,13 +481,13 @@ function SearchExplore() {
     setQuizAuthWarning(null);
   };
 
-  const handleViewFull = (fileUrl?: string | null) => {
-    if (!fileUrl || fileUrl === '#') {
+  const handleViewFull = (documentId?: string | null) => {
+    if (!documentId || documentId.startsWith('mock-')) {
       alert('Document file is not available yet.');
       return;
     }
 
-    window.open(getDocumentUrl(fileUrl), '_blank', 'noopener,noreferrer');
+    window.open(`/dashboard/documents/${documentId}/preview`, '_blank', 'noopener,noreferrer');
   };
 
   const handleCardClick = async (doc: ExploreDocument) => {
@@ -1118,7 +1118,7 @@ function SearchExplore() {
                 {aiCache && (
                   <button
                     type="button"
-                    onClick={() => handleViewFull(aiCache.document.fileUrl)}
+                    onClick={() => handleViewFull(aiCache.document.id)}
                     className="bg-primary text-on-primary font-label-md text-label-md flex items-center gap-2 rounded-lg px-4 py-2 transition-all hover:shadow-md"
                   >
                     <span className="material-symbols-outlined text-[18px]">open_in_new</span>
@@ -1410,7 +1410,7 @@ function SearchExplore() {
 
                   <button
                     type="button"
-                    onClick={() => handleViewFull(aiCache.document.fileUrl)}
+                    onClick={() => handleViewFull(aiCache.document.id)}
                     className="bg-primary text-on-primary flex items-center gap-2 rounded-lg px-5 py-2 transition-all hover:shadow-md"
                   >
                     <span className="material-symbols-outlined text-[18px]">open_in_new</span>

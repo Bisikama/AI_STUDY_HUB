@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
 import { useMyDocuments } from '@/hooks/useMyDocuments';
+import { getVisibilityPresentation } from '@/utils/visibility-status';
 const formatSize = (bytes: number): string => {
   if (bytes === 0) return '0 B';
   const k = 1024;
@@ -11,24 +11,19 @@ const formatSize = (bytes: number): string => {
 };
 
 // Helper component for Status Badge
-const StatusBadge = ({ status }: { status: string }) => {
-  let bgColor = 'bg-gray-100 text-gray-800'; // PRIVATE default
-  
-  if (status === 'PENDING') {
-    bgColor = 'bg-yellow-100 text-yellow-800';
-  } else if (status === 'APPROVED') {
-    bgColor = 'bg-green-100 text-green-800';
-  }
+const StatusBadge = ({ visibilityStatus }: { visibilityStatus?: string }) => {
+  const { label, className } = getVisibilityPresentation(visibilityStatus);
 
   return (
-    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${bgColor}`}>
-      {status}
+    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${className}`}>
+      {label}
     </span>
   );
 };
 
 export default function DocumentDashboard() {
   const { documents, isLoading, isError } = useMyDocuments();
+  const documentItems = Array.isArray(documents) ? documents : (documents?.data ?? []);
 
   if (isLoading) {
     return (
@@ -59,7 +54,7 @@ export default function DocumentDashboard() {
           </p>
         </div>
         <div className="bg-primary-container text-on-primary px-3 py-1 rounded-full text-sm font-semibold">
-          {documents.length} Files
+          {documentItems.length} Files
         </div>
       </div>
 
@@ -75,7 +70,7 @@ export default function DocumentDashboard() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
-            {documents.length === 0 ? (
+            {documentItems.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-2">
@@ -85,7 +80,7 @@ export default function DocumentDashboard() {
                 </td>
               </tr>
             ) : (
-              documents.map((doc: any) => (
+              documentItems.map((doc: any) => (
                 <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -114,7 +109,7 @@ export default function DocumentDashboard() {
                     {new Date(doc.createdAt).toLocaleDateString('vi-VN')}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <StatusBadge status={doc.status} />
+                    <StatusBadge visibilityStatus={doc.visibilityStatus} />
                   </td>
                 </tr>
               ))

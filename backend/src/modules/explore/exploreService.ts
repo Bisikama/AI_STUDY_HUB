@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { GetExploreQueryDto } from './dto/getExploreQuery.dto';
 import { ExploreDocumentItem } from './types/exploreDocumentItem.type';
+import { getPublicEligibilityFilter } from '../documents/document-access.service';
 
 @Injectable()
 export class ExploreService {
@@ -12,7 +13,7 @@ export class ExploreService {
 
     const documents = await this.prisma.document.findMany({
       where: {
-        status: 'APPROVED',
+        ...getPublicEligibilityFilter(),
         ...(search
           ? {
               OR: [
@@ -89,7 +90,7 @@ export class ExploreService {
     const document = await this.prisma.document.findFirst({
       where: {
         id: documentId,
-        status: 'APPROVED',
+        ...getPublicEligibilityFilter(),
       },
       include: {
         subject: true,

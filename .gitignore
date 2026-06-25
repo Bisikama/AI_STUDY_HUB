@@ -50,4 +50,6 @@ yarn-error.log*
 
 /giao_dien
 
-
+# Không theo dõi các thư mục này
+docs/
+postman/

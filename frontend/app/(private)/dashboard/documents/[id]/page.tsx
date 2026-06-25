@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { documentsApi } from '@/services/documentsApi';
 import DeleteDocumentModal from '@/components/documents/DeleteDocumentModal';
+import { getVisibilityPresentation } from '@/utils/visibility-status';
 
 export default function DocumentDetailPage() {
   const { id } = useParams() as { id: string };
@@ -14,6 +15,8 @@ export default function DocumentDetailPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | undefined>();
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [viewType, setViewType] = useState<'text' | 'summary'>('text');
 
   // Toast notifications state
@@ -39,10 +42,10 @@ export default function DocumentDetailPage() {
   const handleAnalyze = async () => {
     if (!id) return;
     setIsAnalyzing(true);
-    
+
     // Toast 1: Loading
     addToast('Loading document data...', 'info');
-    
+
     // Transition Toast 2
     const timer = setTimeout(() => {
       addToast('AI is analyzing and generating questions...', 'info');
@@ -63,6 +66,56 @@ export default function DocumentDetailPage() {
     }
   };
 
+  const handleOpenOriginal = async () => {
+    if (!id) return;
+    const newTab = window.open('', '_blank');
+    if (!newTab) {
+      addToast('Popup blocker prevented opening the document.', 'error');
+      return;
+    }
+    try {
+      const data = await documentsApi.getDownloadSignedUrl(id);
+      newTab.location.href = data.url;
+    } catch (err: any) {
+      newTab.close();
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
+    }
+  };
+
+  const handleRequestPublic = async () => {
+    try {
+      addToast('Đang xử lý yêu cầu...', 'info');
+      await documentsApi.requestDocumentPublic(id);
+      addToast('Đã gửi yêu cầu duyệt công khai.', 'success');
+      mutate();
+      import('swr').then(({ mutate: globalMutate }) => {
+        globalMutate((key: any) => Array.isArray(key) && key[0] === '/documents/me');
+      });
+    } catch (err: any) {
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
+    }
+  };
+
+  const handleWithdrawPublic = async () => {
+    try {
+      setIsWithdrawing(true);
+      await documentsApi.withdrawDocumentPublic(id);
+      addToast('Đã rút tài liệu khỏi Explore.', 'success');
+      mutate();
+      setIsWithdrawModalOpen(false);
+      import('swr').then(({ mutate: globalMutate }) => {
+        globalMutate((key: any) => Array.isArray(key) && key[0] === '/documents/me');
+      });
+    } catch (err: any) {
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
   const formatSize = (bytes: number): string => {
     if (!bytes) return '0 B';
     if (bytes < 1024) return `${bytes} B`;
@@ -71,7 +124,8 @@ export default function DocumentDetailPage() {
   };
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -106,11 +160,49 @@ export default function DocumentDetailPage() {
     );
   }
 
-  const truncatedText = document.fullText
-    ? document.fullText.length > 3000
-      ? document.fullText.substring(0, 3000) + '...'
-      : document.fullText
-    : 'No text content available for this document.';
+  // Extract status presentation logic
+  const getExtractionStatusUI = () => {
+    switch (document.extractionStatus) {
+      case 'READY':
+        return {
+          title: 'PDF đã được trích xuất thành công',
+          icon: 'check_circle',
+          color: 'text-green-600',
+          bg: 'bg-green-50',
+          border: 'border-green-200',
+          detail: document.pageCount ? `Tài liệu gồm ${document.pageCount} trang.` : '',
+        };
+      case 'FAILED':
+        return {
+          title: 'Không thể trích xuất text từ tài liệu này.',
+          icon: 'error',
+          color: 'text-red-600',
+          bg: 'bg-red-50',
+          border: 'border-red-200',
+          detail: 'Bạn vẫn có thể xem PDF gốc.',
+        };
+      case 'PENDING':
+        return {
+          title: 'Tài liệu đang được xử lý.',
+          icon: 'hourglass_empty',
+          color: 'text-yellow-600',
+          bg: 'bg-yellow-50',
+          border: 'border-yellow-200',
+          detail: 'Vui lòng quay lại sau ít phút.',
+        };
+      default:
+        return {
+          title: 'Chưa có thông tin trích xuất.',
+          icon: 'info',
+          color: 'text-gray-600',
+          bg: 'bg-gray-50',
+          border: 'border-gray-200',
+          detail: '',
+        };
+    }
+  };
+
+  const extractionUI = getExtractionStatusUI();
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-6xl bg-[#F8F9FA] p-6 font-sans md:p-8">
@@ -138,17 +230,9 @@ export default function DocumentDetailPage() {
               </span>
             )}
             <span
-              className={`rounded px-2.5 py-1 text-xs font-bold uppercase ${
-                document.status === 'APPROVED'
-                  ? 'bg-green-100 text-green-700'
-                  : document.status === 'PENDING'
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : document.status === 'REJECTED'
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-gray-200 text-gray-700'
-              }`}
+              className={`rounded px-2.5 py-1 text-xs font-bold uppercase ${getVisibilityPresentation(document.visibilityStatus).className}`}
             >
-              {document.status}
+              {getVisibilityPresentation(document.visibilityStatus).label}
             </span>
           </div>
 
@@ -216,11 +300,10 @@ export default function DocumentDetailPage() {
                   console.error('Follow toggle failed:', err);
                 }
               }}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold shadow-sm transition-colors border ${
-                document.isFollowed
+              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold shadow-sm transition-colors border ${document.isFollowed
                   ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
                   : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined text-[18px]">
                 {document.isFollowed ? 'bookmark_remove' : 'bookmark'}
@@ -229,23 +312,6 @@ export default function DocumentDetailPage() {
             </button>
           )}
 
-          <a
-            href={document.fileUrl || document.previewUrl || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-          >
-            <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-            Original
-          </a>
-
-          <Link
-            href={`/dashboard/documents/${document.id}/preview`}
-            className="flex items-center gap-2 rounded-lg bg-[#1a1c23] px-5 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-black"
-          >
-            <span className="material-symbols-outlined text-[18px]">preview</span>
-            Preview
-          </Link>
         </div>
       </div>
 
@@ -259,7 +325,7 @@ export default function DocumentDetailPage() {
                 <span className="material-symbols-outlined text-gray-400">
                   {viewType === 'text' ? 'text_snippet' : 'auto_awesome'}
                 </span>
-                {viewType === 'text' ? 'Extracted Text / Description' : 'AI Summary & Key Insights'}
+                {viewType === 'text' ? 'Extraction Status / Description' : 'AI Summary & Key Insights'}
               </h2>
             </div>
 
@@ -272,8 +338,24 @@ export default function DocumentDetailPage() {
                   </div>
                 )}
 
-                <div className="prose prose-sm max-w-none leading-relaxed text-gray-600">
-                  <p className="whitespace-pre-wrap">{truncatedText}</p>
+                <div className={`flex items-start gap-4 rounded-xl border p-5 ${extractionUI.bg} ${extractionUI.border}`}>
+                  <span className={`material-symbols-outlined text-2xl ${extractionUI.color}`}>
+                    {extractionUI.icon}
+                  </span>
+                  <div>
+                    <h4 className={`font-bold ${extractionUI.color}`}>{extractionUI.title}</h4>
+                    {extractionUI.detail && <p className="mt-1 text-sm text-gray-700">{extractionUI.detail}</p>}
+
+                    <div className="mt-4">
+                      <Link
+                        href={`/dashboard/documents/${document.id}/preview`}
+                        className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm border border-gray-300 transition-colors hover:bg-gray-50"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">preview</span>
+                        Xem bản gốc
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </>
             ) : (
@@ -342,6 +424,92 @@ export default function DocumentDetailPage() {
 
         {/* Right Column (Sidebar) */}
         <div className="flex flex-col gap-6">
+          {/* Actions Card */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
+              Thao tác tài liệu
+            </h3>
+
+            <div className="flex flex-col gap-3">
+              {document.deletionStatus !== 'ACTIVE' ? (
+                <p className="text-sm text-gray-500">Tài liệu không còn khả dụng để thực hiện thao tác này.</p>
+              ) : document.isOwner === false ? (
+                <p className="text-sm text-gray-500">Bạn không có quyền thực hiện thao tác trên tài liệu này.</p>
+              ) : (
+                <>
+                  <Link
+                    href={`/dashboard/documents/${document.id}/preview`}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">preview</span>
+                    Preview PDF
+                  </Link>
+
+                  <button
+                    onClick={handleOpenOriginal}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                    Download / Open Original
+                  </button>
+
+                  {document.visibilityStatus === 'PRIVATE' && (
+                    <div className="mt-2 border-t border-gray-100 pt-3">
+                      {document.extractionStatus !== 'READY' ? (
+                        <div className="group relative">
+                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
+                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                          </button>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">PDF cần trích xuất thành công trước khi gửi duyệt.</p>
+                        </div>
+                      ) : document.aiStatus !== 'READY' ? (
+                        <div className="group relative">
+                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
+                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                          </button>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">Cần hoàn tất AI processing trước khi gửi duyệt.</p>
+                        </div>
+                      ) : !document.subject ? (
+                        <div className="group relative">
+                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
+                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                          </button>
+                          <p className="mt-1.5 text-xs text-gray-500 text-center">Đang kiểm tra điều kiện Subject.</p>
+                        </div>
+                      ) : !document.subject.isSystem ? (
+                        <div className="group relative">
+                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
+                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                          </button>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">Chỉ System Subject mới có thể gửi duyệt công khai.</p>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleRequestPublic}
+                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">public</span>
+                          Request Public
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {document.visibilityStatus === 'PUBLIC' && (
+                    <div className="mt-2 border-t border-gray-100 pt-3">
+                      <button
+                        onClick={() => setIsWithdrawModalOpen(true)}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">public_off</span>
+                        Withdraw from Explore
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
           {/* Tags Card */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
@@ -432,7 +600,7 @@ export default function DocumentDetailPage() {
           {/* System Info Card */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-bold tracking-wider text-blue-500 uppercase">
-              DOCUMENT STATUS: {document.status}
+              DOCUMENT STATUS: {getVisibilityPresentation(document.visibilityStatus).label}
             </h3>
             {/* <div className="flex flex-col gap-3 text-sm">
               <div className="flex justify-between">
@@ -505,6 +673,9 @@ export default function DocumentDetailPage() {
             setIsDeleting(true);
             setDeleteError(undefined);
             await documentsApi.deleteDocument(id);
+            import('swr').then(({ mutate: globalMutate }) => {
+              globalMutate((key: any) => Array.isArray(key) && key[0] === '/documents/me');
+            });
             router.push('/dashboard/documents');
           } catch (err: any) {
             setDeleteError(
@@ -515,6 +686,34 @@ export default function DocumentDetailPage() {
           }
         }}
       />
+
+      {isWithdrawModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-xl font-bold text-gray-900">Withdraw from Explore</h3>
+            <p className="mb-6 text-sm text-gray-500">
+              Bạn có chắc chắn muốn rút tài liệu này khỏi Explore? Tài liệu sẽ trở về trạng thái PRIVATE.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsWithdrawModalOpen(false)}
+                disabled={isWithdrawing}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleWithdrawPublic}
+                disabled={isWithdrawing}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {isWithdrawing ? 'Đang xử lý...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ToastNotification toasts={toasts} />
     </div>
   );
@@ -534,13 +733,12 @@ function ToastNotification({ toasts }: { toasts: Toast[] }) {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${
-            t.variant === 'success'
+          className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${t.variant === 'success'
               ? 'bg-emerald-600'
               : t.variant === 'error'
-              ? 'bg-red-600'
-              : 'bg-blue-600'
-          }`}
+                ? 'bg-red-600'
+                : 'bg-blue-600'
+            }`}
         >
           {t.variant === 'success' && (
             <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>

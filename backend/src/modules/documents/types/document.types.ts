@@ -4,7 +4,26 @@ import {
   Quiz,
   QuizQuestion,
   QuizOption,
+  VisibilityStatus,
+  DeletionStatus,
+  ExtractionStatus,
+  AIStatus,
 } from '../../../../generated/prisma/client';
+
+export interface MyDocumentListItem {
+  id: string;
+  title: string;
+  description: string | null;
+  subjectId: number;
+  fileType: string;
+  visibilityStatus: VisibilityStatus;
+  deletionStatus: DeletionStatus;
+  extractionStatus: ExtractionStatus;
+  aiStatus: AIStatus;
+  pageCount: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export type SanitizedDocument = Omit<Document, 'fileSize'> & {
   fileSize: number;

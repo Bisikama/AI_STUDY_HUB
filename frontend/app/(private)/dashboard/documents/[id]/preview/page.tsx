@@ -5,17 +5,59 @@ import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { documentsApi } from '@/services/documentsApi';
+import { getVisibilityPresentation } from '@/utils/visibility-status';
 
 export default function DocumentPreviewPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
 
-  const { data: response, error, isLoading } = useSWR(
+  const { data: response, error: docError, isLoading: isDocLoading } = useSWR(
     id ? `/documents/${id}` : null,
     () => documentsApi.getDocumentById(id)
   );
 
   const document = response;
+
+  const [previewData, setPreviewData] = React.useState<{ url: string; disposition: string } | null>(null);
+  const [previewError, setPreviewError] = React.useState<{ status: number; message: string } | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    if (id) {
+      setIsPreviewLoading(true);
+      documentsApi
+        .getPreviewSignedUrl(id)
+        .then((data) => {
+          if (isMounted) {
+            setPreviewData(data);
+            setIsPreviewLoading(false);
+          }
+        })
+        .catch((err) => {
+          if (isMounted) {
+            setPreviewError({
+              status: err.response?.status || 500,
+              message: err.response?.data?.message || 'Failed to load preview',
+            });
+            setIsPreviewLoading(false);
+          }
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
+
+  const handleOpenOriginal = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    try {
+      const data = await documentsApi.getDownloadSignedUrl(id);
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      alert(`Could not open original file: ${err.response?.data?.message || err.message}`);
+    }
+  };
 
   const formatSize = (bytes: number): string => {
     if (!bytes) return '0 B';
@@ -24,17 +66,20 @@ export default function DocumentPreviewPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateString?: string | null): string => {
+    if (!dateString) return '—';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '—';
+    return new Intl.DateTimeFormat('vi-VN', {
       year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+    }).format(date);
   };
 
-  if (isLoading) {
+  if (isDocLoading || isPreviewLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-gray-50">
         <span className="material-symbols-outlined text-primary animate-spin text-4xl">sync</span>
@@ -42,14 +87,35 @@ export default function DocumentPreviewPage() {
     );
   }
 
-  if (error || !document) {
+  if (docError || !document || previewError) {
+    const status = previewError?.status;
+    let title = 'Document Not Available';
+    let message = 'This document cannot be previewed at this time.';
+
+    if (status === 401) {
+      title = 'Login Required';
+      message = 'You must be logged in to preview this document.';
+    } else if (status === 403) {
+      title = 'Access Denied';
+      message = 'You do not have permission to view this document.';
+    } else if (status === 404) {
+      title = 'Not Found';
+      message = 'This document does not exist.';
+    } else if (status === 409) {
+      title = 'Document Not Active';
+      message = 'This document is currently inactive, soft-deleted, or unavailable for preview.';
+    } else if (status === 502) {
+      title = 'Preview Generation Failed';
+      message = 'We could not generate a temporary preview URL at this time. Please try again later.';
+    }
+
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center p-8 text-center bg-gray-50">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-500">
           <span className="material-symbols-outlined text-3xl">error</span>
         </div>
-        <h2 className="mb-2 text-2xl font-bold text-gray-900">Access Denied / Not Found</h2>
-        <p className="mb-6 text-gray-500">You do not have permission to view this document or it does not exist.</p>
+        <h2 className="mb-2 text-2xl font-bold text-gray-900">{title}</h2>
+        <p className="mb-6 text-gray-500">{message}</p>
         <Link
           href="/dashboard/documents"
           className="rounded-lg bg-[#1a1c23] px-6 py-2.5 font-semibold text-white transition-colors hover:bg-black"
@@ -60,7 +126,7 @@ export default function DocumentPreviewPage() {
     );
   }
 
-  const iframeSrc = document.previewUrl || document.fileUrl;
+  const iframeSrc = previewData?.url;
 
   return (
     <div className="flex h-screen w-full flex-col lg:flex-row bg-[#F8F9FA] overflow-hidden font-sans">
@@ -90,15 +156,13 @@ export default function DocumentPreviewPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <a 
-              href={iframeSrc || '#'}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button 
+              onClick={handleOpenOriginal}
               className="hidden sm:flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-700 hover:bg-gray-200 transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">open_in_new</span>
               Open Original
-            </a>
+            </button>
           </div>
         </div>
 
@@ -122,15 +186,13 @@ export default function DocumentPreviewPage() {
               <p className="mb-6 text-sm text-gray-500 max-w-sm">
                 This file type cannot be previewed directly in the browser, or the preview URL is missing.
               </p>
-              <a
-                href={document.fileUrl || '#'}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={handleOpenOriginal}
                 className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-[18px]">download</span>
                 Download / Open Original
-              </a>
+              </button>
             </div>
           )}
         </div>
@@ -153,13 +215,8 @@ export default function DocumentPreviewPage() {
             <div className="flex flex-col gap-4 text-sm">
               <div>
                 <p className="text-gray-500 mb-1">Status</p>
-                <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${
-                  document.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
-                  document.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                  document.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
-                  'bg-gray-200 text-gray-700'
-                }`}>
-                  {document.status}
+                <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${getVisibilityPresentation(document.visibilityStatus).className}`}>
+                  {getVisibilityPresentation(document.visibilityStatus).label}
                 </span>
               </div>
               
@@ -178,9 +235,26 @@ export default function DocumentPreviewPage() {
                 <p className="font-medium text-gray-900">{formatDate(document.createdAt)}</p>
               </div>
 
+              {document.description && (
+                <div>
+                  <p className="text-gray-500 mb-1">Description</p>
+                  <p className="font-medium text-gray-900">{document.description}</p>
+                </div>
+              )}
+
               <div>
-                <p className="text-gray-500 mb-1">AI Generated</p>
-                <p className="font-medium text-gray-900">{document.isAIGenerated ? 'Yes' : 'No'}</p>
+                <p className="text-gray-500 mb-1">AI Status</p>
+                <p className="font-medium text-gray-900">{document.aiStatus || '—'}</p>
+              </div>
+
+              <div>
+                <p className="text-gray-500 mb-1">Extraction</p>
+                <p className="font-medium text-gray-900">{document.extractionStatus || '—'}</p>
+              </div>
+
+              <div>
+                <p className="text-gray-500 mb-1">Pages</p>
+                <p className="font-medium text-gray-900">{document.pageCount || '—'}</p>
               </div>
             </div>
           </div>
