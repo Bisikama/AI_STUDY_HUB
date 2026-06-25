@@ -156,7 +156,8 @@ export default function MyDocumentsPage() {
   }, []);
 
   const documents = useMemo<DisplayDocument[]>(() => {
-    const ownedDocuments = ((response?.data || []) as DisplayDocument[]).map((doc) => ({
+    const rawDocs = Array.isArray(response) ? response : (response?.data || []);
+    const ownedDocuments = (rawDocs as DisplayDocument[]).map((doc) => ({
       ...doc,
       isLocalFollowed: false,
     }));
