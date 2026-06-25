@@ -30,9 +30,8 @@ function ToastNotification({ toasts }: { toasts: Toast[] }) {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${
-            t.variant === 'success' ? 'bg-emerald-600' : 'bg-red-600'
-          }`}
+          className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${t.variant === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+            }`}
         >
           {t.variant === 'success' ? (
             <svg
@@ -209,11 +208,10 @@ function Sidebar() {
           <a
             key={item.label}
             href={item.href}
-            className={`mb-0.5 flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
-              item.active
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-            }`}
+            className={`mb-0.5 flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${item.active
+              ? 'bg-gray-100 text-gray-900'
+              : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+              }`}
           >
             {item.icon}
             {item.label}
@@ -271,7 +269,7 @@ export default function UploadZone() {
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [newTagName, setNewTagName] = useState('');
   const [showTagDropdown, setShowTagDropdown] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const toastIdRef = useRef(0);
@@ -291,7 +289,7 @@ export default function UploadZone() {
     () => tagsApi.getTags(),
   );
   const availableTags: Tag[] = tagsResponse || [];
-  
+
   // Warn if tags failed to load
   useEffect(() => {
     if (tagsError) {
@@ -375,7 +373,7 @@ export default function UploadZone() {
   const handleAddTag = (tagName: string) => {
     const trimmed = tagName.trim();
     if (!trimmed) return;
-    
+
     // Convert to slug logic for deduplication on FE side
     const slug = trimmed.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w-]/g, '');
     if (!slug) return;
@@ -398,7 +396,7 @@ export default function UploadZone() {
     } else {
       setSelectedTags([...selectedTags, { id: -1, name: trimmed, slug, isSystem: false }]);
     }
-    
+
     setNewTagName('');
     setShowTagDropdown(false);
   };
@@ -473,7 +471,7 @@ export default function UploadZone() {
       const result = await trigger(payload);
 
       stopProgress(true);
-      
+
       if (result.extractionStatus === 'READY') {
         addToast('Tài liệu đã được upload thành công! PDF đã được trích xuất thành công.', 'success');
       } else if (result.extractionStatus === 'FAILED') {
@@ -509,330 +507,329 @@ export default function UploadZone() {
       <ToastNotification toasts={toasts} />
 
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-8 md:py-10">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900">Upload Materials</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Add new study documents, research papers, or lecture notes to your workspace.
-            </p>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">Upload Materials</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Add new study documents, research papers, or lecture notes to your workspace.
+          </p>
+        </div>
+
+        {/*  Dropzone Card */}
+        {/* Hidden native file input — triggered by Browse Files button */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf"
+          className="hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            if (files.length === 0) return;
+            // Reuse the same onDrop validation path
+            const f = files[0];
+            if (!ACCEPTED_TYPES[f.type as keyof typeof ACCEPTED_TYPES]) {
+              addToast('Chỉ chấp nhận file PDF (.pdf) .', 'error');
+              e.target.value = '';
+              return;
+            }
+            if (f.size > MAX_FILE_SIZE) {
+              addToast('File quá lớn! Kích thước tối đa là 10MB.', 'error');
+              e.target.value = '';
+              return;
+            }
+            setSelectedFile(f);
+            setProgress(0);
+            e.target.value = ''; // reset so same file can be re-selected
+          }}
+        />
+
+        <div
+          {...getRootProps()}
+          className={`mb-4 cursor-default rounded-xl border-2 border-dashed px-8 py-14 text-center transition-colors ${isDragActive
+            ? 'border-gray-500 bg-gray-100'
+            : isMutating
+              ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
+              : 'border-gray-300 bg-white hover:border-gray-400'
+            }`}
+        >
+          <input {...getInputProps()} />
+
+          {/* Cloud upload icon */}
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
+            <svg
+              className="h-6 w-6 text-gray-500"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+              />
+            </svg>
           </div>
 
-          {/*  Dropzone Card */}
-          {/* Hidden native file input — triggered by Browse Files button */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.txt"
-            className="hidden"
-            onChange={(e) => {
-              const files = Array.from(e.target.files ?? []);
-              if (files.length === 0) return;
-              // Reuse the same onDrop validation path
-              const f = files[0];
-              if (!ACCEPTED_TYPES[f.type as keyof typeof ACCEPTED_TYPES]) {
-                addToast('Chỉ chấp nhận file PDF (.pdf) hoặc TXT (.txt).', 'error');
-                e.target.value = '';
-                return;
-              }
-              if (f.size > MAX_FILE_SIZE) {
-                addToast('File quá lớn! Kích thước tối đa là 10MB.', 'error');
-                e.target.value = '';
-                return;
-              }
-              setSelectedFile(f);
-              setProgress(0);
-              e.target.value = ''; // reset so same file can be re-selected
+          <p className="text-lg font-semibold text-gray-800">
+            {isDragActive ? 'Thả file vào đây...' : 'Drag and Drop your study materials here'}
+          </p>
+          <p className="mt-1.5 text-sm text-gray-400">
+            Supports {ACCEPTED_EXTENSIONS.join(', ')} up to 10MB per file.
+          </p>
+
+          {/* Browse Files button — opens native file picker */}
+          <button
+            type="button"
+            disabled={isMutating}
+            onClick={(e) => {
+              e.stopPropagation();
+              fileInputRef.current?.click();
             }}
-          />
-
-          <div
-            {...getRootProps()}
-            className={`mb-4 cursor-default rounded-xl border-2 border-dashed px-8 py-14 text-center transition-colors ${
-              isDragActive
-                ? 'border-gray-500 bg-gray-100'
-                : isMutating
-                  ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
-                  : 'border-gray-300 bg-white hover:border-gray-400'
-            }`}
+            className="mt-6 rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <input {...getInputProps()} />
+            Browse Files
+          </button>
+        </div>
 
-            {/* Cloud upload icon */}
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-              <svg
-                className="h-6 w-6 text-gray-500"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
+        {/* ── Active Uploads Card ─────────────────────────────────────────── */}
+        {selectedFile && (
+          <div className="mb-4 rounded-xl border border-gray-200 bg-white px-5 py-4">
+            <p className="mb-3 text-xs font-semibold tracking-widest text-gray-400 uppercase">
+              Active Uploads
+            </p>
+            <div className="flex items-center gap-3">
+              {/* PDF icon */}
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-red-50">
+                <svg className="h-5 w-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" />
+                  <path fill="white" d="M14 2v6h6" />
+                  <text x="6" y="18" fontSize="5" fontWeight="bold" fill="#ef4444">
+                    PDF
+                  </text>
+                </svg>
+              </div>
+
+              {/* File info + progress */}
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="truncate text-sm font-medium text-gray-800">
+                    {selectedFile.name}
+                  </span>
+                  <span className="ml-3 shrink-0 text-xs font-semibold text-gray-500">
+                    {isMutating || progress > 0 ? `${progress}%` : formatSize(selectedFile.size)}
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div
+                    className="h-full rounded-full bg-gray-900 transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Remove button */}
+              <button
+                type="button"
+                disabled={isMutating}
+                onClick={handleRemoveFile}
+                className="ml-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Remove file"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
+          </div>
+        )}
 
-            <p className="text-lg font-semibold text-gray-800">
-              {isDragActive ? 'Thả file vào đây...' : 'Drag and Drop your study materials here'}
-            </p>
-            <p className="mt-1.5 text-sm text-gray-400">
-              Supports {ACCEPTED_EXTENSIONS.join(', ')} up to 10MB per file.
-            </p>
+        {/* ── Document Details Form ───────────────────────────────────────── */}
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-6">
+          <h2 className="mb-5 text-lg font-bold text-gray-900">Document Details</h2>
 
-            {/* Browse Files button — opens native file picker */}
+          <hr className="mb-6 border-gray-100" />
+
+          {/* Title */}
+          <div className="mb-5">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Document Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="doc-title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={isMutating}
+              placeholder="e.g. Introduction to Quantum Computing Notes"
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors outline-none focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </div>
+
+          {/* Study Folder */}
+          <div className="mb-5">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Study Folder <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              <select
+                id="doc-study-folder"
+                value={selectedSubjectId ?? ''}
+                onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
+                disabled={isMutating}
+                className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <option value="">-- Select a folder --</option>
+                <optgroup label="System Subjects">
+                  {subjects.filter(s => s.isSystem).map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="My Personal Subjects">
+                  {subjects.filter(s => !s.isSystem).map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </optgroup>
+              </select>
+              {/* Create folder UI hidden per Q10 requirements until P1 API exists */}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="mb-5">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              disabled={isMutating}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+              placeholder="Optional description or notes for this document..."
+            />
+          </div>
+
+          {/* Study Tags */}
+          <div className="mb-7 relative">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Study Tags <span className="text-gray-400 font-normal">(Max 10)</span>
+            </label>
+
+            <div className="flex min-h-[44px] flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 transition-colors focus-within:border-gray-400 focus-within:bg-white">
+              {selectedTags.map((tag) => (
+                <span
+                  key={tag.slug}
+                  className="flex items-center gap-1.5 rounded-full bg-[#1a1c23] px-3 py-1 text-xs font-medium text-white"
+                >
+                  {tag.name}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTag(tag)}
+                    disabled={isMutating}
+                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-white/20 disabled:opacity-50"
+                  >
+                    <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
+
+              <div className="relative flex-1 min-w-[120px]">
+                <input
+                  type="text"
+                  value={newTagName}
+                  onChange={(e) => {
+                    setNewTagName(e.target.value);
+                    setShowTagDropdown(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTag(newTagName);
+                    }
+                  }}
+                  onFocus={() => setShowTagDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowTagDropdown(false), 200)}
+                  disabled={isMutating || selectedTags.length >= 10}
+                  placeholder={selectedTags.length >= 10 ? 'Max tags reached' : 'Type or select a tag...'}
+                  className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:cursor-not-allowed"
+                />
+
+                {/* Dropdown for suggestions */}
+                {showTagDropdown && availableTags.length > 0 && (
+                  <div className="absolute left-0 top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    {availableTags
+                      .filter(t => !selectedTags.some(st => st.slug === t.slug))
+                      .filter(t => t.name.toLowerCase().includes(newTagName.toLowerCase()))
+                      .map(tag => (
+                        <div
+                          key={tag.slug}
+                          onClick={() => handleAddTag(tag.name)}
+                          className="cursor-pointer px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <span className="font-medium">{tag.name}</span>
+                          {tag.isSystem && <span className="ml-2 text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">System</span>}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-3">
             <button
               type="button"
+              id="upload-cancel-btn"
+              onClick={handleCancel}
               disabled={isMutating}
-              onClick={(e) => {
-                e.stopPropagation();
-                fileInputRef.current?.click();
-              }}
-              className="mt-6 rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Browse Files
+              Cancel
+            </button>
+            <button
+              type="button"
+              id="upload-submit-btn"
+              onClick={handleSubmit}
+              disabled={isMutating || !selectedFile || !title.trim() || !selectedSubjectId}
+              className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 active:bg-gray-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isMutating ? (
+                <span className="flex items-center gap-2">
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  Uploading...
+                </span>
+              ) : (
+                'Upload Document'
+              )}
             </button>
           </div>
-
-          {/* ── Active Uploads Card ─────────────────────────────────────────── */}
-          {selectedFile && (
-            <div className="mb-4 rounded-xl border border-gray-200 bg-white px-5 py-4">
-              <p className="mb-3 text-xs font-semibold tracking-widest text-gray-400 uppercase">
-                Active Uploads
-              </p>
-              <div className="flex items-center gap-3">
-                {/* PDF icon */}
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-red-50">
-                  <svg className="h-5 w-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" />
-                    <path fill="white" d="M14 2v6h6" />
-                    <text x="6" y="18" fontSize="5" fontWeight="bold" fill="#ef4444">
-                      PDF
-                    </text>
-                  </svg>
-                </div>
-
-                {/* File info + progress */}
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="truncate text-sm font-medium text-gray-800">
-                      {selectedFile.name}
-                    </span>
-                    <span className="ml-3 shrink-0 text-xs font-semibold text-gray-500">
-                      {isMutating || progress > 0 ? `${progress}%` : formatSize(selectedFile.size)}
-                    </span>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-                    <div
-                      className="h-full rounded-full bg-gray-900 transition-all duration-300"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Remove button */}
-                <button
-                  type="button"
-                  disabled={isMutating}
-                  onClick={handleRemoveFile}
-                  className="ml-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Remove file"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Document Details Form ───────────────────────────────────────── */}
-          <div className="rounded-xl border border-gray-200 bg-white px-6 py-6">
-            <h2 className="mb-5 text-lg font-bold text-gray-900">Document Details</h2>
-
-            <hr className="mb-6 border-gray-100" />
-
-            {/* Title */}
-            <div className="mb-5">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Document Title <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="doc-title"
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                disabled={isMutating}
-                placeholder="e.g. Introduction to Quantum Computing Notes"
-                className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors outline-none focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-              />
-            </div>
-
-            {/* Study Folder */}
-            <div className="mb-5">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Study Folder <span className="text-red-500">*</span>
-              </label>
-              <div className="flex gap-2">
-                <select
-                  id="doc-study-folder"
-                  value={selectedSubjectId ?? ''}
-                  onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
-                  disabled={isMutating}
-                  className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value="">-- Select a folder --</option>
-                  <optgroup label="System Subjects">
-                    {subjects.filter(s => s.isSystem).map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="My Personal Subjects">
-                    {subjects.filter(s => !s.isSystem).map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </optgroup>
-                </select>
-                {/* Create folder UI hidden per Q10 requirements until P1 API exists */}
-              </div>
-            </div>
-
-            {/* Description */}
-            <div className="mb-5">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                disabled={isMutating}
-                className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="Optional description or notes for this document..."
-              />
-            </div>
-
-            {/* Study Tags */}
-            <div className="mb-7 relative">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Study Tags <span className="text-gray-400 font-normal">(Max 10)</span>
-              </label>
-              
-              <div className="flex min-h-[44px] flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 transition-colors focus-within:border-gray-400 focus-within:bg-white">
-                {selectedTags.map((tag) => (
-                  <span
-                    key={tag.slug}
-                    className="flex items-center gap-1.5 rounded-full bg-[#1a1c23] px-3 py-1 text-xs font-medium text-white"
-                  >
-                    {tag.name}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTag(tag)}
-                      disabled={isMutating}
-                      className="flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-white/20 disabled:opacity-50"
-                    >
-                      <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </span>
-                ))}
-                
-                <div className="relative flex-1 min-w-[120px]">
-                  <input
-                    type="text"
-                    value={newTagName}
-                    onChange={(e) => {
-                      setNewTagName(e.target.value);
-                      setShowTagDropdown(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddTag(newTagName);
-                      }
-                    }}
-                    onFocus={() => setShowTagDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowTagDropdown(false), 200)}
-                    disabled={isMutating || selectedTags.length >= 10}
-                    placeholder={selectedTags.length >= 10 ? 'Max tags reached' : 'Type or select a tag...'}
-                    className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:cursor-not-allowed"
-                  />
-                  
-                  {/* Dropdown for suggestions */}
-                  {showTagDropdown && availableTags.length > 0 && (
-                    <div className="absolute left-0 top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                      {availableTags
-                        .filter(t => !selectedTags.some(st => st.slug === t.slug))
-                        .filter(t => t.name.toLowerCase().includes(newTagName.toLowerCase()))
-                        .map(tag => (
-                          <div
-                            key={tag.slug}
-                            onClick={() => handleAddTag(tag.name)}
-                            className="cursor-pointer px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <span className="font-medium">{tag.name}</span>
-                            {tag.isSystem && <span className="ml-2 text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">System</span>}
-                          </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                id="upload-cancel-btn"
-                onClick={handleCancel}
-                disabled={isMutating}
-                className="rounded-lg px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                id="upload-submit-btn"
-                onClick={handleSubmit}
-                disabled={isMutating || !selectedFile || !title.trim() || !selectedSubjectId}
-                className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 active:bg-gray-950 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isMutating ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
-                    Uploading...
-                  </span>
-                ) : (
-                  'Upload Document'
-                )}
-              </button>
-            </div>
-          </div>
         </div>
+      </div>
     </>
   );
 }
