@@ -76,10 +76,19 @@ describe('DocumentsService', () => {
       delete: jest.fn(),
       deleteMany: jest.fn(),
       findMany: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
     },
     documentChunk: {
       createMany: jest.fn(),
       findMany: jest.fn(),
+    },
+    tag: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
+    documentTag: {
+      deleteMany: jest.fn(),
+      create: jest.fn(),
     },
     userFollowedDocument: {
       findUnique: jest.fn(),
@@ -134,6 +143,9 @@ describe('DocumentsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation(async (callback) => {
+      return callback(mockPrisma);
+    });
     mockParseDocument.mockReset();
     mockParseDocument.mockResolvedValue({
       text: 'Default valid extracted PDF text with at least twenty characters.',
@@ -612,7 +624,7 @@ describe('DocumentsService', () => {
         fullText: 'secret text',
         summary: { id: 's-1' },
         quizzes: [{ id: 'q-1' }],
-        tags: [{ id: 't-1' }],
+        tags: [{ tag: { id: 1, name: 'AI', slug: 'ai' } }],
         aiRunId: 'run-1',
         aiProcessingStartedAt: mockDate,
         aiGeneratedAt: mockDate,
@@ -651,12 +663,20 @@ describe('DocumentsService', () => {
       // Forbidden fields absent
       const forbiddenFields = [
         'uploadedBy', 'fileUrl', 'previewUrl', 'storagePath', 'status',
-        'fullText', 'summary', 'quizzes', 'tags', 'aiRunId',
+        'fullText', 'summary', 'quizzes', 'aiRunId',
         'aiProcessingStartedAt', 'aiGeneratedAt', 'aiAttemptCount', 'aiFailureReason'
       ];
       forbiddenFields.forEach(field => {
         expect(result).not.toHaveProperty(field);
       });
+      
+      expect(result.tags).toEqual([{ id: 1, name: 'AI', slug: 'ai' }]);
+      expect(result.tags[0]).not.toHaveProperty('tag');
+      expect(result.tags[0]).not.toHaveProperty('documentId');
+      expect(result.tags[0]).not.toHaveProperty('tagId');
+      expect(result.tags[0]).not.toHaveProperty('createdBy');
+      expect(result.tags[0]).not.toHaveProperty('createdAt');
+      expect(result.tags[0]).not.toHaveProperty('updatedAt');
     });
   });
 
@@ -999,12 +1019,19 @@ describe('DocumentsService', () => {
         deletionStatus: 'ACTIVE',
         storagePath: 'path'
       });
-      mockPrisma.document.update.mockResolvedValue({
+      mockPrisma.document.update.mockResolvedValue({});
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({
         id: 'doc-id',
         title: 'New Title',
         description: 'New Desc',
         subjectId: 2,
-        subject: { id: 2, name: 'Science', code: 'SCI101', isSystem: false },
+        subject: {
+          id: 2,
+          name: 'Science',
+          code: 'SCI101',
+          isSystem: false,
+        },
+        tags: [],
         fileType: 'application/pdf',
         fileSize: BigInt(123),
         visibilityStatus: 'PRIVATE',
@@ -1015,13 +1042,7 @@ describe('DocumentsService', () => {
         createdAt: mockDate,
         updatedAt: mockDate,
         requestedAt: null,
-        // forbidden
-        uploadedBy: 'user-1',
-        storagePath: 'path',
-        fileUrl: 'url',
-        fullText: 'text',
       });
-
       const result = await service.updateDocument('doc-id', 'user-1', { title: 'New Title' });
       expect(result.id).toBe('doc-id');
       expect(result.isOwner).toBe(true);
@@ -1030,6 +1051,88 @@ describe('DocumentsService', () => {
       expect(result).not.toHaveProperty('fullText');
       expect(result).not.toHaveProperty('storagePath');
       expect(result).not.toHaveProperty('uploadedBy');
+    });
+
+    it('should process valid tags and use a transaction', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id', uploadedBy: 'user-1', deletedAt: null, deletionStatus: 'ACTIVE', storagePath: 'path'
+      });
+      
+      mockPrisma.tag.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 2, name: 'Interview', slug: 'interview' });
+      mockPrisma.tag.create.mockResolvedValueOnce({ id: 1, name: 'AI', slug: 'ai' });
+      mockPrisma.documentTag.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.documentTag.create.mockResolvedValue({});
+      
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: 'doc-id',
+        tags: [
+          { tag: { id: 1, name: 'AI', slug: 'ai' } },
+          { tag: { id: 2, name: 'Interview', slug: 'interview' } }
+        ]
+      });
+
+      const result = await service.updateDocument('doc-id', 'user-1', { tags: [' AI ', 'ai', 'Interview'] });
+      
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockPrisma.documentTag.deleteMany).toHaveBeenCalledWith({ where: { documentId: 'doc-id' } });
+      expect(mockPrisma.tag.findFirst).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.documentTag.create).toHaveBeenCalledTimes(2);
+      expect(result.tags).toEqual([
+        { id: 1, name: 'AI', slug: 'ai' },
+        { id: 2, name: 'Interview', slug: 'interview' }
+      ]);
+    });
+
+    it('should clear all relations when explicit tags: [] is sent', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id', uploadedBy: 'user-1', deletedAt: null, deletionStatus: 'ACTIVE', storagePath: 'path'
+      });
+      
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: 'doc-id',
+        tags: []
+      });
+
+      const result = await service.updateDocument('doc-id', 'user-1', { tags: [] });
+      expect(mockPrisma.documentTag.deleteMany).toHaveBeenCalledWith({ where: { documentId: 'doc-id' } });
+      expect(mockPrisma.tag.findFirst).not.toHaveBeenCalled();
+      expect(result.tags).toEqual([]);
+    });
+
+    it('should preserve relations when tags is omitted', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id', uploadedBy: 'user-1', deletedAt: null, deletionStatus: 'ACTIVE', storagePath: 'path'
+      });
+      
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: 'doc-id',
+        tags: [{ tag: { id: 2, name: 'Old', slug: 'old' } }]
+      });
+
+      const result = await service.updateDocument('doc-id', 'user-1', { title: 'No tags' });
+      expect(mockPrisma.documentTag.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('should reject more than 10 tags', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id', uploadedBy: 'user-1', deletedAt: null, deletionStatus: 'ACTIVE', storagePath: 'path'
+      });
+      const tags = Array.from({ length: 11 }, (_, i) => `tag${i}`);
+      await expect(service.updateDocument('doc-id', 'user-1', { tags })).rejects.toThrow('Maximum 10 tags');
+      expect(mockPrisma.documentTag.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('should simulate failure during replacement and rollback (mock limitation)', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id', uploadedBy: 'user-1', deletedAt: null, deletionStatus: 'ACTIVE', storagePath: 'path'
+      });
+      
+      mockPrisma.$transaction.mockRejectedValueOnce(new Error('DB Failed'));
+
+      await expect(service.updateDocument('doc-id', 'user-1', { tags: ['fail'] })).rejects.toThrow('DB Failed');
+      // Note: In an actual Prisma environment, a thrown error inside $transaction rolls back all changes.
+      // Since we mock $transaction here, we only verify that it rejects and propagates the error,
+      // representing the atomic failure boundary required by the specification.
     });
   });
 
@@ -1043,7 +1146,12 @@ describe('DocumentsService', () => {
         },
         arr: [BigInt(50), new Date('2026-01-03T00:00:00Z')]
       };
-      const result = (service as any).sanitizeData(input);
+      const result = (service as unknown as ServiceWithPrivateMethods).sanitizeData<{
+        dateField: string;
+        bigIntField: number;
+        nested: { date: string };
+        arr: [number, string];
+      }>(input);
       expect(result.dateField).toBe('2026-01-01T00:00:00.000Z');
       expect(result.bigIntField).toBe(100);
       expect(result.nested.date).toBe('2026-01-02T00:00:00.000Z');

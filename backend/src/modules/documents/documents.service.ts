@@ -106,6 +106,13 @@ export class DocumentsService {
         : null,
       isOwner,
       isFollowed,
+      tags: document.tags
+        ? document.tags.map((t: any) => ({
+            id: t.tag.id,
+            name: t.tag.name,
+            slug: t.tag.slug,
+          }))
+        : [],
       isAIGenerated: document.isAIGenerated,
       summary: document.summary || null,
       quizzes: document.quizzes || [],
@@ -694,6 +701,13 @@ Quy định chặt chẽ:
         uploadedBy: true,
         deletedAt: true,
         storagePath: true,
+
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+
         isAIGenerated: true,
         summary: true,
         quizzes: {
@@ -904,7 +918,7 @@ Quy định chặt chẽ:
   async updateDocument(
     documentId: string,
     userId: string,
-    dto: { title?: string; description?: string; subjectId?: number },
+    dto: { title?: string; description?: string; subjectId?: number; tags?: string[] },
   ): Promise<SanitizedDocument> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
@@ -946,44 +960,141 @@ Quy định chặt chẽ:
       await this.subjectsService.validateSubjectAccess(dto.subjectId, userId);
     }
 
-    const updatedDocument = await this.prisma.document.update({
-      where: { id: documentId },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(description !== undefined && { description }),
-        ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        subjectId: true,
-        subject: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            isSystem: true,
+    let parsedTags: string[] | undefined;
+
+    if (dto.tags !== undefined) {
+      if (!Array.isArray(dto.tags)) {
+        throw new BadRequestException('Tags must be an array of strings');
+      }
+      parsedTags = dto.tags
+        .map((t) => String(t).trim())
+        .filter((t) => t.length > 0)
+        .map((t) =>
+          t
+            .toLowerCase()
+            .replace(/[\s_]+/g, '-')
+            .replace(/[^\w-]/g, ''),
+        );
+      parsedTags = [...new Set(parsedTags)].filter((t) => t.length > 0);
+
+      if (parsedTags.length > 10) {
+        throw new BadRequestException('Maximum 10 tags allowed per document');
+      }
+    }
+
+    const updatedDocument = await this.prisma.$transaction(async (tx) => {
+      // 1. Update metadata
+      await tx.document.update({
+        where: { id: documentId },
+        data: {
+          ...(title !== undefined && { title }),
+          ...(description !== undefined && { description }),
+          ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
+        },
+      });
+
+      // 2. Update tags if provided
+      if (parsedTags !== undefined) {
+        // Delete existing relations
+        await tx.documentTag.deleteMany({
+          where: { documentId },
+        });
+
+        // Add new relations
+        if (parsedTags.length > 0) {
+          const tagIds: number[] = [];
+          for (const tagSlug of parsedTags) {
+            let existingTag = await tx.tag.findFirst({
+              where: {
+                slug: tagSlug,
+                OR: [{ isSystem: true }, { createdBy: userId }],
+              },
+            });
+
+            if (!existingTag) {
+              const originalName =
+                dto
+                  .tags!.find(
+                    (t) =>
+                      t
+                        .trim()
+                        .toLowerCase()
+                        .replace(/[\s_]+/g, '-')
+                        .replace(/[^\w-]/g, '') === tagSlug,
+                  )
+                  ?.trim() || tagSlug;
+
+              existingTag = await tx.tag.create({
+                data: {
+                  name: originalName,
+                  slug: tagSlug,
+                  createdBy: userId,
+                  isSystem: false,
+                },
+              });
+            }
+            tagIds.push(existingTag.id);
+          }
+
+          await Promise.all(
+            tagIds.map((tagId) =>
+              tx.documentTag.create({
+                data: {
+                  documentId,
+                  tagId,
+                },
+              }),
+            ),
+          );
+        }
+      }
+
+      // Return the final queried document
+      return tx.document.findUniqueOrThrow({
+        where: { id: documentId },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          subjectId: true,
+          subject: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              isSystem: true,
+            },
+          },
+          fileType: true,
+          fileSize: true,
+          visibilityStatus: true,
+          deletionStatus: true,
+          extractionStatus: true,
+          aiStatus: true,
+          pageCount: true,
+          createdAt: true,
+          updatedAt: true,
+          requestedAt: true,
+          uploadedBy: true,
+          deletedAt: true,
+          storagePath: true,
+          isAIGenerated: true,
+          tags: {
+            select: {
+              tag: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
+              },
+            },
           },
         },
-        fileType: true,
-        fileSize: true,
-        visibilityStatus: true,
-        deletionStatus: true,
-        extractionStatus: true,
-        aiStatus: true,
-        pageCount: true,
-        createdAt: true,
-        updatedAt: true,
-        requestedAt: true,
-        uploadedBy: true,
-        deletedAt: true,
-        storagePath: true,
-        isAIGenerated: true,
-      },
+      });
     });
 
-    return this.mapSafeDocumentResponse(updatedDocument, true, false);
+    return this.mapSafeDocumentResponse(updatedDocument, true, false); /* eslint-disable-line */
   }
 
   /**

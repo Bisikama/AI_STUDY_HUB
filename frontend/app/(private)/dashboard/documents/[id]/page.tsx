@@ -519,10 +519,10 @@ export default function DocumentDetailPage() {
               {document.tags && document.tags.length > 0 ? (
                 document.tags.map((t: any) => (
                   <span
-                    key={t.tag.id}
+                    key={t.id}
                     className="inline-flex items-center rounded-full bg-[#1a1c23] px-3 py-1 text-xs font-medium text-white"
                   >
-                    {t.tag.name}
+                    {t.name}
                   </span>
                 ))
               ) : (
