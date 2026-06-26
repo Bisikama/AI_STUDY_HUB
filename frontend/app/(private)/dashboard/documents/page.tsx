@@ -31,6 +31,7 @@ type DisplayDocument = Omit<Partial<Document>, 'subjectId' | 'subject'> & {
   id: string;
   title: string;
   fileSize: number;
+  fileSizeBytes?: number | null;
   fileType: string;
   createdAt: string;
   subjectId?: number | string | null;
@@ -125,6 +126,32 @@ function removeFollowedDocumentFromStorage(documentId: string) {
   }
 }
 
+function calculateStorageAnalysis(documents: any[]) {
+  let pdfSize = 0;
+  let noSizeCount = 0;
+  let pdfDocsCount = 0;
+
+  const safeDocs = Array.isArray(documents) ? documents : [];
+
+  safeDocs.forEach((doc) => {
+    const type = (doc?.fileType || '').toLowerCase();
+    const isPdf = type.includes('pdf') || type === '';
+    
+    if (isPdf) {
+      pdfDocsCount++;
+      const rawSize = doc?.fileSizeBytes !== undefined ? doc.fileSizeBytes : doc?.fileSize;
+      const size = Number(rawSize);
+      if (!Number.isFinite(size) || size <= 0) {
+        noSizeCount++;
+      } else {
+        pdfSize += size;
+      }
+    }
+  });
+
+  return { pdfSize, noSizeCount, pdfDocsCount };
+}
+
 export default function MyDocumentsPage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -171,10 +198,13 @@ export default function MyDocumentsPage() {
     return [...ownedDocuments, ...followedDocumentsNotInOwnedList];
   }, [response, localFollowedDocuments]);
 
-  const formatSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  const formatSize = (bytes: any): string => {
+    const size = Number(bytes);
+    if (!Number.isFinite(size) || size <= 0) return '0 B';
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(0)} KB`;
+    if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
   };
 
   const formatDate = (dateString: string): string => {
@@ -221,9 +251,7 @@ export default function MyDocumentsPage() {
     );
   }
 
-  const totalSize = documents.reduce((sum, doc) => sum + doc.fileSize, 0);
-  const totalGB = (totalSize / (1024 * 1024 * 1024)).toFixed(1);
-  const percentage = Math.min(Math.round((totalSize / (2.5 * 1024 * 1024 * 1024)) * 100), 100);
+  const storageAnalysis = calculateStorageAnalysis(documents);
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-6xl bg-[#F8F9FA] p-6 font-sans md:p-8">
@@ -323,7 +351,7 @@ export default function MyDocumentsPage() {
 
                     <p className="mb-3 text-[13px] text-gray-500">
                       {doc.isAIGenerated ? 'AI Generated' : `Added ${formatDate(doc.createdAt)}`} •{' '}
-                      {formatSize(doc.fileSize)}
+                      {formatSize(doc.fileSizeBytes !== undefined ? doc.fileSizeBytes : doc.fileSize)}
                     </p>
 
                     {!doc.isAIGenerated && (
@@ -435,35 +463,25 @@ export default function MyDocumentsPage() {
           <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="col-span-1 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
               <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-900">Storage Analysis</h3>
+                <h3 className="text-xl font-bold text-gray-900">PDF Storage</h3>
                 <span className="text-sm font-medium text-gray-500">
-                  {percentage}% Capacity used
+                  {formatSize(storageAnalysis.pdfSize)} stored
                 </span>
               </div>
 
-              <div className="mb-6 flex h-3.5 w-full overflow-hidden rounded-full bg-gray-100">
-                <div className="h-full bg-[#1a1c23]" style={{ width: '45%' }}></div>
-                <div className="h-full bg-gray-500" style={{ width: '15%' }}></div>
-                <div className="h-full bg-gray-300" style={{ width: '10%' }}></div>
-              </div>
-
-              <div className="flex flex-wrap gap-6 text-sm">
+              <div className="flex flex-col gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full bg-[#1a1c23]"></span>
-                  <span className="text-gray-500">PDF ({totalGB || '1.2'} GB)</span>
+                  <span className="text-gray-700 font-medium">PDF ({formatSize(storageAnalysis.pdfSize)})</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-gray-500"></span>
-                  <span className="text-gray-500">Docs (480 MB)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-gray-300"></span>
-                  <span className="text-gray-500">Media (210 MB)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full border border-gray-200 bg-gray-100"></span>
-                  <span className="text-gray-500">Other</span>
-                </div>
+
+                {storageAnalysis.noSizeCount > 0 && (
+                  <div className="mt-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-md text-xs font-medium">
+                    {storageAnalysis.noSizeCount === storageAnalysis.pdfDocsCount 
+                      ? 'Size data is not available for existing PDF documents yet'
+                      : `${storageAnalysis.noSizeCount} PDF document${storageAnalysis.noSizeCount > 1 ? 's' : ''} have no recorded size yet`}
+                  </div>
+                )}
               </div>
             </div>
 

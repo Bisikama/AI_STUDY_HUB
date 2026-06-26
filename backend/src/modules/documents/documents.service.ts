@@ -842,6 +842,11 @@ Quy định chặt chẽ:
       where: whereClause,
       include: {
         subject: true,
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -862,6 +867,12 @@ Quy định chặt chẽ:
         pageCount: doc.pageCount,
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
+        fileSizeBytes:
+          doc.fileSize !== undefined && doc.fileSize !== null && doc.fileSize > BigInt(0)
+            ? Number(doc.fileSize)
+            : null,
+        subject: (doc as any).subject,
+        tags: (doc as any).tags,
       };
       return d;
     });
