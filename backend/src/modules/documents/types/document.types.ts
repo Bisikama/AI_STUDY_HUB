@@ -23,6 +23,7 @@ export interface MyDocumentListItem {
   pageCount: number | null;
   createdAt: Date;
   updatedAt: Date;
+  fileSizeBytes: number | null;
 }
 
 export type SanitizedDocument = Omit<Document, 'fileSize'> & {

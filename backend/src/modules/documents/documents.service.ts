@@ -822,6 +822,10 @@ Quy định chặt chẽ:
         pageCount: doc.pageCount,
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
+        fileSizeBytes:
+          doc.fileSize !== undefined && doc.fileSize !== null && doc.fileSize > BigInt(0)
+            ? Number(doc.fileSize)
+            : null,
       };
       return d;
     });
