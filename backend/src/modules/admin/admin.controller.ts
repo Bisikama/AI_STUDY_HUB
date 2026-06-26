@@ -6,12 +6,14 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { GetAdminQuizzesQueryDto, UpdateQuestionDto } from './dto/admin-quiz.dto';
 
 // Gắn Guard bảo vệ toàn bộ các API trong Controller này
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -63,5 +65,53 @@ export class AdminController {
   @Delete('documents/:id')
   async forceDeleteDocument(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.adminService.forceDeleteDocument(id);
+  }
+
+  /**
+   * Lấy danh sách toàn bộ bộ câu hỏi trắc nghiệm
+   * GET /api/admin/quizzes
+   */
+  @Get('quizzes')
+  async getQuizzes(@Query() query: GetAdminQuizzesQueryDto) {
+    return this.adminService.getQuizzes(query);
+  }
+
+  /**
+   * Lấy chi tiết câu hỏi của một bộ Quiz
+   * GET /api/admin/quizzes/:id
+   */
+  @Get('quizzes/:id')
+  async getQuizById(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
+    return this.adminService.getQuizById(id);
+  }
+
+  /**
+   * Cập nhật câu hỏi và các lựa chọn
+   * PATCH /api/admin/quizzes/questions/:questionId
+   */
+  @Patch('quizzes/questions/:questionId')
+  async updateQuestion(
+    @Param('questionId', new ParseUUIDPipe({ version: '4' })) questionId: string,
+    @Body() dto: UpdateQuestionDto,
+  ) {
+    return this.adminService.updateQuestion(questionId, dto);
+  }
+
+  /**
+   * Xóa một bộ Quiz
+   * DELETE /api/admin/quizzes/:id
+   */
+  @Delete('quizzes/:id')
+  async deleteQuiz(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
+    return this.adminService.deleteQuiz(id);
+  }
+
+  /**
+   * Thống kê làm bài của bộ Quiz
+   * GET /api/admin/quizzes/:id/analytics
+   */
+  @Get('quizzes/:id/analytics')
+  async getQuizAnalytics(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
+    return this.adminService.getQuizAnalytics(id);
   }
 }
