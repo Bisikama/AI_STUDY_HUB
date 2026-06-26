@@ -24,6 +24,8 @@ export interface MyDocumentListItem {
   createdAt: Date;
   updatedAt: Date;
   fileSizeBytes: number | null;
+  subject?: any;
+  tags?: any[];
 }
 
 export type SanitizedDocument = Omit<Document, 'fileSize'> & {

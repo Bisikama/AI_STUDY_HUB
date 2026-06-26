@@ -351,7 +351,7 @@ export default function MyDocumentsPage() {
 
                     <p className="mb-3 text-[13px] text-gray-500">
                       {doc.isAIGenerated ? 'AI Generated' : `Added ${formatDate(doc.createdAt)}`} •{' '}
-                      {formatSize(doc.fileSize)}
+                      {formatSize(doc.fileSizeBytes !== undefined ? doc.fileSizeBytes : doc.fileSize)}
                     </p>
 
                     {!doc.isAIGenerated && (
