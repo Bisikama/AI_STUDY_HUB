@@ -575,10 +575,25 @@ describe('DocumentsService', () => {
         data: { questionId: 'question-id', optionText: 'Opt B', isCorrect: true },
       });
 
-      // Verify document flag update
-      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+      // Verify document flag updates (PROCESSING -> READY)
+      expect(mockPrisma.document.update).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.document.update).toHaveBeenNthCalledWith(1, {
         where: { id: mockDocumentId },
-        data: { isAIGenerated: true },
+        data: {
+          aiStatus: 'PROCESSING',
+          aiRunId: expect.any(String),
+          aiProcessingStartedAt: expect.any(Date),
+          aiAttemptCount: { increment: 1 },
+          aiFailureReason: null,
+        },
+      });
+      expect(mockPrisma.document.update).toHaveBeenNthCalledWith(2, {
+        where: { id: mockDocumentId },
+        data: {
+          aiStatus: 'READY',
+          aiGeneratedAt: expect.any(Date),
+          isAIGenerated: true,
+        },
       });
 
       // Verify output
@@ -663,7 +678,11 @@ describe('DocumentsService', () => {
       // Forbidden fields absent
       const forbiddenFields = [
         'uploadedBy', 'fileUrl', 'previewUrl', 'storagePath', 'status',
+<<<<<<< Updated upstream
         'fullText', 'summary', 'quizzes', 'aiRunId',
+=======
+        'fullText', 'tags', 'aiRunId',
+>>>>>>> Stashed changes
         'aiProcessingStartedAt', 'aiGeneratedAt', 'aiAttemptCount', 'aiFailureReason'
       ];
       forbiddenFields.forEach(field => {

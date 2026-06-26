@@ -9,8 +9,10 @@ import {
   BadGatewayException,
   ConflictException,
   UnprocessableEntityException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../database/prisma.service';
 import { parseDocument } from './utils/documentParser';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -31,6 +33,8 @@ import { DocumentAccessService, DocumentAccessPurpose } from './document-access.
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(ConfigService) private readonly configService: ConfigService,
@@ -445,9 +449,24 @@ export class DocumentsService {
       );
     }
 
-    // ==========================================
-    // LAYER 2: Token Count Defense (Gemini SDK)
-    // ==========================================
+    const runId = uuidv4();
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        aiStatus: 'PROCESSING',
+        aiRunId: runId,
+        aiProcessingStartedAt: new Date(),
+        aiAttemptCount: {
+          increment: 1,
+        },
+        aiFailureReason: null,
+      },
+    });
+
+    try {
+      // ==========================================
+      // LAYER 2: Token Count Defense (Gemini SDK)
+      // ==========================================
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     if (!apiKey) {
       throw new InternalServerErrorException(
@@ -635,6 +654,8 @@ Quy định chặt chẽ:
         const updatedDoc = await tx.document.update({
           where: { id: documentId },
           data: {
+            aiStatus: 'READY',
+            aiGeneratedAt: new Date(),
             isAIGenerated: true,
           },
         });
@@ -666,6 +687,25 @@ Quy định chặt chẽ:
       throw new InternalServerErrorException(
         `Database transaction failed, changes rolled back: ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      try {
+        await this.prisma.document.update({
+          where: { id: documentId },
+          data: {
+            aiStatus: 'FAILED',
+            aiFailureReason: errorMessage,
+          },
+        });
+      } catch (dbUpdateError) {
+        this.logger.error(
+          `Failed to update FAILED status in DB for document ${documentId}: ${
+            dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
+          }`,
+        );
+      }
+      throw error;
     }
   }
 
