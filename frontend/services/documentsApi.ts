@@ -25,6 +25,11 @@ export interface Document {
   fileType: string;
   downloadCount: number;
   viewCount: number;
+  averageRating?: number;
+  ratingCount?: number;
+  reportCount?: number;
+  moderationWarning?: string | null;
+  status?: 'ACTIVE' | 'UNDER_REVIEW' | 'HIDDEN' | 'REMOVED';
   visibilityStatus: 'PUBLIC' | 'PENDING_REVIEW' | 'PRIVATE';
   deletionStatus?: 'ACTIVE' | 'SOFT_DELETED' | 'DELETING' | 'DELETE_FAILED' | 'REMOVED';
   extractionStatus?: 'PENDING' | 'READY' | 'FAILED';
@@ -38,7 +43,7 @@ export interface Document {
   createdAt: string;
   updatedAt: string;
   requestedAt?: string | null;
-  tags?: Array<{ documentId: string; tagId: number; tag: { id: number; name: string; slug: string; isSystem: boolean } }>;
+  tags?: any[];
 }
 
 export interface UploadDocumentResponse {
@@ -182,4 +187,37 @@ export const documentsApi = {
     const response = await axiosClient.post(`/documents/${id}/withdraw-public`);
     return response.data;
   },
+
+  /**
+   * Rate a document (1-5 stars, optional comment).
+   */
+  rateDocument: async (documentId: string, payload: { rating: number; comment?: string }): Promise<any> => {
+    const response = await axiosClient.post(`/documents/${documentId}/ratings`, payload);
+    return response.data;
+  },
+
+  /**
+   * Get all ratings for a document.
+   */
+  getRatings: async (documentId: string): Promise<any[]> => {
+    const response = await axiosClient.get(`/documents/${documentId}/ratings`);
+    return response.data;
+  },
+
+  /**
+   * Delete rating for a document by current user.
+   */
+  deleteRating: async (documentId: string): Promise<any> => {
+    const response = await axiosClient.delete(`/documents/${documentId}/ratings/me`);
+    return response.data;
+  },
+
+  /**
+   * Report a document.
+   */
+  reportDocument: async (documentId: string, payload: { reason: string; description?: string }): Promise<any> => {
+    const response = await axiosClient.post(`/documents/${documentId}/reports`, payload);
+    return response.data;
+  },
 };
+

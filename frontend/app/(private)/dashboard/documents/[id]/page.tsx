@@ -19,6 +19,97 @@ export default function DocumentDetailPage() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [viewType, setViewType] = useState<'text' | 'summary'>('text');
 
+  // Rating state
+  const { data: ratings, mutate: mutateRatings } = useSWR(
+    id ? `/documents/${id}/ratings` : null,
+    () => documentsApi.getRatings(id)
+  );
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [ratingValue, setRatingValue] = useState<number>(0);
+  const [hoveredStar, setHoveredStar] = useState<number>(0);
+  const [ratingComment, setRatingComment] = useState<string>('');
+  const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
+  const [isEditingRating, setIsEditingRating] = useState<boolean>(false);
+
+  // Report state
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
+  const [reportReason, setReportReason] = useState<string>('INCORRECT_CONTENT');
+  const [reportDescription, setReportDescription] = useState<string>('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      try {
+        setCurrentUser(JSON.parse(userJson));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  const myRating = ratings?.find((r: any) => r.userId === currentUser?.id);
+  React.useEffect(() => {
+    if (myRating && !isEditingRating) {
+      setRatingValue(myRating.rating);
+      setRatingComment(myRating.comment || '');
+    }
+  }, [myRating, isEditingRating]);
+
+  const handleSubmitRating = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (ratingValue < 1 || ratingValue > 5) {
+      addToast('Please select a rating (1-5 stars).', 'error');
+      return;
+    }
+    setIsSubmittingRating(true);
+    try {
+      await documentsApi.rateDocument(id, { rating: ratingValue, comment: ratingComment });
+      addToast('Document rated successfully!', 'success');
+      mutate();
+      mutateRatings();
+      setIsEditingRating(false);
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || err.message || 'Error rating document';
+      addToast(errMsg, 'error');
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
+  const handleDeleteRating = async () => {
+    if (!confirm('Are you sure you want to delete your review?')) return;
+    try {
+      await documentsApi.deleteRating(id);
+      addToast('Your review has been deleted.', 'success');
+      setRatingValue(0);
+      setRatingComment('');
+      mutate();
+      mutateRatings();
+      setIsEditingRating(false);
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || err.message || 'Error deleting review';
+      addToast(errMsg, 'error');
+    }
+  };
+
+  const handleSubmitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingReport(true);
+    try {
+      await documentsApi.reportDocument(id, { reason: reportReason, description: reportDescription });
+      addToast('Document reported successfully! The moderation team will review it soon.', 'success');
+      mutate();
+      setIsReportModalOpen(false);
+      setReportDescription('');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || err.message || 'Error submitting report';
+      addToast(errMsg, 'error');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
   // Toast notifications state
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef(0);
@@ -85,9 +176,9 @@ export default function DocumentDetailPage() {
 
   const handleRequestPublic = async () => {
     try {
-      addToast('Đang xử lý yêu cầu...', 'info');
+      addToast('Processing request...', 'info');
       await documentsApi.requestDocumentPublic(id);
-      addToast('Đã gửi yêu cầu duyệt công khai.', 'success');
+      addToast('Public review request submitted.', 'success');
       mutate();
       import('swr').then(({ mutate: globalMutate }) => {
         globalMutate((key: any) => Array.isArray(key) && key[0] === '/documents/me');
@@ -102,7 +193,7 @@ export default function DocumentDetailPage() {
     try {
       setIsWithdrawing(true);
       await documentsApi.withdrawDocumentPublic(id);
-      addToast('Đã rút tài liệu khỏi Explore.', 'success');
+      addToast('Withdrew document from Explore.', 'success');
       mutate();
       setIsWithdrawModalOpen(false);
       import('swr').then(({ mutate: globalMutate }) => {
@@ -165,34 +256,34 @@ export default function DocumentDetailPage() {
     switch (document.extractionStatus) {
       case 'READY':
         return {
-          title: 'PDF đã được trích xuất thành công',
+          title: 'PDF successfully extracted',
           icon: 'check_circle',
           color: 'text-green-600',
           bg: 'bg-green-50',
           border: 'border-green-200',
-          detail: document.pageCount ? `Tài liệu gồm ${document.pageCount} trang.` : '',
+          detail: document.pageCount ? `Document contains ${document.pageCount} pages.` : '',
         };
       case 'FAILED':
         return {
-          title: 'Không thể trích xuất text từ tài liệu này.',
+          title: 'Failed to extract text from this document.',
           icon: 'error',
           color: 'text-red-600',
           bg: 'bg-red-50',
           border: 'border-red-200',
-          detail: 'Bạn vẫn có thể xem PDF gốc.',
+          detail: 'You can still view the original PDF.',
         };
       case 'PENDING':
         return {
-          title: 'Tài liệu đang được xử lý.',
+          title: 'Document is being processed.',
           icon: 'hourglass_empty',
           color: 'text-yellow-600',
           bg: 'bg-yellow-50',
           border: 'border-yellow-200',
-          detail: 'Vui lòng quay lại sau ít phút.',
+          detail: 'Please check back in a few minutes.',
         };
       default:
         return {
-          title: 'Chưa có thông tin trích xuất.',
+          title: 'No extraction info available.',
           icon: 'info',
           color: 'text-gray-600',
           bg: 'bg-gray-50',
@@ -218,6 +309,20 @@ export default function DocumentDetailPage() {
         <span className="mx-2 text-gray-300">|</span>
         <span className="max-w-[200px] truncate text-gray-400 sm:max-w-md">{document.title}</span>
       </div>
+
+      {/* Moderation Warning Alert */}
+      {document.status === 'UNDER_REVIEW' && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-yellow-800 shadow-sm animate-in fade-in slide-in-from-top-4 duration-200">
+          <span className="material-symbols-outlined text-yellow-600 shrink-0 mt-0.5">warning</span>
+          <div>
+            <h4 className="font-bold text-yellow-900">Document Under Review</h4>
+            <p className="text-sm text-yellow-700 mt-1">
+              This document has received multiple user reports and is currently being moderated.
+              {document.moderationWarning && ` Detailed reason: ${document.moderationWarning}`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Main Header Area */}
       <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
@@ -285,31 +390,41 @@ export default function DocumentDetailPage() {
           )}
 
           {document.isOwner === false && (
-            <button
-              onClick={async () => {
-                try {
-                  if (document.isFollowed) {
-                    await documentsApi.unfollowDocument(document.id);
-                    addToast('Unfollowed document successfully.', 'success');
-                  } else {
-                    await documentsApi.followDocument(document.id);
-                    addToast('Followed document successfully.', 'success');
+            <>
+              <button
+                onClick={() => setIsReportModalOpen(true)}
+                className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-100"
+              >
+                <span className="material-symbols-outlined text-[18px]">report</span>
+                Report
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    if (document.isFollowed) {
+                      await documentsApi.unfollowDocument(document.id);
+                      addToast('Unfollowed document successfully.', 'success');
+                    } else {
+                      await documentsApi.followDocument(document.id);
+                      addToast('Followed document successfully.', 'success');
+                    }
+                    mutate();
+                  } catch (err) {
+                    console.error('Follow toggle failed:', err);
                   }
-                  mutate();
-                } catch (err) {
-                  console.error('Follow toggle failed:', err);
-                }
-              }}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold shadow-sm transition-colors border ${document.isFollowed
+                }}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold shadow-sm transition-colors border ${document.isFollowed
                   ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
                   : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
-                }`}
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {document.isFollowed ? 'bookmark_remove' : 'bookmark'}
-              </span>
-              {document.isFollowed ? 'Unfollow' : 'Follow'}
-            </button>
+                  }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {document.isFollowed ? 'bookmark_remove' : 'bookmark'}
+                </span>
+                {document.isFollowed ? 'Unfollow' : 'Follow'}
+              </button>
+            </>
           )}
 
         </div>
@@ -352,7 +467,7 @@ export default function DocumentDetailPage() {
                         className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm border border-gray-300 transition-colors hover:bg-gray-50"
                       >
                         <span className="material-symbols-outlined text-[18px]">preview</span>
-                        Xem bản gốc
+                        View Original PDF
                       </Link>
                     </div>
                   </div>
@@ -420,6 +535,192 @@ export default function DocumentDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Rating Card */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
+            <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[18px] text-amber-500">star</span>
+              Document Reviews
+            </h3>
+
+            {/* Average Rating Summary */}
+            <div className="mb-6 flex items-center gap-3 bg-amber-50/50 rounded-xl p-4 border border-amber-100 max-w-sm">
+              <div className="text-3xl font-extrabold text-amber-600">
+                {document.averageRating ? document.averageRating.toFixed(1) : '0.0'}
+              </div>
+              <div>
+                <div className="flex">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <span key={i} className={`material-symbols-outlined text-[18px] ${i < Math.round(document.averageRating || 0) ? 'filled text-amber-500' : 'text-gray-300'}`}>
+                      star
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {document.ratingCount || 0} reviews
+                </p>
+              </div>
+            </div>
+
+            {/* User review form (only if not owner) */}
+            {document.isOwner === false && (
+              <div className="mb-6 border-b border-gray-100 pb-6">
+                {myRating && !isEditingRating ? (
+                  <div className="rounded-xl bg-gray-50 p-4 border border-gray-100 max-w-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-gray-700 bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                        Your review
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setIsEditingRating(true)}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={handleDeleteRating}
+                          className="text-xs font-semibold text-red-600 hover:text-red-800"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex mb-1.5">
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <span key={i} className={`material-symbols-outlined text-[16px] ${i < myRating.rating ? 'filled text-amber-500' : 'text-gray-300'}`}>
+                          star
+                        </span>
+                      ))}
+                    </div>
+                    {myRating.comment ? (
+                      <p className="text-sm text-gray-600 italic">"{myRating.comment}"</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">No comment</p>
+                    )}
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmitRating} className="space-y-4 max-w-xl">
+                    <h4 className="text-sm font-bold text-gray-700">
+                      {isEditingRating ? 'Update Review' : 'Write a new review'}
+                    </h4>
+                    {/* Star Picker */}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: 5 }, (_, i) => {
+                        const starValue = i + 1;
+                        const isHighlighted = starValue <= (hoveredStar || ratingValue);
+                        return (
+                          <button
+                            type="button"
+                            key={i}
+                            onMouseEnter={() => setHoveredStar(starValue)}
+                            onMouseLeave={() => setHoveredStar(0)}
+                            onClick={() => setRatingValue(starValue)}
+                            className="focus:outline-none transition-transform hover:scale-110"
+                          >
+                            <span className={`material-symbols-outlined text-[28px] ${isHighlighted ? 'filled text-amber-500' : 'text-gray-300'}`}>
+                              star
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Comment Input */}
+                    <div>
+                      <textarea
+                        value={ratingComment}
+                        onChange={(e) => setRatingComment(e.target.value)}
+                        placeholder="Write a short review (max 500 characters)..."
+                        maxLength={500}
+                        rows={3}
+                        className="w-full rounded-xl border border-gray-300 p-3 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none bg-white"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={isSubmittingRating || ratingValue === 0}
+                        className="flex-1 max-w-[150px] rounded-lg bg-[#1a1c23] hover:bg-black text-white text-xs font-semibold py-2 px-3 shadow transition-colors disabled:opacity-50"
+                      >
+                        {isSubmittingRating ? 'Submitting...' : 'Submit review'}
+                      </button>
+                      {isEditingRating && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingRating(false);
+                            setRatingValue(myRating?.rating || 0);
+                            setRatingComment(myRating?.comment || '');
+                          }}
+                          className="rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-semibold py-2 px-3 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* Other reviews list */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-700 border-b border-gray-100 pb-2">
+                Recent reviews ({ratings?.length || 0})
+              </h4>
+              {ratings && ratings.length > 0 ? (
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
+                  {/* Sort by createdAt descending and take 5 most recent */}
+                  {[...ratings]
+                    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .slice(0, 5)
+                    .map((review: any) => (
+                      <div key={review.id} className="text-sm border-b border-gray-50 pb-3 last:border-b-0 last:pb-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            {review.user?.avatarUrl ? (
+                              <img
+                                src={review.user.avatarUrl}
+                                alt={review.user.fullName || 'User'}
+                                className="h-5 w-5 rounded-full object-cover"
+                              />
+                            ) : (
+                              <span className="material-symbols-outlined text-[18px] text-gray-400">
+                                account_circle
+                              </span>
+                            )}
+                            <span className="font-semibold text-gray-800">
+                              {review.user?.fullName || 'User'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-gray-400">
+                            {formatDate(review.createdAt)}
+                          </span>
+                        </div>
+                        <div className="flex mb-1">
+                          {Array.from({ length: 5 }, (_, i) => (
+                            <span key={i} className={`material-symbols-outlined text-[14px] ${i < review.rating ? 'filled text-amber-500' : 'text-gray-300'}`}>
+                              star
+                            </span>
+                          ))}
+                        </div>
+                        {review.comment ? (
+                          <p className="text-gray-600 text-xs whitespace-pre-wrap">
+                            {review.comment}
+                          </p>
+                        ) : (
+                          <p className="text-gray-400 italic text-[11px]">No comment.</p>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 italic text-center py-4">
+                  No reviews yet for this document.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Right Column (Sidebar) */}
@@ -427,14 +728,14 @@ export default function DocumentDetailPage() {
           {/* Actions Card */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
-              Thao tác tài liệu
+              Document Actions
             </h3>
 
             <div className="flex flex-col gap-3">
               {document.deletionStatus !== 'ACTIVE' ? (
-                <p className="text-sm text-gray-500">Tài liệu không còn khả dụng để thực hiện thao tác này.</p>
+                <p className="text-sm text-gray-500">This document is no longer available for this action.</p>
               ) : document.isOwner === false ? (
-                <p className="text-sm text-gray-500">Bạn không có quyền thực hiện thao tác trên tài liệu này.</p>
+                <p className="text-sm text-gray-500">You do not have permission to perform actions on this document.</p>
               ) : (
                 <>
                   <Link
@@ -453,6 +754,22 @@ export default function DocumentDetailPage() {
                     Download / Open Original
                   </button>
 
+                  {/* System Info Card */}
+                  {document.isOwner && (
+                    <div className="border-gray-100 pt-3">
+
+
+                      <button
+                        onClick={() => setIsDeleteModalOpen(true)}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                      >
+                        Delete Document
+                      </button>
+
+
+                    </div>
+                  )}
+
                   {document.visibilityStatus === 'PRIVATE' && (
                     <div className="mt-2 border-t border-gray-100 pt-3">
                       {document.extractionStatus !== 'READY' ? (
@@ -460,28 +777,28 @@ export default function DocumentDetailPage() {
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
                             <span className="material-symbols-outlined text-[18px]">public</span> Request Public
                           </button>
-                          <p className="mt-1.5 text-xs text-red-500 text-center">PDF cần trích xuất thành công trước khi gửi duyệt.</p>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">PDF extraction must be successful before submitting for review.</p>
                         </div>
                       ) : document.aiStatus !== 'READY' ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
                             <span className="material-symbols-outlined text-[18px]">public</span> Request Public
                           </button>
-                          <p className="mt-1.5 text-xs text-red-500 text-center">Cần hoàn tất AI processing trước khi gửi duyệt.</p>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">AI processing must be completed before submitting for review.</p>
                         </div>
                       ) : !document.subject ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
                             <span className="material-symbols-outlined text-[18px]">public</span> Request Public
                           </button>
-                          <p className="mt-1.5 text-xs text-gray-500 text-center">Đang kiểm tra điều kiện Subject.</p>
+                          <p className="mt-1.5 text-xs text-gray-500 text-center">Checking subject eligibility.</p>
                         </div>
                       ) : !document.subject.isSystem ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
                             <span className="material-symbols-outlined text-[18px]">public</span> Request Public
                           </button>
-                          <p className="mt-1.5 text-xs text-red-500 text-center">Chỉ System Subject mới có thể gửi duyệt công khai.</p>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">Only System Subjects can be submitted for public review.</p>
                         </div>
                       ) : (
                         <button
@@ -597,68 +914,7 @@ export default function DocumentDetailPage() {
             )}
           </div>
 
-          {/* System Info Card */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-bold tracking-wider text-blue-500 uppercase">
-              DOCUMENT STATUS: {getVisibilityPresentation(document.visibilityStatus).label}
-            </h3>
-            {/* <div className="flex flex-col gap-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Document ID</span>
-                <span
-                  className="max-w-[120px] truncate font-mono text-gray-900"
-                  title={document.id}
-                >
-                  {document.id.split('-')[0]}...
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Uploaded By</span>
-                <span
-                  className="max-w-[120px] truncate font-mono text-gray-900"
-                  title={document.uploadedBy}
-                >
-                  {document.uploadedBy.split('-')[0]}...
-                </span>
-              </div>
-              {document.updatedAt && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Last Updated</span>
-                  <span className="font-medium text-gray-900">
-                    {formatDate(document.updatedAt)}
-                  </span>
-                </div>
-              )}
-            </div> */}
 
-            {document.isOwner !== false ? (
-              <div className="mt-6 border-t border-gray-100 pt-4">
-                <button
-                  onClick={() => setIsDeleteModalOpen(true)}
-                  className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
-                >
-                  Delete Document
-                </button>
-              </div>
-            ) : (
-              <div className="mt-6 border-t border-gray-100 pt-4">
-                <button
-                  onClick={async () => {
-                    try {
-                      await documentsApi.unfollowDocument(document.id);
-                      addToast('Unfollowed document successfully.', 'success');
-                      router.push('/dashboard/documents');
-                    } catch (err) {
-                      console.error('Failed to unfollow:', err);
-                    }
-                  }}
-                  className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
-                >
-                  Unfollow Document
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -692,7 +948,7 @@ export default function DocumentDetailPage() {
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="mb-2 text-xl font-bold text-gray-900">Withdraw from Explore</h3>
             <p className="mb-6 text-sm text-gray-500">
-              Bạn có chắc chắn muốn rút tài liệu này khỏi Explore? Tài liệu sẽ trở về trạng thái PRIVATE.
+              Are you sure you want to withdraw this document from Explore? It will return to PRIVATE status.
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -700,16 +956,98 @@ export default function DocumentDetailPage() {
                 disabled={isWithdrawing}
                 className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50"
               >
-                Hủy
+                Cancel
               </button>
               <button
                 onClick={handleWithdrawPublic}
                 disabled={isWithdrawing}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {isWithdrawing ? 'Đang xử lý...' : 'Xác nhận'}
+                {isWithdrawing ? 'Processing...' : 'Confirm'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Modal Popup */}
+      {isReportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-2 text-red-600 mb-3">
+              <span className="material-symbols-outlined text-2xl">report</span>
+              <h3 className="text-xl font-bold text-gray-900">Report Document</h3>
+            </div>
+
+            <p className="mb-4 text-xs text-gray-500">
+              Please select the reason for reporting this document. Accurate reports help build a healthy learning community.
+            </p>
+
+            <form onSubmit={handleSubmitReport} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  Reason for report
+                </label>
+                <select
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                >
+                  <option value="INCORRECT_CONTENT">Incorrect content / Misinformation</option>
+                  <option value="WRONG_SUBJECT">Wrong subject</option>
+                  <option value="OUTDATED_SYLLABUS">Outdated syllabus</option>
+                  <option value="DUPLICATED_DOCUMENT">Duplicate document</option>
+                  <option value="FILE_ERROR">File error (cannot open, blurry, etc.)</option>
+                  <option value="LOW_QUALITY">Low quality</option>
+                  <option value="SPAM">Spam / Advertising</option>
+                  <option value="COPYRIGHT_VIOLATION">Copyright violation</option>
+                  <option value="INAPPROPRIATE_CONTENT">Inappropriate content</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  Detailed description (optional)
+                </label>
+                <textarea
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value)}
+                  placeholder="Describe the issue in detail (max 500 characters)..."
+                  maxLength={500}
+                  rows={4}
+                  className="w-full rounded-xl border border-gray-300 p-3 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsReportModalOpen(false);
+                    setReportDescription('');
+                  }}
+                  disabled={isSubmittingReport}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReport}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors shadow disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSubmittingReport ? (
+                    <>
+                      <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Report'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -734,10 +1072,10 @@ function ToastNotification({ toasts }: { toasts: Toast[] }) {
         <div
           key={t.id}
           className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${t.variant === 'success'
-              ? 'bg-emerald-600'
-              : t.variant === 'error'
-                ? 'bg-red-600'
-                : 'bg-blue-600'
+            ? 'bg-emerald-600'
+            : t.variant === 'error'
+              ? 'bg-red-600'
+              : 'bg-blue-600'
             }`}
         >
           {t.variant === 'success' && (

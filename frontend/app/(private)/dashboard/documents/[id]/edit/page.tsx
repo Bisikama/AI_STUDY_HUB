@@ -51,7 +51,7 @@ export default function EditDocumentPage() {
       setDescription(document.description || '');
       setSelectedSubjectId(document.subjectId || null);
       if (document.tags) {
-        setSelectedTags(document.tags);
+        setSelectedTags(document.tags.map((t: any) => t.tag || t));
       }
     }
   }, [document]);

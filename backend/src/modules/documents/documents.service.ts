@@ -93,6 +93,12 @@ export class DocumentsService {
       extractionStatus: document.extractionStatus,
       aiStatus: document.aiStatus,
       pageCount: document.pageCount,
+      status: document.status,
+      averageRating: document.averageRating ?? 0,
+      ratingCount: document.ratingCount ?? 0,
+      moderationWarning: document.status === 'UNDER_REVIEW'
+        ? 'Tài liệu này đang được kiểm tra bởi quản trị viên. Một số sinh viên đã báo cáo vấn đề về độ chính xác.'
+        : null,
       createdAt: document.createdAt
         ? document.createdAt instanceof Date
           ? document.createdAt.toISOString()
@@ -140,6 +146,9 @@ export class DocumentsService {
       extractionStatus: document.extractionStatus,
       aiStatus: document.aiStatus,
       pageCount: document.pageCount,
+      status: document.status,
+      averageRating: document.averageRating ?? 0,
+      ratingCount: document.ratingCount ?? 0,
       createdAt: document.createdAt
         ? document.createdAt instanceof Date
           ? document.createdAt.toISOString()
@@ -262,7 +271,7 @@ export class DocumentsService {
         storagePath: null,
         fileSize: BigInt(file.size),
         fileType: file.mimetype,
-        status: 'PRIVATE',
+        status: 'ACTIVE',
         visibilityStatus: 'PRIVATE',
         deletionStatus: 'ACTIVE',
         extractionStatus: 'PENDING',
@@ -419,7 +428,7 @@ export class DocumentsService {
       throw new NotFoundException(`Document with ID ${documentId} has been deleted`);
     }
 
-    if (document.status === 'PENDING') {
+    if (document.visibilityStatus === 'PENDING_REVIEW') {
       throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.ANALYZING_DOCUMENT);
     }
 
@@ -741,6 +750,9 @@ Quy định chặt chẽ:
         uploadedBy: true,
         deletedAt: true,
         storagePath: true,
+        status: true,
+        averageRating: true,
+        ratingCount: true,
 
         tags: {
           include: {
@@ -785,11 +797,16 @@ Quy định chặt chẽ:
       }
     }
 
-    if (document.uploadedBy !== userId && userRole !== 'ADMIN') {
+    const isOwner = userId ? document.uploadedBy === userId : false;
+    const isAdmin = userRole === 'ADMIN';
+
+    if (document.visibilityStatus !== 'PUBLIC' && !isOwner && !isAdmin) {
       throw new ForbiddenException('You do not have permission to view this document');
     }
 
-    const isOwner = userId ? document.uploadedBy === userId : false;
+    if ((document.status === 'HIDDEN' || document.status === 'REMOVED') && !isOwner && !isAdmin) {
+      throw new ForbiddenException('You do not have permission to view this document');
+    }
 
     let isFollowed = false;
     if (userId) {
@@ -1485,5 +1502,190 @@ Quy định chặt chẽ:
     }
 
     return updatedDocument;
+  }
+
+  async rateDocument(documentId: string, userId: string, rating: number, comment?: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Không tìm thấy tài liệu.');
+    }
+
+    if (document.uploadedBy === userId) {
+      throw new BadRequestException('Bạn không thể tự đánh giá tài liệu của chính mình.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Upsert the rating
+      const documentRating = await tx.documentRating.upsert({
+        where: {
+          documentId_userId: {
+            documentId,
+            userId,
+          },
+        },
+        update: {
+          rating,
+          comment: comment?.trim() || null,
+        },
+        create: {
+          documentId,
+          userId,
+          rating,
+          comment: comment?.trim() || null,
+        },
+      });
+
+      // Recalculate averageRating and ratingCount
+      const agg = await tx.documentRating.aggregate({
+        where: { documentId },
+        _avg: { rating: true },
+        _count: { rating: true },
+      });
+
+      await tx.document.update({
+        where: { id: documentId },
+        data: {
+          averageRating: agg._avg.rating ?? 0,
+          ratingCount: agg._count.rating ?? 0,
+        },
+      });
+
+      return documentRating;
+    });
+  }
+
+  async getRatings(documentId: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Không tìm thấy tài liệu.');
+    }
+
+    const ratings = await this.prisma.documentRating.findMany({
+      where: { documentId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return ratings;
+  }
+
+  async deleteRating(documentId: string, userId: string) {
+    const rating = await this.prisma.documentRating.findUnique({
+      where: {
+        documentId_userId: {
+          documentId,
+          userId,
+        },
+      },
+    });
+
+    if (!rating) {
+      throw new NotFoundException('Bạn chưa đánh giá tài liệu này.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.documentRating.delete({
+        where: {
+          documentId_userId: {
+            documentId,
+            userId,
+          },
+        },
+      });
+
+      // Recalculate averageRating and ratingCount
+      const agg = await tx.documentRating.aggregate({
+        where: { documentId },
+        _avg: { rating: true },
+        _count: { rating: true },
+      });
+
+      await tx.document.update({
+        where: { id: documentId },
+        data: {
+          averageRating: agg._avg.rating ?? 0,
+          ratingCount: agg._count.rating ?? 0,
+        },
+      });
+    });
+
+    return { success: true, message: 'Đã xóa đánh giá thành công.' };
+  }
+
+  async reportDocument(documentId: string, userId: string, reason: any, description?: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Không tìm thấy tài liệu.');
+    }
+
+    if (document.uploadedBy === userId) {
+      throw new BadRequestException('Bạn không thể báo cáo tài liệu của chính mình.');
+    }
+
+    // Check if user already reported this document with a PENDING or REVIEWING status
+    const existingReport = await this.prisma.documentReport.findFirst({
+      where: {
+        documentId,
+        reporterId: userId,
+        status: {
+          in: ['PENDING', 'REVIEWING'],
+        },
+      },
+    });
+
+    if (existingReport) {
+      throw new ConflictException('Bạn đã gửi báo cáo cho tài liệu này và báo cáo đang được xử lý.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const report = await tx.documentReport.create({
+        data: {
+          documentId,
+          reporterId: userId,
+          reason,
+          description: description?.trim() || null,
+          status: 'PENDING',
+        },
+      });
+
+      // Increment reportCount of document
+      const updatedDoc = await tx.document.update({
+        where: { id: documentId },
+        data: {
+          reportCount: {
+            increment: 1,
+          },
+        },
+      });
+
+      // If reportCount >= 3, automatically transition to UNDER_REVIEW
+      if (updatedDoc.reportCount >= 3 && updatedDoc.status === 'ACTIVE') {
+        await tx.document.update({
+          where: { id: documentId },
+          data: {
+            status: 'UNDER_REVIEW',
+          },
+        });
+      }
+
+      return report;
+    });
   }
 }
