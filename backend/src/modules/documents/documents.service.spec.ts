@@ -16,6 +16,7 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  ConflictException,
 } from '@nestjs/common';
 
 interface ServiceWithPrivateMethods {
@@ -110,6 +111,21 @@ describe('DocumentsService', () => {
     },
     quizOption: {
       create: jest.fn(),
+    },
+    documentRating: {
+      upsert: jest.fn(),
+      aggregate: jest.fn(),
+      findUnique: jest.fn(),
+      delete: jest.fn(),
+      findMany: jest.fn(),
+    },
+    documentReport: {
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn((callback) => callback(mockPrisma)),
   };
@@ -677,13 +693,8 @@ describe('DocumentsService', () => {
 
       // Forbidden fields absent
       const forbiddenFields = [
-        'uploadedBy', 'fileUrl', 'previewUrl', 'storagePath', 'status',
-<<<<<<< Updated upstream
-        'fullText', 'summary', 'quizzes', 'aiRunId',
-=======
-        'fullText', 'tags', 'aiRunId',
->>>>>>> Stashed changes
-        'aiProcessingStartedAt', 'aiGeneratedAt', 'aiAttemptCount', 'aiFailureReason'
+        'uploadedBy', 'fileUrl', 'previewUrl', 'storagePath', 'fullText', 'aiRunId',
+        'aiProcessingStartedAt', 'aiGeneratedAt', 'aiAttemptCount', 'aiFailureReason', 'deletedAt'
       ];
       forbiddenFields.forEach(field => {
         expect(result).not.toHaveProperty(field);
@@ -1176,6 +1187,68 @@ describe('DocumentsService', () => {
       expect(result.nested.date).toBe('2026-01-02T00:00:00.000Z');
       expect(result.arr[0]).toBe(50);
       expect(result.arr[1]).toBe('2026-01-03T00:00:00.000Z');
+    });
+  });
+
+  describe('Document Ratings & Reports', () => {
+    describe('rateDocument', () => {
+      it('should throw NotFoundException if document does not exist', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue(null);
+        await expect(service.rateDocument('doc-1', 'user-1', 5)).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw BadRequestException if user rates their own document', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-1' });
+        await expect(service.rateDocument('doc-1', 'user-1', 5)).rejects.toThrow(BadRequestException);
+      });
+
+      it('should upsert rating and update document averages', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-other' });
+        mockPrisma.documentRating.upsert.mockResolvedValue({ id: 'rating-1', rating: 5, comment: 'Good' });
+        mockPrisma.documentRating.aggregate.mockResolvedValue({ _avg: { rating: 4.5 }, _count: { rating: 10 } });
+        mockPrisma.document.update.mockResolvedValue({ id: 'doc-1' });
+
+        const result = await service.rateDocument('doc-1', 'user-1', 5, 'Good');
+        expect(result).toBeDefined();
+        expect(mockPrisma.documentRating.upsert).toHaveBeenCalled();
+        expect(mockPrisma.document.update).toHaveBeenCalledWith({
+          where: { id: 'doc-1' },
+          data: { averageRating: 4.5, ratingCount: 10 },
+        });
+      });
+    });
+
+    describe('reportDocument', () => {
+      it('should throw NotFoundException if document does not exist', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue(null);
+        await expect(service.reportDocument('doc-1', 'user-1', 'INCORRECT_CONTENT')).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw BadRequestException if user reports their own document', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-1' });
+        await expect(service.reportDocument('doc-1', 'user-1', 'INCORRECT_CONTENT')).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw ConflictException if user already has active report', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-other' });
+        mockPrisma.documentReport.findFirst.mockResolvedValue({ id: 'report-1' });
+
+        await expect(service.reportDocument('doc-1', 'user-1', 'INCORRECT_CONTENT')).rejects.toThrow(ConflictException);
+      });
+
+      it('should create report and auto moderate document if reports >= 3', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-other' });
+        mockPrisma.documentReport.findFirst.mockResolvedValue(null);
+        mockPrisma.documentReport.create.mockResolvedValue({ id: 'report-new' });
+        mockPrisma.document.update
+          .mockResolvedValueOnce({ id: 'doc-1', reportCount: 3, status: 'ACTIVE' })
+          .mockResolvedValueOnce({ id: 'doc-1', status: 'UNDER_REVIEW' });
+
+        const result = await service.reportDocument('doc-1', 'user-1', 'INCORRECT_CONTENT', 'Description');
+        expect(result).toBeDefined();
+        expect(mockPrisma.documentReport.create).toHaveBeenCalled();
+        expect(mockPrisma.document.update).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

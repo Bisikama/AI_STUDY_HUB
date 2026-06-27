@@ -23,7 +23,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ValidateFilePipe } from './pipes';
-import { UploadDocumentDto, UpdateDocumentDto, GetDocumentsDto } from './dto';
+import { UploadDocumentDto, UpdateDocumentDto, GetDocumentsDto, CreateOrUpdateRatingDto, CreateReportDto } from './dto';
 import { DocumentsService } from './documents.service';
 import { DocumentAccessService } from './document-access.service';
 import type { StorageAdapter } from '../../supabase/storage-adapter.interface';
@@ -245,6 +245,76 @@ export class DocumentsController {
       statusCode: 200,
       message: 'Document public visibility withdrawn successfully',
       data: document,
+    };
+  }
+
+  @Post(':documentId/ratings')
+  @UseGuards(JwtAuthGuard)
+  async rateDocument(
+    @Param('documentId', new ParseUUIDPipe({ version: '4' })) documentId: string,
+    @Body() dto: CreateOrUpdateRatingDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    const rating = await this.documentsService.rateDocument(documentId, userId, dto.rating, dto.comment);
+    return {
+      statusCode: 201,
+      message: 'Document rated successfully',
+      data: rating,
+    };
+  }
+
+  @Get(':documentId/ratings')
+  async getRatings(
+    @Param('documentId', new ParseUUIDPipe({ version: '4' })) documentId: string,
+  ) {
+    const ratings = await this.documentsService.getRatings(documentId);
+    return {
+      statusCode: 200,
+      message: 'Get document ratings successfully',
+      data: ratings,
+    };
+  }
+
+  @Patch(':documentId/ratings/me')
+  @UseGuards(JwtAuthGuard)
+  async updateRatingMe(
+    @Param('documentId', new ParseUUIDPipe({ version: '4' })) documentId: string,
+    @Body() dto: CreateOrUpdateRatingDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    const rating = await this.documentsService.rateDocument(documentId, userId, dto.rating, dto.comment);
+    return {
+      statusCode: 200,
+      message: 'Document rating updated successfully',
+      data: rating,
+    };
+  }
+
+  @Delete(':documentId/ratings/me')
+  @UseGuards(JwtAuthGuard)
+  async deleteRatingMe(
+    @Param('documentId', new ParseUUIDPipe({ version: '4' })) documentId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const result = await this.documentsService.deleteRating(documentId, userId);
+    return {
+      statusCode: 200,
+      message: result.message,
+    };
+  }
+
+  @Post(':documentId/reports')
+  @UseGuards(JwtAuthGuard)
+  async reportDocument(
+    @Param('documentId', new ParseUUIDPipe({ version: '4' })) documentId: string,
+    @Body() dto: CreateReportDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    const report = await this.documentsService.reportDocument(documentId, userId, dto.reason, dto.description);
+    return {
+      statusCode: 201,
+      message: 'Document reported successfully',
+      data: report,
     };
   }
 }

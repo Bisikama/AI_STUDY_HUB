@@ -6,6 +6,7 @@ export type DocumentAccessPurpose = 'SIGNED_PREVIEW' | 'SIGNED_DOWNLOAD';
 
 export const getPublicEligibilityFilter = (): Prisma.DocumentWhereInput => ({
   visibilityStatus: 'PUBLIC',
+  status: 'ACTIVE',
   deletionStatus: 'ACTIVE',
   deletedAt: null,
   storagePath: { not: null },
@@ -15,6 +16,7 @@ export const getPublicEligibilityFilter = (): Prisma.DocumentWhereInput => ({
 
 export const getModerationPendingFilter = (): Prisma.DocumentWhereInput => ({
   visibilityStatus: 'PENDING_REVIEW',
+  status: 'ACTIVE',
   deletionStatus: 'ACTIVE',
   deletedAt: null,
   storagePath: { not: null },
@@ -57,6 +59,7 @@ export class DocumentAccessService {
         deletedAt: true,
         fileType: true,
         title: true,
+        status: true,
       },
     });
 
@@ -85,7 +88,8 @@ export class DocumentAccessService {
     if (
       document.deletionStatus !== 'ACTIVE' ||
       document.deletedAt !== null ||
-      !document.storagePath
+      !document.storagePath ||
+      ((document.status === 'HIDDEN' || document.status === 'REMOVED') && !isOwner && !isAdmin)
     ) {
       throw new ConflictException('DOCUMENT_NOT_ACTIVE');
     }

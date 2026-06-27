@@ -124,7 +124,8 @@ export async function seedDocuments(
     const subject = subjects.find((s) => s.code === template.subjectCode)!;
 
     // 1. Random trạng thái cho thực tế (để UI có nhiều màu sắc khác nhau)
-    const randomStatus = faker.helpers.arrayElement(['PRIVATE', 'PENDING', 'APPROVED']);
+    const randomVisibility = faker.helpers.arrayElement(['PRIVATE', 'PENDING_REVIEW', 'PUBLIC']);
+    const randomStatus = faker.helpers.arrayElement(['ACTIVE', 'ACTIVE', 'ACTIVE', 'UNDER_REVIEW']);
 
     // 2. Format lại chuẩn URL của Supabase
     const fakeSupabaseUrl = `https://${process.env.SUPABASE_PROJECT_REF}.supabase.co/storage/v1/object/public/documents/seed-${faker.string.uuid()}.pdf`;
@@ -138,8 +139,10 @@ export async function seedDocuments(
         fileUrl: fakeSupabaseUrl,
         fileSize: fileSize,
         fileType: 'application/pdf',
-        status: randomStatus, // Đã fix đúng chuẩn Schema mới
-        rating: parseFloat(faker.number.float({ min: 3.5, max: 5.0 }).toFixed(1)),
+        status: randomStatus as any, // Đã fix đúng chuẩn Schema mới
+        visibilityStatus: randomVisibility as any,
+        averageRating: parseFloat(faker.number.float({ min: 3.5, max: 5.0 }).toFixed(1)),
+        ratingCount: faker.number.int({ min: 1, max: 20 }),
         viewCount: faker.number.int({ min: 50, max: 2000 }),
         downloadCount: faker.number.int({ min: 10, max: 800 }),
 

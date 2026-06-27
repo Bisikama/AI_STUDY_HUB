@@ -14,6 +14,7 @@ export class ExploreService {
     const documents = await this.prisma.document.findMany({
       where: {
         visibilityStatus: 'PUBLIC',
+        status: 'ACTIVE',
         deletionStatus: 'ACTIVE',
         extractionStatus: 'READY',
         aiStatus: 'READY',
@@ -96,6 +97,7 @@ export class ExploreService {
       where: {
         id: documentId,
         visibilityStatus: 'PUBLIC',
+        status: 'ACTIVE',
         deletionStatus: 'ACTIVE',
         extractionStatus: 'READY',
         aiStatus: 'READY',
@@ -174,6 +176,7 @@ export class ExploreService {
             documentId,
             document: {
               visibilityStatus: 'PUBLIC',
+              status: 'ACTIVE',
               deletionStatus: 'ACTIVE',
               extractionStatus: 'READY',
               aiStatus: 'READY',

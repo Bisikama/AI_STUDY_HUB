@@ -38,7 +38,7 @@ async function main() {
 
     // Bước 7: Seed User Document Views (Lịch sử xem)
     console.log('👀 Seeding document views history...');
-    const approvedDocs = documents.filter((doc) => doc.status === 'APPROVED');
+    const approvedDocs = documents.filter((doc) => doc.visibilityStatus === 'PUBLIC');
     if (approvedDocs.length > 0) {
       const student = users.find((u) => u.email.startsWith('student.phạm'));
       if (student) {
