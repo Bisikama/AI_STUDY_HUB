@@ -1,8 +1,9 @@
 import { Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { DocumentStatus } from '../../../generated/prisma/client';
+import { DocumentStatus, VisibilityStatus, ReportStatus, ReportReason } from '../../../generated/prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { GetAdminQuizzesQueryDto, UpdateQuestionDto } from './dto/admin-quiz.dto';
+import { ResolveReportDto } from './dto/resolve-report.dto';
 
 @Injectable()
 export class AdminService {
@@ -95,7 +96,7 @@ export class AdminService {
   async getPendingDocuments() {
     try {
       const documents = await this.prisma.document.findMany({
-        where: { status: DocumentStatus.PENDING },
+        where: { visibilityStatus: VisibilityStatus.PENDING_REVIEW },
         select: {
           id: true,
           title: true,
@@ -104,6 +105,7 @@ export class AdminService {
           fileSize: true,
           fileType: true,
           status: true,
+          visibilityStatus: true,
           fullText: true,        // nội dung text đầy đủ để admin review
           createdAt: true,
           subject: {
@@ -125,7 +127,7 @@ export class AdminService {
 
   async approveOrRejectDoc(docId: string, status: 'APPROVED' | 'REJECTED') {
     try {
-      const dbStatus = status === 'APPROVED' ? DocumentStatus.APPROVED : DocumentStatus.PRIVATE;
+      const dbStatus = status === 'APPROVED' ? VisibilityStatus.PUBLIC : VisibilityStatus.PRIVATE;
 
       const document = await this.prisma.document.findUnique({
         where: { id: docId },
@@ -138,7 +140,7 @@ export class AdminService {
       const updatedDoc = await this.prisma.document.update({
         where: { id: docId },
         data: {
-          status: dbStatus,
+          visibilityStatus: dbStatus,
         },
       });
 
@@ -429,6 +431,228 @@ export class AdminService {
       if (error instanceof NotFoundException) throw error;
       console.error('Lỗi khi lấy thống kê quiz:', error);
       throw new InternalServerErrorException('Không thể lấy thống kê bộ câu hỏi');
+    }
+  }
+
+  async getReports(query: { status?: any; reason?: any; documentId?: string; page?: number; limit?: number }) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (query.status) {
+      where.status = query.status;
+    }
+    if (query.reason) {
+      where.reason = query.reason;
+    }
+    if (query.documentId) {
+      where.documentId = query.documentId;
+    }
+
+    try {
+      const [reports, totalItems] = await Promise.all([
+        this.prisma.documentReport.findMany({
+          where,
+          include: {
+            document: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                visibilityStatus: true,
+                uploadedBy: true,
+                user: {
+                  select: {
+                    fullName: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+            reporter: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+              },
+            },
+            reviewer: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+              },
+            },
+          },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.documentReport.count({ where }),
+      ]);
+
+      const totalPages = Math.ceil(totalItems / limit);
+
+      return {
+        data: this.sanitizeData(reports),
+        totalItems,
+        totalPages,
+        page,
+        limit,
+      };
+    } catch (error) {
+      console.error('Lỗi khi lấy danh sách báo cáo:', error);
+      throw new InternalServerErrorException('Không thể lấy danh sách báo cáo');
+    }
+  }
+
+  async getReportDetails(reportId: string) {
+    try {
+      const report = await this.prisma.documentReport.findUnique({
+        where: { id: reportId },
+        include: {
+          document: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              visibilityStatus: true,
+              uploadedBy: true,
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                },
+              },
+            },
+          },
+          reporter: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+          reviewer: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      if (!report) {
+        throw new NotFoundException('Không tìm thấy báo cáo.');
+      }
+
+      return this.sanitizeData(report);
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      console.error('Lỗi khi lấy chi tiết báo cáo:', error);
+      throw new InternalServerErrorException('Không thể lấy chi tiết báo cáo');
+    }
+  }
+
+  async updateReport(reportId: string, adminId: string, dto: ResolveReportDto) {
+    const report = await this.prisma.documentReport.findUnique({
+      where: { id: reportId },
+    });
+
+    if (!report) {
+      throw new NotFoundException('Không tìm thấy báo cáo.');
+    }
+
+    try {
+      const updatedReport = await this.prisma.$transaction(async (tx) => {
+        // 1. Update this report
+        const rep = await tx.documentReport.update({
+          where: { id: reportId },
+          data: {
+            status: dto.status,
+            reviewedBy: adminId,
+            reviewedAt: new Date(),
+            adminNote: dto.adminNote?.trim() || null,
+          },
+          include: {
+            document: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+              },
+            },
+          },
+        });
+
+        // 2. If rejected
+        if (dto.status === 'REJECTED') {
+          // Check if there are other pending/reviewing reports for this document
+          const otherActiveReportsCount = await tx.documentReport.count({
+            where: {
+              documentId: report.documentId,
+              id: { not: reportId },
+              status: {
+                in: ['PENDING', 'REVIEWING'],
+              },
+            },
+          });
+
+          // If no active reports left, and document is UNDER_REVIEW, restore it to ACTIVE
+          if (otherActiveReportsCount === 0) {
+            const doc = await tx.document.findUnique({
+              where: { id: report.documentId },
+              select: { status: true },
+            });
+            if (doc && doc.status === 'UNDER_REVIEW') {
+              await tx.document.update({
+                where: { id: report.documentId },
+                data: { status: 'ACTIVE' },
+              });
+            }
+          }
+        }
+
+        // 3. If resolved and documentStatus is provided
+        if (dto.status === 'RESOLVED' && dto.documentStatus) {
+          await tx.document.update({
+            where: { id: report.documentId },
+            data: {
+              status: dto.documentStatus,
+            },
+          });
+
+          // If documentStatus is HIDDEN or REMOVED, auto resolve all other active reports
+          if (dto.documentStatus === 'HIDDEN' || dto.documentStatus === 'REMOVED') {
+            await tx.documentReport.updateMany({
+              where: {
+                documentId: report.documentId,
+                id: { not: reportId },
+                status: {
+                  in: ['PENDING', 'REVIEWING'],
+                },
+              },
+              data: {
+                status: 'RESOLVED',
+                reviewedBy: adminId,
+                reviewedAt: new Date(),
+                adminNote: 'Báo cáo được giải quyết tự động vì tài liệu đã bị ẩn hoặc gỡ bỏ bởi quản trị viên.',
+              },
+            });
+          }
+        }
+
+        return rep;
+      });
+
+      return this.sanitizeData(updatedReport);
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      console.error('Lỗi khi cập nhật báo cáo:', error);
+      throw new InternalServerErrorException('Không thể cập nhật báo cáo');
     }
   }
 }

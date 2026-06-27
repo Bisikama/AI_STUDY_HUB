@@ -51,7 +51,7 @@ export default function EditDocumentPage() {
       setDescription(document.description || '');
       setSelectedSubjectId(document.subjectId || null);
       if (document.tags) {
-        setSelectedTags(document.tags.map((t: any) => t.tag));
+        setSelectedTags(document.tags.map((t: any) => t.tag || t));
       }
     }
   }, [document]);
@@ -127,9 +127,9 @@ export default function EditDocumentPage() {
       };
 
       if (selectedTags.length > 0) {
-        payload.tags = JSON.stringify(selectedTags.map(t => t.name));
+        payload.tags = selectedTags.map(t => t.name);
       } else {
-        payload.tags = "[]"; // Send empty array to clear tags
+        payload.tags = [];
       }
 
       await documentsApi.updateDocument(id, payload);

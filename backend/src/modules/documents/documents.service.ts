@@ -9,8 +9,10 @@ import {
   BadGatewayException,
   ConflictException,
   UnprocessableEntityException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../database/prisma.service';
 import { parseDocument } from './utils/documentParser';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -23,13 +25,16 @@ import type {
   MyDocumentListItem,
 } from './types/document.types';
 import { STORAGE_ADAPTER } from 'src/supabase/storage-adapter.interface';
-import type { StorageAdapter } from 'src/supabase/storage-adapter.interface'; import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constant';
+import type { StorageAdapter } from 'src/supabase/storage-adapter.interface';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constant';
 import { SubjectsService } from '../subjects/subjects.service';
 import { TagsService } from '../tags/tags.service';
 import { DocumentAccessService, DocumentAccessPurpose } from './document-access.service';
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(ConfigService) private readonly configService: ConfigService,
@@ -37,7 +42,7 @@ export class DocumentsService {
     private readonly subjectsService: SubjectsService,
     private readonly tagsService: TagsService,
     private readonly documentAccessService: DocumentAccessService,
-  ) { }
+  ) {}
 
   /**
    * Helper function to convert BigInt to Number/String in objects to prevent serialization crashes.
@@ -60,30 +65,67 @@ export class DocumentsService {
     return data as T;
   }
 
-  private mapSafeDocumentResponse(document: any, isOwner: boolean = false, isFollowed: boolean = false): any {
+  private mapSafeDocumentResponse(
+    document: any,
+    isOwner: boolean = false,
+    isFollowed: boolean = false,
+  ): any {
     return {
       id: document.id,
       title: document.title,
       description: document.description,
       subjectId: document.subjectId,
-      subject: document.subject ? {
-        id: document.subject.id,
-        name: document.subject.name,
-        code: document.subject.code,
-        isSystem: document.subject.isSystem,
-      } : null,
+      subject: document.subject
+        ? {
+            id: document.subject.id,
+            name: document.subject.name,
+            code: document.subject.code,
+            isSystem: document.subject.isSystem,
+          }
+        : null,
       fileType: document.fileType,
-      fileSize: document.fileSize !== undefined && document.fileSize !== null ? Number(document.fileSize) : undefined,
+      fileSize:
+        document.fileSize !== undefined && document.fileSize !== null
+          ? Number(document.fileSize)
+          : undefined,
       visibilityStatus: document.visibilityStatus,
       deletionStatus: document.deletionStatus,
       extractionStatus: document.extractionStatus,
       aiStatus: document.aiStatus,
       pageCount: document.pageCount,
-      createdAt: document.createdAt ? (document.createdAt instanceof Date ? document.createdAt.toISOString() : new Date(document.createdAt).toISOString()) : null,
-      updatedAt: document.updatedAt ? (document.updatedAt instanceof Date ? document.updatedAt.toISOString() : new Date(document.updatedAt).toISOString()) : null,
-      requestedAt: document.requestedAt ? (document.requestedAt instanceof Date ? document.requestedAt.toISOString() : new Date(document.requestedAt).toISOString()) : null,
+      status: document.status,
+      averageRating: document.averageRating ?? 0,
+      ratingCount: document.ratingCount ?? 0,
+      moderationWarning: document.status === 'UNDER_REVIEW'
+        ? 'Tài liệu này đang được kiểm tra bởi quản trị viên. Một số sinh viên đã báo cáo vấn đề về độ chính xác.'
+        : null,
+      createdAt: document.createdAt
+        ? document.createdAt instanceof Date
+          ? document.createdAt.toISOString()
+          : new Date(document.createdAt).toISOString()
+        : null,
+      updatedAt: document.updatedAt
+        ? document.updatedAt instanceof Date
+          ? document.updatedAt.toISOString()
+          : new Date(document.updatedAt).toISOString()
+        : null,
+      requestedAt: document.requestedAt
+        ? document.requestedAt instanceof Date
+          ? document.requestedAt.toISOString()
+          : new Date(document.requestedAt).toISOString()
+        : null,
       isOwner,
       isFollowed,
+      tags: document.tags
+        ? document.tags.map((t: any) => ({
+            id: t.tag.id,
+            name: t.tag.name,
+            slug: t.tag.slug,
+          }))
+        : [],
+      isAIGenerated: document.isAIGenerated,
+      summary: document.summary || null,
+      quizzes: document.quizzes || [],
     };
   }
 
@@ -95,13 +137,23 @@ export class DocumentsService {
       subjectId: document.subjectId,
       fileName: document.fileName,
       fileType: document.fileType,
-      fileSize: document.fileSize !== undefined && document.fileSize !== null ? Number(document.fileSize) : undefined,
+      fileSize:
+        document.fileSize !== undefined && document.fileSize !== null
+          ? Number(document.fileSize)
+          : undefined,
       visibilityStatus: document.visibilityStatus,
       deletionStatus: document.deletionStatus,
       extractionStatus: document.extractionStatus,
       aiStatus: document.aiStatus,
       pageCount: document.pageCount,
-      createdAt: document.createdAt ? (document.createdAt instanceof Date ? document.createdAt.toISOString() : new Date(document.createdAt).toISOString()) : null,
+      status: document.status,
+      averageRating: document.averageRating ?? 0,
+      ratingCount: document.ratingCount ?? 0,
+      createdAt: document.createdAt
+        ? document.createdAt instanceof Date
+          ? document.createdAt.toISOString()
+          : new Date(document.createdAt).toISOString()
+        : null,
     };
   }
 
@@ -115,7 +167,7 @@ export class DocumentsService {
   ): Promise<{ url: string; expiresAt: string; fileName: string; disposition: string }> {
     // 1. Authorize via DocumentAccessService. Will throw 401/403/404/409 properly.
     const access = await this.documentAccessService.authorizeAccess(documentId, userId, purpose);
-    
+
     // 2. Call Storage Adapter to generate the URL
     try {
       if (purpose === 'SIGNED_PREVIEW') {
@@ -208,8 +260,6 @@ export class DocumentsService {
       }
     }
 
-
-
     // 4. Create technical staging Document record in database
     const document = await this.prisma.document.create({
       data: {
@@ -221,7 +271,7 @@ export class DocumentsService {
         storagePath: null,
         fileSize: BigInt(file.size),
         fileType: file.mimetype,
-        status: 'PRIVATE',
+        status: 'ACTIVE',
         visibilityStatus: 'PRIVATE',
         deletionStatus: 'ACTIVE',
         extractionStatus: 'PENDING',
@@ -378,7 +428,7 @@ export class DocumentsService {
       throw new NotFoundException(`Document with ID ${documentId} has been deleted`);
     }
 
-    if (document.status === 'PENDING') {
+    if (document.visibilityStatus === 'PENDING_REVIEW') {
       throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.ANALYZING_DOCUMENT);
     }
 
@@ -408,40 +458,55 @@ export class DocumentsService {
       );
     }
 
-    // ==========================================
-    // LAYER 2: Token Count Defense (Gemini SDK)
-    // ==========================================
-    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
-    if (!apiKey) {
-      throw new InternalServerErrorException(
-        'GEMINI_API_KEY is not configured in the environment variables.',
-      );
-    }
+    const runId = uuidv4();
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        aiStatus: 'PROCESSING',
+        aiRunId: runId,
+        aiProcessingStartedAt: new Date(),
+        aiAttemptCount: {
+          increment: 1,
+        },
+        aiFailureReason: null,
+      },
+    });
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    // Use gemini-1.5-flash which is standard and support responseMimeType
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
-
-    let totalTokens = 0;
     try {
-      const tokenCountResult = await model.countTokens(text);
-      totalTokens = tokenCountResult.totalTokens;
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to verify token count: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+      // ==========================================
+      // LAYER 2: Token Count Defense (Gemini SDK)
+      // ==========================================
+      const apiKey = this.configService.get<string>('GEMINI_API_KEY');
+      if (!apiKey) {
+        throw new InternalServerErrorException(
+          'GEMINI_API_KEY is not configured in the environment variables.',
+        );
+      }
 
-    if (totalTokens > 30000) {
-      throw new BadRequestException(
-        `Document contains too many tokens: ${totalTokens} (maximum allowed is 30,000 tokens).`,
-      );
-    }
+      const genAI = new GoogleGenerativeAI(apiKey);
+      // Use gemini-1.5-flash which is standard and support responseMimeType
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
-    // ==========================================
-    // Prompt Engineering & JSON Forcing (Gemini SDK call)
-    // ==========================================
-    const systemInstruction = `
+      let totalTokens = 0;
+      try {
+        const tokenCountResult = await model.countTokens(text);
+        totalTokens = tokenCountResult.totalTokens;
+      } catch (error) {
+        throw new InternalServerErrorException(
+          `Failed to verify token count: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+
+      if (totalTokens > 30000) {
+        throw new BadRequestException(
+          `Document contains too many tokens: ${totalTokens} (maximum allowed is 30,000 tokens).`,
+        );
+      }
+
+      // ==========================================
+      // Prompt Engineering & JSON Forcing (Gemini SDK call)
+      // ==========================================
+      const systemInstruction = `
 Bạn là một chuyên gia trợ lý học thuật AI chuyên nghiệp. Hãy phân tích tài liệu văn bản được cung cấp và trả về một chuỗi JSON thuần chứa phần tóm tắt và bộ câu hỏi trắc nghiệm ôn tập.
 TẤT CẢ các câu trả lời phải được viết bằng tiếng Việt.
 
@@ -479,156 +544,177 @@ Quy định chặt chẽ:
 5. Không được tự bịa ra thông tin không có trong tài liệu.
 `;
 
-    let responseText = '';
-    try {
-      const result = await model.generateContent({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: `Dưới đây là nội dung tài liệu học tập cần phân tích:\n\n${text}` }],
+      let responseText = '';
+      try {
+        const result = await model.generateContent({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `Dưới đây là nội dung tài liệu học tập cần phân tích:\n\n${text}` }],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.2,
           },
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.2,
-        },
-        systemInstruction: systemInstruction,
-      });
+          systemInstruction: systemInstruction,
+        });
 
-      responseText = result.response.text();
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Gemini API generation failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+        responseText = result.response.text();
+      } catch (error) {
+        throw new InternalServerErrorException(
+          `Gemini API generation failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
 
-    // Parse JSON response
-    let parsedData: {
-      summary: { heading: string; content: string }[];
-      keyPoints: string[];
-      quizzes: { question: string; options: string[]; correctAnswer: number }[];
-    };
-
-    try {
-      // Ensure we strip any markdown wrappers if Gemini somehow ignored the system instruction
-      const cleanedJson = responseText
-        .replace(/^```json\s*/i, '')
-        .replace(/```\s*$/, '')
-        .trim();
-      parsedData = JSON.parse(cleanedJson) as {
+      // Parse JSON response
+      let parsedData: {
         summary: { heading: string; content: string }[];
         keyPoints: string[];
         quizzes: { question: string; options: string[]; correctAnswer: number }[];
       };
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to parse JSON response from AI: ${error instanceof Error ? error.message : String(error)}. Raw response was: ${responseText}`,
-      );
-    }
 
-    // Validate structure
-    if (!parsedData.summary || !parsedData.keyPoints || !parsedData.quizzes) {
-      throw new InternalServerErrorException(
-        'AI output does not contain the required keys: summary, keyPoints, quizzes',
-      );
-    }
+      try {
+        // Ensure we strip any markdown wrappers if Gemini somehow ignored the system instruction
+        const cleanedJson = responseText
+          .replace(/^```json\s*/i, '')
+          .replace(/```\s*$/, '')
+          .trim();
+        parsedData = JSON.parse(cleanedJson) as {
+          summary: { heading: string; content: string }[];
+          keyPoints: string[];
+          quizzes: { question: string; options: string[]; correctAnswer: number }[];
+        };
+      } catch (error) {
+        throw new InternalServerErrorException(
+          `Failed to parse JSON response from AI: ${error instanceof Error ? error.message : String(error)}. Raw response was: ${responseText}`,
+        );
+      }
 
-    // Prepare formats for DB
-    const summaryText = parsedData.summary
-      .map((s) => `### ${s.heading}\n${s.content}`)
-      .join('\n\n');
-    const keyPoints = parsedData.keyPoints.map((kp) => `• ${kp}`).join('\n');
+      // Validate structure
+      if (!parsedData.summary || !parsedData.keyPoints || !parsedData.quizzes) {
+        throw new InternalServerErrorException(
+          'AI output does not contain the required keys: summary, keyPoints, quizzes',
+        );
+      }
 
-    // ==========================================
-    // Database Giao dịch (Prisma Transaction)
-    // ==========================================
-    try {
-      const transactionResult = await this.prisma.$transaction(async (tx) => {
-        // Clean up existing summary and quizzes for this document if any (to allow re-analysis)
-        await tx.documentSummary.deleteMany({
-          where: { documentId },
-        });
+      // Prepare formats for DB
+      const summaryText = parsedData.summary
+        .map((s) => `### ${s.heading}\n${s.content}`)
+        .join('\n\n');
+      const keyPoints = parsedData.keyPoints.map((kp) => `• ${kp}`).join('\n');
 
-        await tx.quiz.deleteMany({
-          where: { documentId },
-        });
+      // ==========================================
+      // Database Giao dịch (Prisma Transaction)
+      // ==========================================
+      try {
+        const transactionResult = await this.prisma.$transaction(async (tx) => {
+          // Clean up existing summary and quizzes for this document if any (to allow re-analysis)
+          await tx.documentSummary.deleteMany({
+            where: { documentId },
+          });
 
-        // 1. Create DocumentSummary
-        const docSummary = await tx.documentSummary.create({
-          data: {
-            documentId,
-            summaryText,
-            keyPoints,
-            status: 'COMPLETED',
-          },
-        });
+          await tx.quiz.deleteMany({
+            where: { documentId },
+          });
 
-        // 2. Create Quiz
-        const quiz = await tx.quiz.create({
-          data: {
-            documentId,
-            title: `${document.title} - AI Quiz`,
-            createdBy: userId,
-          },
-        });
-
-        // 3. Create Questions and Options
-        for (const item of parsedData.quizzes) {
-          const question = await tx.quizQuestion.create({
+          // 1. Create DocumentSummary
+          const docSummary = await tx.documentSummary.create({
             data: {
-              quizId: quiz.id,
-              questionText: item.question,
+              documentId,
+              summaryText,
+              keyPoints,
+              status: 'COMPLETED',
             },
           });
 
-          const optionPromises = item.options.map((optText, index) =>
-            tx.quizOption.create({
+          // 2. Create Quiz
+          const quiz = await tx.quiz.create({
+            data: {
+              documentId,
+              title: `${document.title} - AI Quiz`,
+              createdBy: userId,
+            },
+          });
+
+          // 3. Create Questions and Options
+          for (const item of parsedData.quizzes) {
+            const question = await tx.quizQuestion.create({
               data: {
-                questionId: question.id,
-                optionText: optText,
-                isCorrect: index === item.correctAnswer,
+                quizId: quiz.id,
+                questionText: item.question,
               },
-            }),
-          );
+            });
 
-          await Promise.all(optionPromises);
-        }
+            const optionPromises = item.options.map((optText, index) =>
+              tx.quizOption.create({
+                data: {
+                  questionId: question.id,
+                  optionText: optText,
+                  isCorrect: index === item.correctAnswer,
+                },
+              }),
+            );
 
-        // 4. Update Document status/flag
-        const updatedDoc = await tx.document.update({
-          where: { id: documentId },
-          data: {
-            isAIGenerated: true,
-          },
-        });
+            await Promise.all(optionPromises);
+          }
 
-        const quizWithQuestions = await tx.quiz.findUnique({
-          where: { id: quiz.id },
-          include: {
-            questions: {
-              include: {
-                options: true,
+          // 4. Update Document status/flag
+          const updatedDoc = await tx.document.update({
+            where: { id: documentId },
+            data: {
+              aiStatus: 'READY',
+              aiGeneratedAt: new Date(),
+              isAIGenerated: true,
+            },
+          });
+
+          const quizWithQuestions = await tx.quiz.findUnique({
+            where: { id: quiz.id },
+            include: {
+              questions: {
+                include: {
+                  options: true,
+                },
               },
             },
-          },
+          });
+
+          if (!quizWithQuestions) {
+            throw new InternalServerErrorException('Generated quiz could not be retrieved');
+          }
+
+          return {
+            summary: docSummary,
+            quiz: quizWithQuestions,
+            document: updatedDoc,
+          };
         });
 
-        if (!quizWithQuestions) {
-          throw new InternalServerErrorException('Generated quiz could not be retrieved');
-        }
-
-        return {
-          summary: docSummary,
-          quiz: quizWithQuestions,
-          document: updatedDoc,
-        };
-      });
-
-      return this.sanitizeData<AnalyzeResult>(transactionResult);
+        return this.sanitizeData<AnalyzeResult>(transactionResult);
+      } catch (error) {
+        throw new InternalServerErrorException(
+          `Database transaction failed, changes rolled back: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     } catch (error) {
-      throw new InternalServerErrorException(
-        `Database transaction failed, changes rolled back: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      try {
+        await this.prisma.document.update({
+          where: { id: documentId },
+          data: {
+            aiStatus: 'FAILED',
+            aiFailureReason: errorMessage,
+          },
+        });
+      } catch (dbUpdateError) {
+        this.logger.error(
+          `Failed to update FAILED status in DB for document ${documentId}: ${
+            dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
+          }`,
+        );
+      }
+      throw error;
     }
   }
 
@@ -664,6 +750,27 @@ Quy định chặt chẽ:
         uploadedBy: true,
         deletedAt: true,
         storagePath: true,
+        status: true,
+        averageRating: true,
+        ratingCount: true,
+
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+
+        isAIGenerated: true,
+        summary: true,
+        quizzes: {
+          include: {
+            questions: {
+              include: {
+                options: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -681,17 +788,25 @@ Quy định chặt chẽ:
 
     let userRole = 'STUDENT';
     if (userId) {
-      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
       if (user) {
         userRole = user.role;
       }
     }
 
-    if (document.uploadedBy !== userId && userRole !== 'ADMIN') {
+    const isOwner = userId ? document.uploadedBy === userId : false;
+    const isAdmin = userRole === 'ADMIN';
+
+    if (document.visibilityStatus !== 'PUBLIC' && !isOwner && !isAdmin) {
       throw new ForbiddenException('You do not have permission to view this document');
     }
 
-    const isOwner = userId ? document.uploadedBy === userId : false;
+    if ((document.status === 'HIDDEN' || document.status === 'REMOVED') && !isOwner && !isAdmin) {
+      throw new ForbiddenException('You do not have permission to view this document');
+    }
 
     let isFollowed = false;
     if (userId) {
@@ -744,6 +859,11 @@ Quy định chặt chẽ:
       where: whereClause,
       include: {
         subject: true,
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -764,6 +884,12 @@ Quy định chặt chẽ:
         pageCount: doc.pageCount,
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
+        fileSizeBytes:
+          doc.fileSize !== undefined && doc.fileSize !== null && doc.fileSize > BigInt(0)
+            ? Number(doc.fileSize)
+            : null,
+        subject: (doc as any).subject,
+        tags: (doc as any).tags,
       };
       return d;
     });
@@ -860,7 +986,7 @@ Quy định chặt chẽ:
   async updateDocument(
     documentId: string,
     userId: string,
-    dto: { title?: string; description?: string; subjectId?: number },
+    dto: { title?: string; description?: string; subjectId?: number; tags?: string[] },
   ): Promise<SanitizedDocument> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
@@ -870,8 +996,14 @@ Quy định chặt chẽ:
       throw new NotFoundException(`Document with ID ${documentId} not found`);
     }
 
-    if (document.deletedAt !== null || document.deletionStatus !== 'ACTIVE' || !document.storagePath) {
-      throw new NotFoundException(`Document with ID ${documentId} has been deleted or is unavailable`);
+    if (
+      document.deletedAt !== null ||
+      document.deletionStatus !== 'ACTIVE' ||
+      !document.storagePath
+    ) {
+      throw new NotFoundException(
+        `Document with ID ${documentId} has been deleted or is unavailable`,
+      );
     }
 
     if (document.uploadedBy !== userId) {
@@ -896,43 +1028,141 @@ Quy định chặt chẽ:
       await this.subjectsService.validateSubjectAccess(dto.subjectId, userId);
     }
 
-    const updatedDocument = await this.prisma.document.update({
-      where: { id: documentId },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(description !== undefined && { description }),
-        ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        subjectId: true,
-        subject: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            isSystem: true,
+    let parsedTags: string[] | undefined;
+
+    if (dto.tags !== undefined) {
+      if (!Array.isArray(dto.tags)) {
+        throw new BadRequestException('Tags must be an array of strings');
+      }
+      parsedTags = dto.tags
+        .map((t) => String(t).trim())
+        .filter((t) => t.length > 0)
+        .map((t) =>
+          t
+            .toLowerCase()
+            .replace(/[\s_]+/g, '-')
+            .replace(/[^\w-]/g, ''),
+        );
+      parsedTags = [...new Set(parsedTags)].filter((t) => t.length > 0);
+
+      if (parsedTags.length > 10) {
+        throw new BadRequestException('Maximum 10 tags allowed per document');
+      }
+    }
+
+    const updatedDocument = await this.prisma.$transaction(async (tx) => {
+      // 1. Update metadata
+      await tx.document.update({
+        where: { id: documentId },
+        data: {
+          ...(title !== undefined && { title }),
+          ...(description !== undefined && { description }),
+          ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
+        },
+      });
+
+      // 2. Update tags if provided
+      if (parsedTags !== undefined) {
+        // Delete existing relations
+        await tx.documentTag.deleteMany({
+          where: { documentId },
+        });
+
+        // Add new relations
+        if (parsedTags.length > 0) {
+          const tagIds: number[] = [];
+          for (const tagSlug of parsedTags) {
+            let existingTag = await tx.tag.findFirst({
+              where: {
+                slug: tagSlug,
+                OR: [{ isSystem: true }, { createdBy: userId }],
+              },
+            });
+
+            if (!existingTag) {
+              const originalName =
+                dto
+                  .tags!.find(
+                    (t) =>
+                      t
+                        .trim()
+                        .toLowerCase()
+                        .replace(/[\s_]+/g, '-')
+                        .replace(/[^\w-]/g, '') === tagSlug,
+                  )
+                  ?.trim() || tagSlug;
+
+              existingTag = await tx.tag.create({
+                data: {
+                  name: originalName,
+                  slug: tagSlug,
+                  createdBy: userId,
+                  isSystem: false,
+                },
+              });
+            }
+            tagIds.push(existingTag.id);
+          }
+
+          await Promise.all(
+            tagIds.map((tagId) =>
+              tx.documentTag.create({
+                data: {
+                  documentId,
+                  tagId,
+                },
+              }),
+            ),
+          );
+        }
+      }
+
+      // Return the final queried document
+      return tx.document.findUniqueOrThrow({
+        where: { id: documentId },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          subjectId: true,
+          subject: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              isSystem: true,
+            },
+          },
+          fileType: true,
+          fileSize: true,
+          visibilityStatus: true,
+          deletionStatus: true,
+          extractionStatus: true,
+          aiStatus: true,
+          pageCount: true,
+          createdAt: true,
+          updatedAt: true,
+          requestedAt: true,
+          uploadedBy: true,
+          deletedAt: true,
+          storagePath: true,
+          isAIGenerated: true,
+          tags: {
+            select: {
+              tag: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
+              },
+            },
           },
         },
-        fileType: true,
-        fileSize: true,
-        visibilityStatus: true,
-        deletionStatus: true,
-        extractionStatus: true,
-        aiStatus: true,
-        pageCount: true,
-        createdAt: true,
-        updatedAt: true,
-        requestedAt: true,
-        uploadedBy: true,
-        deletedAt: true,
-        storagePath: true,
-      },
+      });
     });
 
-    return this.mapSafeDocumentResponse(updatedDocument, true, false);
+    return this.mapSafeDocumentResponse(updatedDocument, true, false); /* eslint-disable-line */
   }
 
   /**
@@ -1039,7 +1269,7 @@ Quy định chặt chẽ:
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.documentChunk.createMany({
-          data: chunks.map(chunk => ({
+          data: chunks.map((chunk) => ({
             documentId: input.documentId,
             chunkIndex: chunk.chunkIndex,
             content: chunk.content,
@@ -1060,10 +1290,12 @@ Quy định chặt chẽ:
     } catch (error) {
       console.error(`Document extraction failed for ${input.documentId}: Transaction error`);
       // Best-effort update to FAILED
-      await this.prisma.document.update({
-        where: { id: input.documentId },
-        data: { extractionStatus: 'FAILED' },
-      }).catch(() => {});
+      await this.prisma.document
+        .update({
+          where: { id: input.documentId },
+          data: { extractionStatus: 'FAILED' },
+        })
+        .catch(() => {});
       return { extractionStatus: 'FAILED', chunkCount: 0 };
     }
 
@@ -1149,7 +1381,9 @@ Quy định chặt chẽ:
     }
 
     if (document.uploadedBy !== userId) {
-      throw new ForbiddenException('You do not have permission to request public visibility for this document');
+      throw new ForbiddenException(
+        'You do not have permission to request public visibility for this document',
+      );
     }
 
     if (!document.subject?.isSystem) {
@@ -1218,7 +1452,9 @@ Quy định chặt chẽ:
     }
 
     if (document.uploadedBy !== userId) {
-      throw new ForbiddenException('You do not have permission to withdraw public visibility for this document');
+      throw new ForbiddenException(
+        'You do not have permission to withdraw public visibility for this document',
+      );
     }
 
     if (
@@ -1266,5 +1502,190 @@ Quy định chặt chẽ:
     }
 
     return updatedDocument;
+  }
+
+  async rateDocument(documentId: string, userId: string, rating: number, comment?: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Không tìm thấy tài liệu.');
+    }
+
+    if (document.uploadedBy === userId) {
+      throw new BadRequestException('Bạn không thể tự đánh giá tài liệu của chính mình.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Upsert the rating
+      const documentRating = await tx.documentRating.upsert({
+        where: {
+          documentId_userId: {
+            documentId,
+            userId,
+          },
+        },
+        update: {
+          rating,
+          comment: comment?.trim() || null,
+        },
+        create: {
+          documentId,
+          userId,
+          rating,
+          comment: comment?.trim() || null,
+        },
+      });
+
+      // Recalculate averageRating and ratingCount
+      const agg = await tx.documentRating.aggregate({
+        where: { documentId },
+        _avg: { rating: true },
+        _count: { rating: true },
+      });
+
+      await tx.document.update({
+        where: { id: documentId },
+        data: {
+          averageRating: agg._avg.rating ?? 0,
+          ratingCount: agg._count.rating ?? 0,
+        },
+      });
+
+      return documentRating;
+    });
+  }
+
+  async getRatings(documentId: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Không tìm thấy tài liệu.');
+    }
+
+    const ratings = await this.prisma.documentRating.findMany({
+      where: { documentId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return ratings;
+  }
+
+  async deleteRating(documentId: string, userId: string) {
+    const rating = await this.prisma.documentRating.findUnique({
+      where: {
+        documentId_userId: {
+          documentId,
+          userId,
+        },
+      },
+    });
+
+    if (!rating) {
+      throw new NotFoundException('Bạn chưa đánh giá tài liệu này.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.documentRating.delete({
+        where: {
+          documentId_userId: {
+            documentId,
+            userId,
+          },
+        },
+      });
+
+      // Recalculate averageRating and ratingCount
+      const agg = await tx.documentRating.aggregate({
+        where: { documentId },
+        _avg: { rating: true },
+        _count: { rating: true },
+      });
+
+      await tx.document.update({
+        where: { id: documentId },
+        data: {
+          averageRating: agg._avg.rating ?? 0,
+          ratingCount: agg._count.rating ?? 0,
+        },
+      });
+    });
+
+    return { success: true, message: 'Đã xóa đánh giá thành công.' };
+  }
+
+  async reportDocument(documentId: string, userId: string, reason: any, description?: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Không tìm thấy tài liệu.');
+    }
+
+    if (document.uploadedBy === userId) {
+      throw new BadRequestException('Bạn không thể báo cáo tài liệu của chính mình.');
+    }
+
+    // Check if user already reported this document with a PENDING or REVIEWING status
+    const existingReport = await this.prisma.documentReport.findFirst({
+      where: {
+        documentId,
+        reporterId: userId,
+        status: {
+          in: ['PENDING', 'REVIEWING'],
+        },
+      },
+    });
+
+    if (existingReport) {
+      throw new ConflictException('Bạn đã gửi báo cáo cho tài liệu này và báo cáo đang được xử lý.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const report = await tx.documentReport.create({
+        data: {
+          documentId,
+          reporterId: userId,
+          reason,
+          description: description?.trim() || null,
+          status: 'PENDING',
+        },
+      });
+
+      // Increment reportCount of document
+      const updatedDoc = await tx.document.update({
+        where: { id: documentId },
+        data: {
+          reportCount: {
+            increment: 1,
+          },
+        },
+      });
+
+      // If reportCount >= 3, automatically transition to UNDER_REVIEW
+      if (updatedDoc.reportCount >= 3 && updatedDoc.status === 'ACTIVE') {
+        await tx.document.update({
+          where: { id: documentId },
+          data: {
+            status: 'UNDER_REVIEW',
+          },
+        });
+      }
+
+      return report;
+    });
   }
 }

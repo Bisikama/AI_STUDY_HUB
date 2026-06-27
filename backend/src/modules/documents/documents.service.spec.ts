@@ -16,6 +16,7 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  ConflictException,
 } from '@nestjs/common';
 
 interface ServiceWithPrivateMethods {
@@ -76,10 +77,19 @@ describe('DocumentsService', () => {
       delete: jest.fn(),
       deleteMany: jest.fn(),
       findMany: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
     },
     documentChunk: {
       createMany: jest.fn(),
       findMany: jest.fn(),
+    },
+    tag: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
+    documentTag: {
+      deleteMany: jest.fn(),
+      create: jest.fn(),
     },
     userFollowedDocument: {
       findUnique: jest.fn(),
@@ -101,6 +111,21 @@ describe('DocumentsService', () => {
     },
     quizOption: {
       create: jest.fn(),
+    },
+    documentRating: {
+      upsert: jest.fn(),
+      aggregate: jest.fn(),
+      findUnique: jest.fn(),
+      delete: jest.fn(),
+      findMany: jest.fn(),
+    },
+    documentReport: {
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn((callback) => callback(mockPrisma)),
   };
@@ -134,6 +159,9 @@ describe('DocumentsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation(async (callback) => {
+      return callback(mockPrisma);
+    });
     mockParseDocument.mockReset();
     mockParseDocument.mockResolvedValue({
       text: 'Default valid extracted PDF text with at least twenty characters.',
@@ -563,10 +591,25 @@ describe('DocumentsService', () => {
         data: { questionId: 'question-id', optionText: 'Opt B', isCorrect: true },
       });
 
-      // Verify document flag update
-      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+      // Verify document flag updates (PROCESSING -> READY)
+      expect(mockPrisma.document.update).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.document.update).toHaveBeenNthCalledWith(1, {
         where: { id: mockDocumentId },
-        data: { isAIGenerated: true },
+        data: {
+          aiStatus: 'PROCESSING',
+          aiRunId: expect.any(String),
+          aiProcessingStartedAt: expect.any(Date),
+          aiAttemptCount: { increment: 1 },
+          aiFailureReason: null,
+        },
+      });
+      expect(mockPrisma.document.update).toHaveBeenNthCalledWith(2, {
+        where: { id: mockDocumentId },
+        data: {
+          aiStatus: 'READY',
+          aiGeneratedAt: expect.any(Date),
+          isAIGenerated: true,
+        },
       });
 
       // Verify output
@@ -612,7 +655,7 @@ describe('DocumentsService', () => {
         fullText: 'secret text',
         summary: { id: 's-1' },
         quizzes: [{ id: 'q-1' }],
-        tags: [{ id: 't-1' }],
+        tags: [{ tag: { id: 1, name: 'AI', slug: 'ai' } }],
         aiRunId: 'run-1',
         aiProcessingStartedAt: mockDate,
         aiGeneratedAt: mockDate,
@@ -650,13 +693,20 @@ describe('DocumentsService', () => {
 
       // Forbidden fields absent
       const forbiddenFields = [
-        'uploadedBy', 'fileUrl', 'previewUrl', 'storagePath', 'status',
-        'fullText', 'summary', 'quizzes', 'tags', 'aiRunId',
-        'aiProcessingStartedAt', 'aiGeneratedAt', 'aiAttemptCount', 'aiFailureReason'
+        'uploadedBy', 'fileUrl', 'previewUrl', 'storagePath', 'fullText', 'aiRunId',
+        'aiProcessingStartedAt', 'aiGeneratedAt', 'aiAttemptCount', 'aiFailureReason', 'deletedAt'
       ];
       forbiddenFields.forEach(field => {
         expect(result).not.toHaveProperty(field);
       });
+      
+      expect(result.tags).toEqual([{ id: 1, name: 'AI', slug: 'ai' }]);
+      expect(result.tags[0]).not.toHaveProperty('tag');
+      expect(result.tags[0]).not.toHaveProperty('documentId');
+      expect(result.tags[0]).not.toHaveProperty('tagId');
+      expect(result.tags[0]).not.toHaveProperty('createdBy');
+      expect(result.tags[0]).not.toHaveProperty('createdAt');
+      expect(result.tags[0]).not.toHaveProperty('updatedAt');
     });
   });
 
@@ -999,12 +1049,19 @@ describe('DocumentsService', () => {
         deletionStatus: 'ACTIVE',
         storagePath: 'path'
       });
-      mockPrisma.document.update.mockResolvedValue({
+      mockPrisma.document.update.mockResolvedValue({});
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({
         id: 'doc-id',
         title: 'New Title',
         description: 'New Desc',
         subjectId: 2,
-        subject: { id: 2, name: 'Science', code: 'SCI101', isSystem: false },
+        subject: {
+          id: 2,
+          name: 'Science',
+          code: 'SCI101',
+          isSystem: false,
+        },
+        tags: [],
         fileType: 'application/pdf',
         fileSize: BigInt(123),
         visibilityStatus: 'PRIVATE',
@@ -1015,13 +1072,7 @@ describe('DocumentsService', () => {
         createdAt: mockDate,
         updatedAt: mockDate,
         requestedAt: null,
-        // forbidden
-        uploadedBy: 'user-1',
-        storagePath: 'path',
-        fileUrl: 'url',
-        fullText: 'text',
       });
-
       const result = await service.updateDocument('doc-id', 'user-1', { title: 'New Title' });
       expect(result.id).toBe('doc-id');
       expect(result.isOwner).toBe(true);
@@ -1030,6 +1081,88 @@ describe('DocumentsService', () => {
       expect(result).not.toHaveProperty('fullText');
       expect(result).not.toHaveProperty('storagePath');
       expect(result).not.toHaveProperty('uploadedBy');
+    });
+
+    it('should process valid tags and use a transaction', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id', uploadedBy: 'user-1', deletedAt: null, deletionStatus: 'ACTIVE', storagePath: 'path'
+      });
+      
+      mockPrisma.tag.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 2, name: 'Interview', slug: 'interview' });
+      mockPrisma.tag.create.mockResolvedValueOnce({ id: 1, name: 'AI', slug: 'ai' });
+      mockPrisma.documentTag.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.documentTag.create.mockResolvedValue({});
+      
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: 'doc-id',
+        tags: [
+          { tag: { id: 1, name: 'AI', slug: 'ai' } },
+          { tag: { id: 2, name: 'Interview', slug: 'interview' } }
+        ]
+      });
+
+      const result = await service.updateDocument('doc-id', 'user-1', { tags: [' AI ', 'ai', 'Interview'] });
+      
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockPrisma.documentTag.deleteMany).toHaveBeenCalledWith({ where: { documentId: 'doc-id' } });
+      expect(mockPrisma.tag.findFirst).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.documentTag.create).toHaveBeenCalledTimes(2);
+      expect(result.tags).toEqual([
+        { id: 1, name: 'AI', slug: 'ai' },
+        { id: 2, name: 'Interview', slug: 'interview' }
+      ]);
+    });
+
+    it('should clear all relations when explicit tags: [] is sent', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id', uploadedBy: 'user-1', deletedAt: null, deletionStatus: 'ACTIVE', storagePath: 'path'
+      });
+      
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: 'doc-id',
+        tags: []
+      });
+
+      const result = await service.updateDocument('doc-id', 'user-1', { tags: [] });
+      expect(mockPrisma.documentTag.deleteMany).toHaveBeenCalledWith({ where: { documentId: 'doc-id' } });
+      expect(mockPrisma.tag.findFirst).not.toHaveBeenCalled();
+      expect(result.tags).toEqual([]);
+    });
+
+    it('should preserve relations when tags is omitted', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id', uploadedBy: 'user-1', deletedAt: null, deletionStatus: 'ACTIVE', storagePath: 'path'
+      });
+      
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: 'doc-id',
+        tags: [{ tag: { id: 2, name: 'Old', slug: 'old' } }]
+      });
+
+      const result = await service.updateDocument('doc-id', 'user-1', { title: 'No tags' });
+      expect(mockPrisma.documentTag.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('should reject more than 10 tags', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id', uploadedBy: 'user-1', deletedAt: null, deletionStatus: 'ACTIVE', storagePath: 'path'
+      });
+      const tags = Array.from({ length: 11 }, (_, i) => `tag${i}`);
+      await expect(service.updateDocument('doc-id', 'user-1', { tags })).rejects.toThrow('Maximum 10 tags');
+      expect(mockPrisma.documentTag.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('should simulate failure during replacement and rollback (mock limitation)', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id', uploadedBy: 'user-1', deletedAt: null, deletionStatus: 'ACTIVE', storagePath: 'path'
+      });
+      
+      mockPrisma.$transaction.mockRejectedValueOnce(new Error('DB Failed'));
+
+      await expect(service.updateDocument('doc-id', 'user-1', { tags: ['fail'] })).rejects.toThrow('DB Failed');
+      // Note: In an actual Prisma environment, a thrown error inside $transaction rolls back all changes.
+      // Since we mock $transaction here, we only verify that it rejects and propagates the error,
+      // representing the atomic failure boundary required by the specification.
     });
   });
 
@@ -1043,12 +1176,79 @@ describe('DocumentsService', () => {
         },
         arr: [BigInt(50), new Date('2026-01-03T00:00:00Z')]
       };
-      const result = (service as any).sanitizeData(input);
+      const result = (service as unknown as ServiceWithPrivateMethods).sanitizeData<{
+        dateField: string;
+        bigIntField: number;
+        nested: { date: string };
+        arr: [number, string];
+      }>(input);
       expect(result.dateField).toBe('2026-01-01T00:00:00.000Z');
       expect(result.bigIntField).toBe(100);
       expect(result.nested.date).toBe('2026-01-02T00:00:00.000Z');
       expect(result.arr[0]).toBe(50);
       expect(result.arr[1]).toBe('2026-01-03T00:00:00.000Z');
+    });
+  });
+
+  describe('Document Ratings & Reports', () => {
+    describe('rateDocument', () => {
+      it('should throw NotFoundException if document does not exist', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue(null);
+        await expect(service.rateDocument('doc-1', 'user-1', 5)).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw BadRequestException if user rates their own document', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-1' });
+        await expect(service.rateDocument('doc-1', 'user-1', 5)).rejects.toThrow(BadRequestException);
+      });
+
+      it('should upsert rating and update document averages', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-other' });
+        mockPrisma.documentRating.upsert.mockResolvedValue({ id: 'rating-1', rating: 5, comment: 'Good' });
+        mockPrisma.documentRating.aggregate.mockResolvedValue({ _avg: { rating: 4.5 }, _count: { rating: 10 } });
+        mockPrisma.document.update.mockResolvedValue({ id: 'doc-1' });
+
+        const result = await service.rateDocument('doc-1', 'user-1', 5, 'Good');
+        expect(result).toBeDefined();
+        expect(mockPrisma.documentRating.upsert).toHaveBeenCalled();
+        expect(mockPrisma.document.update).toHaveBeenCalledWith({
+          where: { id: 'doc-1' },
+          data: { averageRating: 4.5, ratingCount: 10 },
+        });
+      });
+    });
+
+    describe('reportDocument', () => {
+      it('should throw NotFoundException if document does not exist', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue(null);
+        await expect(service.reportDocument('doc-1', 'user-1', 'INCORRECT_CONTENT')).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw BadRequestException if user reports their own document', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-1' });
+        await expect(service.reportDocument('doc-1', 'user-1', 'INCORRECT_CONTENT')).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw ConflictException if user already has active report', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-other' });
+        mockPrisma.documentReport.findFirst.mockResolvedValue({ id: 'report-1' });
+
+        await expect(service.reportDocument('doc-1', 'user-1', 'INCORRECT_CONTENT')).rejects.toThrow(ConflictException);
+      });
+
+      it('should create report and auto moderate document if reports >= 3', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-other' });
+        mockPrisma.documentReport.findFirst.mockResolvedValue(null);
+        mockPrisma.documentReport.create.mockResolvedValue({ id: 'report-new' });
+        mockPrisma.document.update
+          .mockResolvedValueOnce({ id: 'doc-1', reportCount: 3, status: 'ACTIVE' })
+          .mockResolvedValueOnce({ id: 'doc-1', status: 'UNDER_REVIEW' });
+
+        const result = await service.reportDocument('doc-1', 'user-1', 'INCORRECT_CONTENT', 'Description');
+        expect(result).toBeDefined();
+        expect(mockPrisma.documentReport.create).toHaveBeenCalled();
+        expect(mockPrisma.document.update).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

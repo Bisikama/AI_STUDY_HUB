@@ -14,6 +14,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GetAdminQuizzesQueryDto, UpdateQuestionDto } from './dto/admin-quiz.dto';
+import { ResolveReportDto } from './dto/resolve-report.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 // Gắn Guard bảo vệ toàn bộ các API trong Controller này
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -113,5 +115,38 @@ export class AdminController {
   @Get('quizzes/:id/analytics')
   async getQuizAnalytics(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.adminService.getQuizAnalytics(id);
+  }
+
+  /**
+   * Lấy danh sách báo cáo tài liệu học thuật
+   * GET /api/admin/reports
+   */
+  @Get('reports')
+  async getReports(
+    @Query() query: { status?: string; reason?: string; documentId?: string; page?: number; limit?: number },
+  ) {
+    return this.adminService.getReports(query);
+  }
+
+  /**
+   * Xem chi tiết một báo cáo
+   * GET /api/admin/reports/:reportId
+   */
+  @Get('reports/:reportId')
+  async getReportDetails(@Param('reportId', new ParseUUIDPipe({ version: '4' })) reportId: string) {
+    return this.adminService.getReportDetails(reportId);
+  }
+
+  /**
+   * Cập nhật trạng thái báo cáo (RESOLVED hoặc REJECTED)
+   * PATCH /api/admin/reports/:reportId
+   */
+  @Patch('reports/:reportId')
+  async updateReport(
+    @Param('reportId', new ParseUUIDPipe({ version: '4' })) reportId: string,
+    @Body() dto: ResolveReportDto,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.updateReport(reportId, adminId, dto);
   }
 }

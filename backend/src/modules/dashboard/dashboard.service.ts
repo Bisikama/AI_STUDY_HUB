@@ -24,7 +24,7 @@ export class DashboardService {
       fileSize: document.fileSize.toString(),
       downloadCount: document.downloadCount,
       viewCount: document.viewCount,
-      rating: document.rating ?? 0,
+      rating: document.averageRating ?? 0,
       quizCount: document._count?.quizzes ?? 0,
       hasSummary: document.summary !== null,
       createdAt: document.createdAt,
@@ -57,7 +57,8 @@ export class DashboardService {
     // 2. Public Documents from OTHER users (status APPROVED)
     const publicDocs = await this.prisma.document.findMany({
       where: {
-        status: 'APPROVED',
+        visibilityStatus: 'PUBLIC',
+        status: 'ACTIVE',
         uploadedBy: { not: userId },
       },
       orderBy: { createdAt: 'desc' },
@@ -76,9 +77,10 @@ export class DashboardService {
     // 3. Trending: Approved documents sorted by rating desc, then viewCount desc
     const trendingDocs = await this.prisma.document.findMany({
       where: {
-        status: 'APPROVED',
+        visibilityStatus: 'PUBLIC',
+        status: 'ACTIVE',
       },
-      orderBy: [{ rating: 'desc' }, { viewCount: 'desc' }],
+      orderBy: [{ averageRating: 'desc' }, { viewCount: 'desc' }],
       take: 5,
       include: {
         subject: true,
@@ -96,7 +98,8 @@ export class DashboardService {
       where: {
         documents: {
           some: {
-            status: 'APPROVED',
+            visibilityStatus: 'PUBLIC',
+            status: 'ACTIVE',
           },
         },
       },
@@ -108,7 +111,8 @@ export class DashboardService {
           select: {
             documents: {
               where: {
-                status: 'APPROVED',
+                visibilityStatus: 'PUBLIC',
+                status: 'ACTIVE',
               },
             },
           },

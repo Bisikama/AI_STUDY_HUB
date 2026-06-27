@@ -6,6 +6,8 @@ import {
   MaxLength,
   IsPositive,
   IsInt,
+  IsArray,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -29,5 +31,11 @@ export class UpdateDocumentDto {
   @IsOptional()
   @Type(() => Number)
   subjectId?: number;
+
+  @IsOptional()
+  @IsArray({ message: 'Tags must be an array of strings' })
+  @IsString({ each: true, message: 'Each tag must be a string' })
+  @ArrayMaxSize(10, { message: 'Maximum 10 tags allowed' })
+  tags?: string[];
 }
 
