@@ -8,6 +8,7 @@ import { documentsApi } from '@/services/documentsApi';
 import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
 import Link from 'next/link';
+import TeacherVerificationModal from '@/components/TeacherVerificationModal';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
@@ -179,6 +180,7 @@ function DashboardPage() {
   const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
   const [showEditAccountModal, setShowEditAccountModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [editFullName, setEditFullName] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem('user');
@@ -267,7 +269,7 @@ function DashboardPage() {
   const myDocumentItems = myDocumentsResponse?.data ?? [];
 
   const isDocumentOwner = myDocumentItems.some(
-    (d: any) => d.id === selectedDocumentId && d.isOwner,
+    (d: { id: string; isOwner?: boolean }) => d.id === selectedDocumentId && d.isOwner,
   );
   const isDocumentFollowed = selectedDocumentId
     ? followedDocumentIds.includes(selectedDocumentId)
@@ -674,6 +676,18 @@ function DashboardPage() {
                           manage_accounts
                         </span>{' '}
                         Edit Account
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAvatarDropdown(false);
+                          setShowVerificationModal(true);
+                        }}
+                        className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          verified_user
+                        </span>{' '}
+                        Xác thực Giảng viên
                       </button>
                       <hr className="border-outline-variant my-1" />
                       <button
@@ -1456,6 +1470,11 @@ function DashboardPage() {
             </div>
           </div>
         )}
+
+        <TeacherVerificationModal
+          isOpen={showVerificationModal}
+          onClose={() => setShowVerificationModal(false)}
+        />
       </div>
     </div>
   );

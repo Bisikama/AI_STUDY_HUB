@@ -39,8 +39,12 @@ export class SupabaseService implements StorageAdapter {
     });
   }
 
+  getClient(): SupabaseClient {
+    return this.supabase;
+  }
+
   private sanitizeFileName(fileName: string): string {
-    const safeName = fileName.replace(/^.*[\\\/]/, ''); // remove directory paths
+    const safeName = fileName.replace(/^.*[\\/]/, ''); // remove directory paths
     const ext = path.extname(safeName).toLowerCase();
     let nameWithoutExt = path.basename(safeName, ext);
 

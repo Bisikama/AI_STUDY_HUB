@@ -754,19 +754,26 @@ export default function DocumentDetailPage() {
                     Download / Open Original
                   </button>
 
+                  {document.isOwner && (
+                    <button
+                      onClick={handleAnalyze}
+                      disabled={isAnalyzing}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                      {isAnalyzing ? 'Analyzing AI...' : 'Analyze with AI'}
+                    </button>
+                  )}
+
                   {/* System Info Card */}
                   {document.isOwner && (
                     <div className="border-gray-100 pt-3">
-
-
                       <button
                         onClick={() => setIsDeleteModalOpen(true)}
                         className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
                       >
                         Delete Document
                       </button>
-
-
                     </div>
                   )}
 
@@ -778,13 +785,6 @@ export default function DocumentDetailPage() {
                             <span className="material-symbols-outlined text-[18px]">public</span> Request Public
                           </button>
                           <p className="mt-1.5 text-xs text-red-500 text-center">PDF extraction must be successful before submitting for review.</p>
-                        </div>
-                      ) : document.aiStatus !== 'READY' ? (
-                        <div className="group relative">
-                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
-                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
-                          </button>
-                          <p className="mt-1.5 text-xs text-red-500 text-center">AI processing must be completed before submitting for review.</p>
                         </div>
                       ) : !document.subject ? (
                         <div className="group relative">

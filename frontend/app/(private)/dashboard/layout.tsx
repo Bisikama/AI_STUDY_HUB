@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import axiosClient from '@/utils/axios';
+import TeacherVerificationModal from '@/components/TeacherVerificationModal';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [search, setSearch] = useState('');
   const [userFullName, setUserFullName] = useState('User');
 
@@ -216,10 +218,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
                         onClick={() => {
                           setShowAvatarDropdown(false);
+                          setShowVerificationModal(true);
                         }}
                       >
-                        <span className="material-symbols-outlined text-[18px]">person</span>{' '}
-                        Profile
+                        <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
+                        Xác thực Giảng viên
                       </button>
                       <hr className="border-outline-variant my-1" />
                       <button
@@ -235,6 +238,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
+
+        <TeacherVerificationModal
+          isOpen={showVerificationModal}
+          onClose={() => setShowVerificationModal(false)}
+        />
 
         {/* Page Content */}
         <main className="flex-1 bg-[#F8F9FA]">{children}</main>

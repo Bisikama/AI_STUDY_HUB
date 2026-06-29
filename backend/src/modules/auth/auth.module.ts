@@ -6,10 +6,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from './mail.service';
+import { SupabaseModule } from '../../supabase/supabase.module';
 
 @Module({
   imports: [
     PrismaModule,
+    SupabaseModule,
     JwtModule.registerAsync({
       global: true,
       inject: [ConfigService],
