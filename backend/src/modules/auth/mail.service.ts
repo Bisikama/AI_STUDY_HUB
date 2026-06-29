@@ -1,81 +1,55 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { SupabaseService } from '../../supabase/supabase.service';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private transporter: nodemailer.Transporter | null = null;
-  private fromAddress = 'noreply@aistudyhub.com';
 
-  constructor(private configService: ConfigService) {
-    const host = this.configService.get<string>('SMTP_HOST');
-    const portVal = this.configService.get<string | number>('SMTP_PORT');
-    const port = portVal ? Number(portVal) : undefined;
-    const user = this.configService.get<string>('SMTP_USER');
-    const pass = this.configService.get<string>('SMTP_PASS');
-    const from = this.configService.get<string>('SMTP_FROM');
-
-    if (host && port && user && pass) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465, // true for 465, false for other ports
-        auth: { user, pass },
-      });
-      if (from) {
-        this.fromAddress = from;
-      }
-      this.logger.log('🚀 SMTP Mailer configured successfully.');
-    } else {
-      this.logger.warn(
-        '⚠️ SMTP config missing. MailService will log OTPs to the terminal console instead.',
-      );
-    }
+  constructor(
+    private configService: ConfigService,
+    private supabaseService: SupabaseService,
+  ) {
+    this.logger.log('🚀 Supabase Mailer initialized.');
   }
 
   async sendOtp(to: string, otp: string): Promise<boolean> {
-    const subject = 'AI Study Hub - Mã OTP khôi phục mật khẩu';
-    const textContent = `Mã OTP khôi phục mật khẩu của bạn là: ${otp}. Mã này có hiệu lực trong 10 phút.`;
-    const htmlContent = `
-      <div style="font-family: sans-serif; padding: 20px; max-width: 500px; border: 1px solid #eaeaea; border-radius: 8px;">
-        <h2 style="color: #0F172A; margin-bottom: 20px;">AI Study Hub</h2>
-        <p>Xin chào,</p>
-        <p>Chúng tôi nhận được yêu cầu khôi phục mật khẩu từ bạn. Hãy sử dụng mã OTP dưới đây để tiến hành đặt lại mật khẩu mới:</p>
-        <div style="background-color: #F8F9FA; padding: 15px; text-align: center; border-radius: 6px; margin: 20px 0;">
-          <span style="font-size: 28px; font-weight: bold; letter-spacing: 5px; color: #2563EB;">${otp}</span>
-        </div>
-        <p style="color: #64748B; font-size: 13px;">Mã OTP này có hiệu lực trong vòng <b>10 phút</b>. Nếu bạn không yêu cầu khôi phục mật khẩu, vui lòng bỏ qua email này.</p>
-        <hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;" />
-        <p style="color: #94A3B8; font-size: 11px; text-align: center;">AI Study Hub &copy; 2026. All rights reserved.</p>
-      </div>
-    `;
+    try {
+      const supabase = this.supabaseService.getClient();
+      const redirectTo = `${this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5000'}/reset-password`;
+      
+      // 1. Gọi Supabase Auth API để gửi yêu cầu reset password
+      const { error } = await supabase.auth.resetPasswordForEmail(to, {
+        redirectTo,
+      });
 
-    if (this.transporter) {
-      try {
-        await this.transporter.sendMail({
-          from: this.fromAddress,
-          to,
-          subject,
-          text: textContent,
-          html: htmlContent,
-        });
-        this.logger.log(`✅ Mail OTP sent successfully to: ${to}`);
-        return true;
-      } catch (error) {
-        this.logger.warn(
-          `⚠️ Failed to send SMTP mail to ${to} (falling back to console/dev OTP): ${error instanceof Error ? error.message : String(error)}`,
-        );
+      if (error) {
+        this.logger.error(`❌ Supabase resetPasswordForEmail error: ${error.message}`);
       }
-    }
 
-    // Fallback: in mã ra console cực kỳ rõ ràng để dev test
-    console.log('\n==================================================');
-    console.log(`✉️  [MAIL SERVICE - MOCK OTP SENDER]`);
-    console.log(`👉  Gửi đến: ${to}`);
-    console.log(`🔑  MÃ OTP RESET PASSWORD: ${otp}`);
-    console.log(`⏱️  Hết hạn sau: 10 phút`);
-    console.log('==================================================\n');
-    return false;
+      // 2. Sử dụng Supabase Admin API để tạo trực tiếp Supabase Recovery Link và OTP
+      const { data: adminData, error: adminError } = await supabase.auth.admin.generateLink({
+        type: 'recovery',
+        email: to,
+        options: { redirectTo },
+      });
+
+      console.log('\n==================================================');
+      console.log(`🔑 [SUPABASE AUTH RECOVERY LINK & OTP]`);
+      console.log(`👉 Email: ${to}`);
+      if (!adminError && adminData?.properties) {
+        console.log(`🔗 Link Reset từ Supabase: ${adminData.properties.action_link}`);
+        console.log(`🔢 Mã OTP Supabase: ${adminData.properties.email_otp}`);
+      }
+      console.log(`🔑 Mã OTP hệ thống của bạn: ${otp}`);
+      console.log('==================================================\n');
+
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `❌ Lỗi kết nối Supabase Mailer: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
   }
 }
