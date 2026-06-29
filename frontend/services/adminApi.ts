@@ -1,5 +1,78 @@
 import axiosClient from "@/utils/axios";
 
+export type ReportStatus = 'PENDING' | 'REVIEWING' | 'RESOLVED' | 'REJECTED';
+
+export type ReportReason =
+  | 'INCORRECT_CONTENT'
+  | 'WRONG_SUBJECT'
+  | 'OUTDATED_SYLLABUS'
+  | 'DUPLICATED_DOCUMENT'
+  | 'FILE_ERROR'
+  | 'LOW_QUALITY'
+  | 'SPAM'
+  | 'COPYRIGHT_VIOLATION'
+  | 'INAPPROPRIATE_CONTENT'
+  | 'OTHER';
+
+export type DocumentModerationStatus = 'ACTIVE' | 'UNDER_REVIEW' | 'HIDDEN' | 'REMOVED';
+
+export interface AdminReport {
+  id: string;
+  documentId: string;
+  reporterId: string;
+  reason: ReportReason;
+  description: string | null;
+  status: ReportStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  adminNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  document: {
+    id: string;
+    title: string;
+    status: DocumentModerationStatus;
+    visibilityStatus: 'PRIVATE' | 'PENDING_REVIEW' | 'PUBLIC';
+    uploadedBy: string;
+    user: {
+      fullName: string;
+      email: string;
+    };
+  };
+  reporter: {
+    id: string;
+    fullName: string;
+    email: string;
+  };
+  reviewer: {
+    id: string;
+    fullName: string;
+    email: string;
+  } | null;
+}
+
+export interface GetReportsParams {
+  page?: number;
+  limit?: number;
+  status?: ReportStatus;
+  reason?: ReportReason;
+  documentId?: string;
+}
+
+export interface GetReportsResponse {
+  data: AdminReport[];
+  totalItems: number;
+  totalPages: number;
+  page: number;
+  limit: number;
+}
+
+export interface ResolveReportPayload {
+  status: ReportStatus;
+  documentStatus?: DocumentModerationStatus;
+  adminNote?: string;
+}
+
 export interface AdminMetrics {
   totalUsers: number;
   totalDocuments: number;
@@ -154,6 +227,24 @@ export const adminApi = {
   /** GET /api/admin/quizzes/:id/analytics */
   getQuizAnalytics: async (id: string): Promise<QuizAnalytics> => {
     const response = await axiosClient.get(`/admin/quizzes/${id}/analytics`);
+    return response.data;
+  },
+  
+  /** GET /api/admin/reports */
+  getReports: async (params?: GetReportsParams): Promise<GetReportsResponse> => {
+    const response = await axiosClient.get("/admin/reports", { params });
+    return response.data;
+  },
+
+  /** GET /api/admin/reports/:reportId */
+  getReportDetails: async (reportId: string): Promise<AdminReport> => {
+    const response = await axiosClient.get(`/admin/reports/${reportId}`);
+    return response.data;
+  },
+
+  /** PATCH /api/admin/reports/:reportId */
+  resolveReport: async (reportId: string, payload: ResolveReportPayload): Promise<AdminReport> => {
+    const response = await axiosClient.patch(`/admin/reports/${reportId}`, payload);
     return response.data;
   },
 };
