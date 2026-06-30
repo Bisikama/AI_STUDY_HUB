@@ -366,6 +366,8 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
         status: 'PENDING',
+        title: 'test.pdf',
+        storagePath: 'test.pdf',
         deletedAt: null,
       });
 
@@ -378,6 +380,8 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
         status: 'PRIVATE',
+        title: 'test.pdf',
+        storagePath: 'test.pdf',
         fullText: '',
         fileUrl: '',
         deletedAt: null,
@@ -393,6 +397,8 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
         status: 'PRIVATE',
+        title: 'test.pdf',
+        storagePath: 'test.pdf',
         fullText: 'A'.repeat(40001),
         deletedAt: null,
         uploadedBy: mockUserId,
@@ -408,6 +414,8 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
         status: 'PRIVATE',
+        title: 'test.pdf',
+        storagePath: 'test.pdf',
         fullText: 'Short content',
         deletedAt: null,
         uploadedBy: mockUserId,
@@ -423,6 +431,8 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
         status: 'PRIVATE',
+        title: 'test.pdf',
+        storagePath: 'test.pdf',
         fullText: 'Short content',
         deletedAt: null,
         uploadedBy: mockUserId,
@@ -439,6 +449,8 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
         status: 'PRIVATE',
+        title: 'test.pdf',
+        storagePath: 'test.pdf',
         fullText: 'Short content',
         deletedAt: null,
         uploadedBy: mockUserId,
@@ -455,6 +467,8 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
         status: 'PRIVATE',
+        title: 'test.pdf',
+        storagePath: 'test.pdf',
         fullText: 'Short content',
         deletedAt: null,
         uploadedBy: mockUserId,
@@ -475,6 +489,8 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
         status: 'PRIVATE',
+        title: 'test.pdf',
+        storagePath: 'test.pdf',
         fullText: 'Short content',
         deletedAt: null,
         uploadedBy: mockUserId,
@@ -495,7 +511,8 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: mockDocumentId,
         status: 'PRIVATE',
-        title: 'Document Title',
+        title: 'Document Title.pdf',
+        storagePath: 'Document Title.pdf',
         fullText: 'Short content',
         uploadedBy: mockUserId,
         deletedAt: null,
@@ -570,7 +587,7 @@ describe('DocumentsService', () => {
       expect(mockPrisma.quiz.create).toHaveBeenCalledWith({
         data: {
           documentId: mockDocumentId,
-          title: 'Document Title - AI Quiz',
+          title: 'Document Title.pdf - AI Quiz',
           createdBy: mockUserId,
         },
       });
@@ -717,13 +734,13 @@ describe('DocumentsService', () => {
       expect(res).toEqual({ extractionStatus: 'FAILED', chunkCount: 0 });
     });
 
-    it('should skip if mimeType is not application/pdf', async () => {
+    it('should skip if file type is unsupported', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', extractionStatus: 'PENDING' });
-      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.txt', mimeType: 'text/plain' });
-      expect(res).toEqual({ extractionStatus: 'FAILED', chunkCount: 0 });
+      const res = await service.extractAndPersist({ documentId: 'doc-1', pdfBuffer: Buffer.from(''), originalName: 'a.doc', mimeType: 'application/msword' });
+      expect(res).toEqual({ extractionStatus: 'UNSUPPORTED', chunkCount: 0 });
       expect(mockPrisma.document.update).toHaveBeenCalledWith({
         where: { id: 'doc-1' },
-        data: { extractionStatus: 'FAILED' }
+        data: { extractionStatus: 'UNSUPPORTED' }
       });
     });
 

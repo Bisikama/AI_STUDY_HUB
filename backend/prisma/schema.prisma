@@ -88,6 +88,7 @@ enum ExtractionStatus {
   PENDING
   READY
   FAILED
+  UNSUPPORTED
 }
 
 enum AIStatus {

@@ -31,6 +31,13 @@ import { SubjectsService } from '../subjects/subjects.service';
 import { TagsService } from '../tags/tags.service';
 import { DocumentAccessService, DocumentAccessPurpose } from './document-access.service';
 
+export function isAnalysisSupportedFile(storagePath: string | null, originalName: string): boolean {
+  const nameToUse = storagePath || originalName;
+  if (!nameToUse) return false;
+  const ext = path.extname(nameToUse).toLowerCase();
+  return ext === '.pdf' || ext === '.txt' || ext === '.docx';
+}
+
 @Injectable()
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
@@ -384,15 +391,22 @@ export class DocumentsService {
     }
 
     // 8. Extract and persist chunks synchronously
-    try {
-      await this.extractAndPersist({
-        documentId: document.id,
-        pdfBuffer: file.buffer,
-        originalName: file.originalname,
-        mimeType: file.mimetype,
+    if (isAnalysisSupportedFile(storagePath, file.originalname)) {
+      try {
+        await this.extractAndPersist({
+          documentId: document.id,
+          pdfBuffer: file.buffer,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+        });
+      } catch (error) {
+        // Ignore: upload succeeds but extractionStatus becomes FAILED
+      }
+    } else {
+      await this.prisma.document.update({
+        where: { id: document.id },
+        data: { extractionStatus: 'UNSUPPORTED' },
       });
-    } catch (error) {
-      // Ignore: upload succeeds but extractionStatus becomes FAILED
     }
 
     // Refresh document to get final states
@@ -430,6 +444,14 @@ export class DocumentsService {
 
     if (document.visibilityStatus === 'PENDING_REVIEW') {
       throw new BadRequestException(ERROR_MESSAGES.DOCUMENT.ANALYZING_DOCUMENT);
+    }
+
+    if (!isAnalysisSupportedFile(document.storagePath, document.title)) {
+      throw new UnprocessableEntityException({
+        statusCode: 422,
+        message: 'AI_ANALYSIS_UNSUPPORTED_FILE_TYPE',
+        error: 'Unsupported File Type for AI Analysis'
+      });
     }
 
     // if (document.uploadedBy !== userId) {
@@ -1174,7 +1196,7 @@ Quy định chặt chẽ:
     originalName: string;
     mimeType: string;
   }): Promise<{
-    extractionStatus: 'READY' | 'FAILED';
+    extractionStatus: 'READY' | 'FAILED' | 'UNSUPPORTED';
     chunkCount: number;
     pageCount?: number;
   }> {
@@ -1190,12 +1212,12 @@ Quy định chặt chẽ:
       return { extractionStatus: document.extractionStatus, chunkCount: 0 }; // Do not re-extract
     }
 
-    if (input.mimeType !== 'application/pdf') {
+    if (!isAnalysisSupportedFile(document.storagePath, input.originalName)) {
       await this.prisma.document.update({
         where: { id: input.documentId },
-        data: { extractionStatus: 'FAILED' },
+        data: { extractionStatus: 'UNSUPPORTED' },
       });
-      return { extractionStatus: 'FAILED', chunkCount: 0 };
+      return { extractionStatus: 'UNSUPPORTED', chunkCount: 0 };
     }
 
     let rawText = '';
