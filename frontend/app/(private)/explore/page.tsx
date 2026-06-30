@@ -22,6 +22,12 @@ type ExploreDocument = {
   viewCount: number;
   quizCount: number;
   hasSummary: boolean;
+  uploader: {
+    id: string;
+    fullName: string;
+    role: string;
+    isTeacher: boolean;
+  };
   createdAt: string;
 };
 
@@ -88,8 +94,10 @@ const FOLLOWED_DOCUMENTS_STORAGE_KEY = 'studyhub_followed_documents';
 
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
   const response = await fetch(url, { credentials: 'include' });
-
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      if (typeof window !== 'undefined') window.location.href = '/login';
+    }
     throw new Error('Failed to fetch explore documents');
   }
 
@@ -104,8 +112,10 @@ const fetcher = async (url: string): Promise<ExploreDocument[]> => {
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
   const response = await fetch(url, { credentials: 'include' });
-
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      if (typeof window !== 'undefined') window.location.href = '/login';
+    }
     throw new Error('Failed to fetch AI cache');
   }
 
@@ -868,6 +878,19 @@ function SearchExplore() {
                             <h3 className="font-headline-md text-primary group-hover:text-primary-container leading-tight">
                               {doc.title}
                             </h3>
+                            {doc.uploader && (
+                              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-medium text-gray-700">
+                                  {doc.uploader.fullName}
+                                </span>
+                                {doc.uploader.isTeacher && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+                                    <span className="material-symbols-outlined text-[14px]">verified</span>
+                                    Giảng viên đã xác minh
+                                  </span>
+                                )}
+                              </div>
+                            )}
                             <button
                               type="button"
                               onClick={(e) => toggleFollow(doc, e)}

@@ -6,7 +6,7 @@ import { ExploreDocumentItem } from './types/exploreDocumentItem.type';
 
 @Injectable()
 export class ExploreService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getExploreDocuments(query: GetExploreQueryDto): Promise<ExploreDocumentItem[]> {
     const search = query?.search?.trim();
@@ -24,37 +24,37 @@ export class ExploreService {
         },
         ...(search
           ? {
-              OR: [
-                {
-                  title: {
+            OR: [
+              {
+                title: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                description: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                subject: {
+                  name: {
                     contains: search,
                     mode: 'insensitive',
                   },
                 },
-                {
-                  description: {
+              },
+              {
+                subject: {
+                  code: {
                     contains: search,
                     mode: 'insensitive',
                   },
                 },
-                {
-                  subject: {
-                    name: {
-                      contains: search,
-                      mode: 'insensitive',
-                    },
-                  },
-                },
-                {
-                  subject: {
-                    code: {
-                      contains: search,
-                      mode: 'insensitive',
-                    },
-                  },
-                },
-              ],
-            }
+              },
+            ],
+          }
           : {}),
       },
       include: {
@@ -63,6 +63,13 @@ export class ExploreService {
         _count: {
           select: {
             quizzes: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            role: true,
           },
         },
       },
@@ -87,6 +94,12 @@ export class ExploreService {
         viewCount: document.viewCount,
         quizCount: document._count.quizzes,
         hasSummary: document.summary !== null,
+        uploader: {
+          id: document.user.id,
+          fullName: document.user.fullName,
+          role: document.user.role,
+          isTeacher: document.user.role === 'TEACHER',
+        },
         createdAt: document.createdAt,
       };
     });
@@ -118,6 +131,13 @@ export class ExploreService {
             },
           },
         },
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            role: true,
+          },
+        },
       },
     });
 
@@ -139,6 +159,12 @@ export class ExploreService {
         fileSize: document.fileSize.toString(),
         downloadCount: document.downloadCount,
         viewCount: document.viewCount,
+        uploader: {
+          id: document.user.id,
+          fullName: document.user.fullName,
+          role: document.user.role,
+          isTeacher: document.user.role === 'TEACHER',
+        },
         createdAt: document.createdAt,
       },
 

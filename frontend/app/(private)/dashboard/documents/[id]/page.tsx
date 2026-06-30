@@ -294,6 +294,7 @@ export default function DocumentDetailPage() {
   };
 
   const extractionUI = getExtractionStatusUI();
+  const publishCtaText = currentUser?.role === 'STUDENT' ? 'Gửi yêu cầu chia sẻ' : 'Chia sẻ trong AI Study Hub';
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-6xl bg-[#F8F9FA] p-6 font-sans md:p-8">
@@ -782,21 +783,21 @@ export default function DocumentDetailPage() {
                       {document.extractionStatus !== 'READY' ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
-                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                            <span className="material-symbols-outlined text-[18px]">public</span> {publishCtaText}
                           </button>
                           <p className="mt-1.5 text-xs text-red-500 text-center">PDF extraction must be successful before submitting for review.</p>
                         </div>
                       ) : !document.subject ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
-                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                            <span className="material-symbols-outlined text-[18px]">public</span> {publishCtaText}
                           </button>
                           <p className="mt-1.5 text-xs text-gray-500 text-center">Checking subject eligibility.</p>
                         </div>
                       ) : !document.subject.isSystem ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
-                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                            <span className="material-symbols-outlined text-[18px]">public</span> {publishCtaText}
                           </button>
                           <p className="mt-1.5 text-xs text-red-500 text-center">Only System Subjects can be submitted for public review.</p>
                         </div>
@@ -806,7 +807,7 @@ export default function DocumentDetailPage() {
                           className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black"
                         >
                           <span className="material-symbols-outlined text-[18px]">public</span>
-                          Request Public
+                          {publishCtaText}
                         </button>
                       )}
                     </div>

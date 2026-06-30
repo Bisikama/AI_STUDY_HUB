@@ -7,13 +7,15 @@ import { ExploreDocumentItem } from './types/exploreDocumentItem.type';
 
 @Controller('explore')
 export class ExploreController {
-  constructor(private readonly exploreService: ExploreService) {}
+  constructor(private readonly exploreService: ExploreService) { }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
   async getExploreDocuments(@Query() query: GetExploreQueryDto): Promise<ExploreDocumentItem[]> {
     return this.exploreService.getExploreDocuments(query);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id/ai-cache')
   async getDocumentAiCache(@Param('id') id: string) {
     return this.exploreService.getDocumentAiCache(id);

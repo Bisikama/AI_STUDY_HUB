@@ -13,5 +13,11 @@ export type ExploreDocumentItem = {
   viewCount: number;
   quizCount: number;
   hasSummary: boolean;
+  uploader: {
+    id: string;
+    fullName: string;
+    role: string;
+    isTeacher: boolean;
+  };
   createdAt: Date;
 };

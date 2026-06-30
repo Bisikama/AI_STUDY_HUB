@@ -906,6 +906,35 @@ describe('DocumentsService', () => {
       });
     });
 
+    it('1b. Teacher requests public on valid PRIVATE document -> auto approved to PUBLIC', async () => {
+      mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.document.findUnique
+        .mockResolvedValueOnce({
+          id: 'doc-teacher',
+          uploadedBy: 'teacher-1',
+          visibilityStatus: 'PRIVATE',
+          deletionStatus: 'ACTIVE',
+          deletedAt: null,
+          storagePath: 'path/to/file.pdf',
+          extractionStatus: 'READY',
+          aiStatus: 'READY',
+          subject: { isSystem: true },
+        })
+        .mockResolvedValueOnce({
+          id: 'doc-teacher',
+          visibilityStatus: 'PUBLIC',
+        });
+
+      mockPrisma.user.findUnique.mockResolvedValueOnce({ role: 'TEACHER' });
+
+      const res = await service.requestPublic('doc-teacher', 'teacher-1');
+      expect(res.visibilityStatus).toBe('PUBLIC');
+      expect(mockPrisma.document.updateMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({ id: 'doc-teacher' }),
+        data: expect.objectContaining({ visibilityStatus: 'PUBLIC' }),
+      });
+    });
+
     it('2. Personal Subject -> 422 DOCUMENT_PUBLIC_SUBJECT_REQUIRED', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
         id: 'doc-2',
