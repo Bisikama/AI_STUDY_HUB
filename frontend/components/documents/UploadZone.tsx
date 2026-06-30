@@ -195,7 +195,7 @@ function Sidebar() {
           </svg>
         </div>
         <div>
-          <p className="text-sm leading-none font-bold text-gray-900">ScholarHub</p>
+          <p className="text-sm leading-none font-bold text-gray-900">AI STUDY HUB</p>
           <p className="mt-0.5 text-[9px] font-semibold tracking-widest text-gray-400 uppercase">
             Academic Excellence
           </p>

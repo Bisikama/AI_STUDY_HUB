@@ -51,16 +51,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${
-          mobileMenuOpen ? 'flex' : 'hidden'
-        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
+        className={`${mobileMenuOpen ? 'flex' : 'hidden'
+          } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
         <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
               <h1 className="font-headline-md text-headline-md text-primary font-bold">
-                ScholarHub
+                AI STUDY HUB
               </h1>
               <p className="font-label-sm text-label-sm text-secondary text-[10px] tracking-wider uppercase">
                 Academic Excellence
@@ -88,11 +87,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/dashboard"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
-                pathname === '/dashboard'
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname === '/dashboard'
                   ? 'bg-surface-container-low text-primary font-semibold'
                   : 'text-secondary hover:bg-surface-container-low'
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined">search</span> Discover
             </Link>
@@ -100,11 +98,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/dashboard/documents"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
-                pathname.includes('/dashboard/documents')
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname.includes('/dashboard/documents')
                   ? 'bg-surface-container-low text-primary font-semibold'
                   : 'text-secondary hover:bg-surface-container-low'
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined">description</span> My Documents
             </Link>
@@ -112,11 +109,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/practice"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
-                pathname.includes('/practice')
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname.includes('/practice')
                   ? 'bg-surface-container-low text-primary font-semibold'
                   : 'text-secondary hover:bg-surface-container-low'
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined">lightbulb</span> Practice Mode
             </Link>
@@ -164,7 +160,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <span className="material-symbols-outlined">menu</span>
               </button>
-              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
+              <span className="font-headline-md text-headline-md text-primary">AI STUDY HUB</span>
             </div>
 
             {/* Search Form */}
