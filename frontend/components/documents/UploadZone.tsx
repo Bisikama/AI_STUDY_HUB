@@ -11,8 +11,15 @@ import { tagsApi, Tag } from '@/services/tagsApi';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ACCEPTED_TYPES: Record<string, string[]> = {
   'application/pdf': ['.pdf'],
+  'text/plain': ['.txt'],
+  'application/msword': ['.doc'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+  'application/zip': ['.zip'],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+  'image/jpeg': ['.jpeg', '.jpg'],
+  'image/png': ['.png'],
 };
-const ACCEPTED_EXTENSIONS = ['.pdf'];
+const ACCEPTED_EXTENSIONS = ['.pdf', '.txt', '.doc', '.docx', '.zip', '.xlsx', '.jpg', '.png'];
 
 //  Toast types
 type ToastVariant = 'success' | 'error';
@@ -338,7 +345,7 @@ export default function UploadZone() {
         if (err?.code === 'file-too-large') {
           addToast('File quá lớn! Kích thước tối đa là 10MB.', 'error');
         } else if (err?.code === 'file-invalid-type') {
-          addToast('Chỉ chấp nhận file PDF (.pdf).', 'error');
+          addToast(`Loại file không được hỗ trợ. Các loại hợp lệ: ${ACCEPTED_EXTENSIONS.join(', ')}`, 'error');
         } else {
           addToast('File không hợp lệ. Vui lòng thử lại.', 'error');
         }
@@ -520,15 +527,15 @@ export default function UploadZone() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept={ACCEPTED_EXTENSIONS.join(',')}
           className="hidden"
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []);
             if (files.length === 0) return;
             // Reuse the same onDrop validation path
             const f = files[0];
-            if (!ACCEPTED_TYPES[f.type as keyof typeof ACCEPTED_TYPES]) {
-              addToast('Chỉ chấp nhận file PDF (.pdf) .', 'error');
+            if (!ACCEPTED_TYPES[f.type as keyof typeof ACCEPTED_TYPES] && !ACCEPTED_EXTENSIONS.some(ext => f.name.toLowerCase().endsWith(ext))) {
+              addToast(`Loại file không được hỗ trợ. Các loại hợp lệ: ${ACCEPTED_EXTENSIONS.join(', ')}`, 'error');
               e.target.value = '';
               return;
             }

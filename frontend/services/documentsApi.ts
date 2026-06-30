@@ -32,7 +32,7 @@ export interface Document {
   status?: 'ACTIVE' | 'UNDER_REVIEW' | 'HIDDEN' | 'REMOVED';
   visibilityStatus: 'PUBLIC' | 'PENDING_REVIEW' | 'PRIVATE';
   deletionStatus?: 'ACTIVE' | 'SOFT_DELETED' | 'DELETING' | 'DELETE_FAILED' | 'REMOVED';
-  extractionStatus?: 'PENDING' | 'READY' | 'FAILED';
+  extractionStatus?: 'PENDING' | 'READY' | 'FAILED' | 'UNSUPPORTED';
   aiStatus?: 'NOT_REQUESTED' | 'PROCESSING' | 'READY' | 'FAILED';
   pageCount?: number | null;
   isAIGenerated: boolean;

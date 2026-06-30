@@ -281,6 +281,15 @@ export default function DocumentDetailPage() {
           border: 'border-yellow-200',
           detail: 'Please check back in a few minutes.',
         };
+      case 'UNSUPPORTED':
+        return {
+          title: 'File format not supported for AI analysis.',
+          icon: 'do_not_disturb',
+          color: 'text-gray-600',
+          bg: 'bg-gray-100',
+          border: 'border-gray-300',
+          detail: 'You can still view/download the original file, but AI features are disabled.',
+        };
       default:
         return {
           title: 'No extraction info available.',
@@ -758,8 +767,9 @@ export default function DocumentDetailPage() {
                   {document.isOwner && (
                     <button
                       onClick={handleAnalyze}
-                      disabled={isAnalyzing}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                      disabled={isAnalyzing || document.extractionStatus === 'UNSUPPORTED'}
+                      title={document.extractionStatus === 'UNSUPPORTED' ? 'AI Analysis not supported for this file format' : ''}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
                       {isAnalyzing ? 'Analyzing AI...' : 'Analyze with AI'}
@@ -888,8 +898,9 @@ export default function DocumentDetailPage() {
               <div className="flex flex-col gap-3">
                 <button
                   onClick={handleAnalyze}
-                  disabled={isAnalyzing}
-                  className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-gray-700 disabled:opacity-50 w-full"
+                  disabled={isAnalyzing || document.extractionStatus === 'UNSUPPORTED'}
+                  title={document.extractionStatus === 'UNSUPPORTED' ? 'AI Analysis not supported for this file format' : ''}
+                  className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed w-full"
                 >
                   <span className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-[18px] text-blue-400">auto_awesome</span>
