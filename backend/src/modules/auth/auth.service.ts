@@ -187,8 +187,7 @@ export class AuthService {
     const mailSent = await this.mailService.sendOtp(email, otp);
 
     return {
-      message: 'Mã OTP khôi phục mật khẩu đã được gửi.',
-      ...(!mailSent ? { devOtp: otp } : {}),
+      message: 'Email khôi phục mật khẩu đã được gửi qua dịch vụ Supabase.',
     };
   }
 

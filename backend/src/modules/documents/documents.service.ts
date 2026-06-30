@@ -885,7 +885,7 @@ Quy định chặt chẽ:
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
         fileSizeBytes:
-          doc.fileSize !== undefined && doc.fileSize !== null && doc.fileSize > BigInt(0)
+          doc.fileSize !== undefined && doc.fileSize !== null && Number(doc.fileSize) > 0
             ? Number(doc.fileSize)
             : null,
         subject: (doc as any).subject,
@@ -1395,11 +1395,18 @@ Quy định chặt chẽ:
       document.deletedAt !== null ||
       !document.storagePath ||
       document.visibilityStatus !== 'PRIVATE' ||
-      document.extractionStatus !== 'READY' ||
-      document.aiStatus !== 'READY'
+      document.extractionStatus !== 'READY'
     ) {
       throw new ConflictException('DOCUMENT_INVALID_STATE');
     }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    const isAutoApproved = user?.role === 'TEACHER' || user?.role === 'ADMIN';
+    const targetVisibility = isAutoApproved ? 'PUBLIC' : 'PENDING_REVIEW';
 
     const updateResult = await this.prisma.document.updateMany({
       where: {
@@ -1410,10 +1417,9 @@ Quy định chặt chẽ:
         deletedAt: null,
         storagePath: { not: null },
         extractionStatus: 'READY',
-        aiStatus: 'READY',
       },
       data: {
-        visibilityStatus: 'PENDING_REVIEW',
+        visibilityStatus: targetVisibility,
         requestedAt: new Date(),
       },
     });

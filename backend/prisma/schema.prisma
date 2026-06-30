@@ -49,6 +49,12 @@ enum ReportStatus {
   REJECTED
 }
 
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 
 /// Trạng thái tiến trình upload file lên Cloud Storage
 enum UploadProgressStatus {
@@ -116,6 +122,7 @@ model User {
   documentRatings         DocumentRating[]
   documentReportsMade     DocumentReport[] @relation("DocumentReporter")
   documentReportsReviewed DocumentReport[] @relation("DocumentReviewer")
+  teacherVerification     TeacherVerification?
 
   @@map("users")
 }
@@ -131,6 +138,22 @@ model PasswordResetToken {
   createdAt DateTime  @default(now()) @map("created_at")
 
   @@map("password_reset_tokens")
+}
+
+/// Quản lý Yêu cầu xác thực Giảng viên
+model TeacherVerification {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @unique @map("user_id") @db.Uuid
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teacherCode String             @map("teacher_code")
+  department  String?
+  proofUrl    String?            @map("proof_url")
+  status      VerificationStatus @default(PENDING)
+  adminNote   String?            @map("admin_note") @db.Text
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  @@map("teacher_verifications")
 }
 
 /// Danh mục Môn học/Mã học phần

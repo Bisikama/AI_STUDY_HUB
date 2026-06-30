@@ -21,7 +21,7 @@ export class DashboardService {
       fileUrl: document.fileUrl,
       previewUrl: document.previewUrl,
       fileType: document.fileType,
-      fileSize: document.fileSize.toString(),
+      fileSize: document.fileSize !== undefined && document.fileSize !== null ? document.fileSize.toString() : '0',
       downloadCount: document.downloadCount,
       viewCount: document.viewCount,
       rating: document.averageRating ?? 0,
