@@ -20,4 +20,9 @@ export type ExploreDocumentItem = {
     isTeacher: boolean;
   };
   createdAt: Date;
+  copyrightSourceType?: string | null;
+  copyrightAuthorName?: string | null;
+  copyrightSourceUrl?: string | null;
+  copyrightLicense?: string | null;
+  copyrightAttribution?: string | null;
 };

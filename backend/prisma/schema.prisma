@@ -104,6 +104,15 @@ enum ReservationStatus {
   RELEASED
 }
 
+enum CopyrightSourceType {
+  OWN_ORIGINAL
+  OPEN_LICENSE
+  AUTHORIZED
+  FPT_OFFICIAL
+  THIRD_PARTY
+  UNKNOWN
+}
+
 /// Quản lý thông tin tài khoản người dùng
 model User {
   id           String   @id @default(uuid()) @db.Uuid
@@ -133,6 +142,7 @@ model User {
   storageUsage            UserStorageUsage?
   storageReservations     StorageReservation[]
   personalFolders         PersonalFolder[]
+  copyrightDeclarations   Document[] @relation("DocumentCopyrightDeclarer")
 
   @@map("users")
 }
@@ -298,6 +308,17 @@ model Document {
   aiGeneratedAt         DateTime? @map("ai_generated_at")
   aiAttemptCount        Int       @default(0) @map("ai_attempt_count")
   aiFailureReason       String?   @map("ai_failure_reason") @db.Text
+
+  // Copyright Fields
+  copyrightSourceType          CopyrightSourceType @default(UNKNOWN) @map("copyright_source_type")
+  copyrightAuthorName          String?             @map("copyright_author_name") @db.VarChar(255)
+  copyrightSourceUrl           String?             @map("copyright_source_url") @db.VarChar(512)
+  copyrightLicense             String?             @map("copyright_license") @db.VarChar(100)
+  copyrightAttribution         String?             @map("copyright_attribution") @db.Text
+  copyrightPermissionReference String?             @map("copyright_permission_reference") @db.Text
+  copyrightDeclaredAt          DateTime?           @map("copyright_declared_at")
+  copyrightDeclaredBy          String?             @map("copyright_declared_by") @db.Uuid
+  copyrightDeclarer            User?               @relation("DocumentCopyrightDeclarer", fields: [copyrightDeclaredBy], references: [id], onDelete: SetNull)
 
   // Quan hệ
   summary        DocumentSummary?

@@ -29,6 +29,7 @@ import {
   GetDocumentsDto,
   CreateOrUpdateRatingDto,
   CreateReportDto,
+  UpdateCopyrightDto,
 } from './dto';
 import { DocumentsService } from './documents.service';
 import { DocumentAccessService } from './document-access.service';
@@ -144,6 +145,21 @@ export class DocumentsController {
     };
   }
 
+  @Patch(':id/copyright')
+  @UseGuards(JwtAuthGuard)
+  async updateCopyright(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateCopyrightDto,
+  ) {
+    const document = await this.documentsService.updateCopyright(id, userId, dto);
+    return {
+      statusCode: 200,
+      message: 'Copyright information updated successfully',
+      data: document,
+    };
+  }
+
   @Get(':id/preview')
   @UseGuards(JwtAuthGuard)
   @Header('Cache-Control', 'no-store')
@@ -217,12 +233,15 @@ export class DocumentsController {
     @CurrentUser('id') userId: string,
   ): Promise<{ statusCode: number; message: string; data: SanitizedDocument }> {
     // Only allow title, description, subjectId, tags
-    const safeDto = {
+    const safeDto: any = {
       title: dto.title,
       description: dto.description,
       subjectId: dto.subjectId,
       tags: dto.tags,
     };
+    if (dto.personalFolderId !== undefined) {
+      safeDto.personalFolderId = dto.personalFolderId;
+    }
     const document = await this.documentsService.updateDocument(id, userId, safeDto);
     return {
       statusCode: 200,

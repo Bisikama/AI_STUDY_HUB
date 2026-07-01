@@ -135,6 +135,26 @@ export class DocumentsService {
       isAIGenerated: document.isAIGenerated,
       summary: document.summary || null,
       quizzes: document.quizzes || [],
+      copyrightSourceType: document.copyrightSourceType,
+      copyrightAuthorName: document.copyrightAuthorName,
+      copyrightSourceUrl: document.copyrightSourceUrl,
+      copyrightLicense: document.copyrightLicense,
+      copyrightAttribution: document.copyrightAttribution,
+      // Admin and owner logic: only owner or admin can see these private copyright fields.
+      // Assuming for now mapSafeDocumentResponse has isOwner=true when it's the owner's document.
+      copyrightPermissionReference: isOwner ? document.copyrightPermissionReference : null,
+      copyrightDeclaredAt: isOwner && document.copyrightDeclaredAt ? new Date(document.copyrightDeclaredAt).toISOString() : null,
+      copyrightDeclaredBy: isOwner ? document.copyrightDeclaredBy : null,
+      canRequestPublic: document.visibilityStatus === 'PRIVATE'
+        && this.checkPublicationEligibility(document).isEligible
+        && this.checkCopyrightEligibility(document).isEligible,
+      publicationEligibilityReason: document.visibilityStatus === 'PRIVATE'
+        ? (!this.checkPublicationEligibility(document).isEligible
+          ? this.checkPublicationEligibility(document).reason || 'AI_NOT_READY_FOR_PUBLICATION'
+          : (!this.checkCopyrightEligibility(document).isEligible
+            ? this.checkCopyrightEligibility(document).reason
+            : null))
+        : null,
     };
   }
 
@@ -1717,6 +1737,72 @@ Quy định chặt chẽ:
     return { isEligible: true };
   }
 
+  checkCopyrightEligibility(document: any): { isEligible: boolean; reason?: string } {
+    switch (document.copyrightSourceType) {
+      case 'OWN_ORIGINAL':
+        if (!document.copyrightDeclaredAt || document.copyrightDeclaredBy !== document.uploadedBy) {
+          return { isEligible: false, reason: 'COPYRIGHT_DECLARATION_REQUIRED' };
+        }
+        return { isEligible: true };
+      case 'OPEN_LICENSE':
+        if (!document.copyrightSourceUrl || !document.copyrightLicense || !document.copyrightAttribution) {
+          return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
+        }
+        return { isEligible: true };
+      case 'AUTHORIZED':
+        if (!document.copyrightPermissionReference) {
+          return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
+        }
+        return { isEligible: true };
+      case 'FPT_OFFICIAL':
+        if (!document.copyrightSourceUrl && !document.copyrightPermissionReference) {
+          return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
+        }
+        return { isEligible: true };
+      case 'THIRD_PARTY':
+      case 'UNKNOWN':
+      default:
+        return { isEligible: false, reason: 'COPYRIGHT_SHARING_NOT_ALLOWED' };
+    }
+  }
+
+  async updateCopyright(documentId: string, userId: string, dto: any) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+    if (document.uploadedBy !== userId) {
+      throw new ForbiddenException('You do not have permission to update this document');
+    }
+    if (document.deletionStatus !== 'ACTIVE' || document.deletedAt !== null) {
+      throw new ConflictException('DOCUMENT_INVALID_STATE');
+    }
+
+    const updatedDocument = await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        copyrightSourceType: dto.sourceType,
+        copyrightAuthorName: dto.authorName,
+        copyrightSourceUrl: dto.sourceUrl,
+        copyrightLicense: dto.license,
+        copyrightAttribution: dto.attribution,
+        copyrightPermissionReference: dto.permissionReference,
+        copyrightDeclaredAt: new Date(),
+        copyrightDeclaredBy: userId,
+      },
+      include: {
+        subject: { select: { isSystem: true, id: true, name: true, code: true } },
+        tags: { include: { tag: true } },
+        summary: true,
+        quizzes: { include: { questions: { include: { options: true } } } },
+      }
+    });
+
+    return this.mapSafeDocumentResponse(updatedDocument, true, false);
+  }
+
   async requestPublic(documentId: string, userId: string) {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
@@ -1760,6 +1846,15 @@ Quy định chặt chẽ:
         message:
           'Tài liệu phải hoàn tất AI Analyze, bao gồm Summary và Quiz, trước khi có thể chia sẻ.',
         error: eligibility.reason || 'AI_NOT_READY_FOR_PUBLICATION',
+        statusCode: 409,
+      });
+    }
+
+    const copyrightEligibility = this.checkCopyrightEligibility(document);
+    if (!copyrightEligibility.isEligible) {
+      throw new ConflictException({
+        message: 'Tài liệu thiếu thông tin bản quyền hoặc nguồn gốc không được phép chia sẻ.',
+        error: copyrightEligibility.reason,
         statusCode: 409,
       });
     }

@@ -141,6 +141,13 @@ export async function seedDocuments(
         fileType: 'application/pdf',
         status: randomStatus as any, // Đã fix đúng chuẩn Schema mới
         visibilityStatus: randomVisibility as any,
+        copyrightSourceType: faker.helpers.arrayElement(['OWN_ORIGINAL', 'OPEN_LICENSE', 'FPT_OFFICIAL', 'UNKNOWN']) as any,
+        copyrightAuthorName: faker.person.fullName(),
+        copyrightSourceUrl: faker.internet.url(),
+        copyrightLicense: faker.helpers.arrayElement(['CC BY 4.0', 'CC BY-NC 4.0', 'MIT', null]),
+        copyrightAttribution: faker.lorem.sentence(),
+        copyrightDeclaredAt: new Date(),
+        copyrightDeclaredBy: user.id,
         averageRating: parseFloat(faker.number.float({ min: 3.5, max: 5.0 }).toFixed(1)),
         ratingCount: faker.number.int({ min: 1, max: 20 }),
         viewCount: faker.number.int({ min: 50, max: 2000 }),

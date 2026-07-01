@@ -101,6 +101,11 @@ export class ExploreService {
           isTeacher: document.user.role === 'TEACHER',
         },
         createdAt: document.createdAt,
+        copyrightSourceType: document.copyrightSourceType,
+        copyrightAuthorName: document.copyrightAuthorName,
+        copyrightSourceUrl: document.copyrightSourceUrl,
+        copyrightLicense: document.copyrightLicense,
+        copyrightAttribution: document.copyrightAttribution,
       };
     });
   }
@@ -166,6 +171,11 @@ export class ExploreService {
           isTeacher: document.user.role === 'TEACHER',
         },
         createdAt: document.createdAt,
+        copyrightSourceType: document.copyrightSourceType,
+        copyrightAuthorName: document.copyrightAuthorName,
+        copyrightSourceUrl: document.copyrightSourceUrl,
+        copyrightLicense: document.copyrightLicense,
+        copyrightAttribution: document.copyrightAttribution,
       },
 
       summaries: document.summary ? [document.summary] : [],

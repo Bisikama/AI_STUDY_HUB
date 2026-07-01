@@ -108,6 +108,9 @@ describe('DocumentsService', () => {
       deleteMany: jest.fn(),
       findUnique: jest.fn(),
     },
+    personalFolder: {
+      findUnique: jest.fn(),
+    },
     quizQuestion: {
       create: jest.fn(),
     },
@@ -1024,6 +1027,9 @@ describe('DocumentsService', () => {
       subject: { isSystem: true },
       summary: { content: 'test' },
       quizzes: [{ questions: [{ id: 'q1' }] }],
+      copyrightSourceType: 'OWN_ORIGINAL',
+      copyrightDeclaredAt: new Date(),
+      copyrightDeclaredBy: 'user-1',
     };
 
     it('1. Owner requests public on valid PRIVATE document with system subject', async () => {
@@ -1055,6 +1061,7 @@ describe('DocumentsService', () => {
           ...validAiDocument,
           id: 'doc-teacher',
           uploadedBy: 'teacher-1',
+          copyrightDeclaredBy: 'teacher-1',
         })
         .mockResolvedValueOnce({
           id: 'doc-teacher',
@@ -1382,6 +1389,84 @@ describe('DocumentsService', () => {
       });
       expect(mockPrisma.tag.findFirst).not.toHaveBeenCalled();
       expect(result.tags).toEqual([]);
+    });
+
+    it('should update personalFolderId when valid folder is provided', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id',
+        uploadedBy: 'user-1',
+        deletedAt: null,
+        deletionStatus: 'ACTIVE',
+        storagePath: 'path',
+      });
+      mockPrisma.personalFolder.findUnique.mockResolvedValue({ id: 'folder-b', ownerId: 'user-1' });
+      mockPrisma.document.update.mockResolvedValue({});
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({ id: 'doc-id' });
+
+      await service.updateDocument('doc-id', 'user-1', { personalFolderId: 'folder-b' });
+
+      expect(mockPrisma.document.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'doc-id' },
+          data: expect.objectContaining({ personalFolderId: 'folder-b' }),
+        })
+      );
+    });
+
+    it('should set personalFolderId to null when null is provided', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id',
+        uploadedBy: 'user-1',
+        deletedAt: null,
+        deletionStatus: 'ACTIVE',
+        storagePath: 'path',
+      });
+      mockPrisma.document.update.mockResolvedValue({});
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({ id: 'doc-id' });
+
+      await service.updateDocument('doc-id', 'user-1', { personalFolderId: null } as any);
+
+      expect(mockPrisma.document.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'doc-id' },
+          data: expect.objectContaining({ personalFolderId: null }),
+        })
+      );
+    });
+
+    it('should not update personalFolderId when it is omitted from payload', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id',
+        uploadedBy: 'user-1',
+        deletedAt: null,
+        deletionStatus: 'ACTIVE',
+        storagePath: 'path',
+      });
+      mockPrisma.document.update.mockResolvedValue({});
+      mockPrisma.document.findUniqueOrThrow.mockResolvedValue({ id: 'doc-id' });
+
+      await service.updateDocument('doc-id', 'user-1', { title: 'New Title' });
+
+      expect(mockPrisma.document.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'doc-id' },
+          data: expect.not.objectContaining({ personalFolderId: expect.anything() }),
+        })
+      );
+    });
+
+    it('should throw NotFoundException if folder does not belong to owner', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        id: 'doc-id',
+        uploadedBy: 'user-1',
+        deletedAt: null,
+        deletionStatus: 'ACTIVE',
+        storagePath: 'path',
+      });
+      mockPrisma.personalFolder.findUnique.mockResolvedValue({ id: 'folder-user-b', ownerId: 'user-2' });
+
+      await expect(service.updateDocument('doc-id', 'user-1', { personalFolderId: 'folder-user-b' }))
+        .rejects.toThrow(NotFoundException);
     });
 
     it('should preserve relations when tags is omitted', async () => {
