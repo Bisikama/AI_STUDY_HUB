@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { documentsApi, Document, StorageSummary } from '@/services/documentsApi';
+import { personalFoldersApi, PersonalFolder } from '@/services/personalFoldersApi';
 
 const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
 const FOLLOWED_DOCUMENTS_STORAGE_KEY = 'studyhub_followed_documents';
@@ -158,13 +159,28 @@ export default function MyDocumentsPage() {
   const [localFollowedDocuments, setLocalFollowedDocuments] = useState<DisplayDocument[]>(() =>
     readFollowedDocumentsFromStorage(),
   );
+  
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'unfiled' | 'legacy' | null>('all');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Load personal folders
+  const { data: foldersResponse } = useSWR('/personal-folders', () => personalFoldersApi.getFolders());
+  const folders: PersonalFolder[] = foldersResponse || [];
 
   const {
     data: response,
     error,
     isLoading,
     mutate,
-  } = useSWR('/documents/me', () => documentsApi.getMyDocuments());
+  } = useSWR(
+    ['/documents/me', activeFolderId, activeFilter],
+    () => documentsApi.getMyDocuments({
+      folderId: activeFolderId || undefined,
+      unfiled: activeFilter === 'unfiled' ? true : undefined,
+      legacyFolder: activeFilter === 'legacy' ? true : undefined,
+    })
+  );
 
   const {
     data: storageSummary,
@@ -258,18 +274,78 @@ export default function MyDocumentsPage() {
   const storageAnalysis = calculateStorageAnalysis(documents);
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-6xl bg-[#F8F9FA] p-6 font-sans md:p-8">
-      {documents.length > 0 ? (
-        <>
-          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-[28px] font-bold tracking-tight text-gray-900">
-                Document Library
-              </h1>
-              <p className="mt-1 text-[15px] text-gray-500">
-                Manage your course materials and AI-generated notes.
-              </p>
-            </div>
+    <div className="flex min-h-screen bg-[#F8F9FA] font-sans">
+      {/* Folder Sidebar */}
+      {isSidebarOpen && (
+        <aside className="w-64 border-r border-gray-200 bg-white p-5 flex flex-col gap-4 sticky top-0 h-screen overflow-y-auto hidden md:flex">
+          <div className="mb-2">
+            <h2 className="text-sm font-bold text-gray-900 tracking-tight uppercase">My Library</h2>
+          </div>
+          
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={() => { setActiveFilter('all'); setActiveFolderId(null); }}
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${activeFilter === 'all' && !activeFolderId ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
+            >
+              <span className="material-symbols-outlined text-[18px]">library_books</span>
+              All Documents
+            </button>
+            <button
+              onClick={() => { setActiveFilter('unfiled'); setActiveFolderId(null); }}
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${activeFilter === 'unfiled' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
+            >
+              <span className="material-symbols-outlined text-[18px]">inbox</span>
+              Unfiled
+            </button>
+            <button
+              onClick={() => { setActiveFilter('legacy'); setActiveFolderId(null); }}
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${activeFilter === 'legacy' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
+            >
+              <span className="material-symbols-outlined text-[18px]">archive</span>
+              Legacy (Uncategorized)
+            </button>
+          </div>
+
+          <div className="mt-4 mb-2">
+            <h2 className="text-sm font-bold text-gray-900 tracking-tight uppercase">Folders</h2>
+          </div>
+          
+          <div className="flex flex-col gap-1">
+            {folders.map(folder => (
+              <button
+                key={folder.id}
+                onClick={() => { setActiveFolderId(folder.id); setActiveFilter(null); }}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${activeFolderId === folder.id ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
+                <span className="material-symbols-outlined text-[18px]">folder</span>
+                {folder.name}
+              </button>
+            ))}
+          </div>
+        </aside>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 p-6 md:p-8 overflow-y-auto">
+        {documents.length > 0 || isLoading ? (
+          <>
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  className="hidden md:flex items-center justify-center h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                >
+                  <span className="material-symbols-outlined">menu</span>
+                </button>
+                <div>
+                  <h1 className="text-[28px] font-bold tracking-tight text-gray-900">
+                    Document Library
+                  </h1>
+                  <p className="mt-1 text-[15px] text-gray-500">
+                    Manage your course materials and AI-generated notes.
+                  </p>
+                </div>
+              </div>
 
             <div className="mt-4 flex items-center gap-4 sm:mt-0">
               <div className="flex items-center rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
@@ -525,89 +601,26 @@ export default function MyDocumentsPage() {
           </div>
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12">
-          <div className="relative mb-12 flex w-full max-w-md items-center justify-center">
-            <div className="absolute h-[280px] w-[280px] rotate-6 rounded-[40px] border border-gray-100 bg-white shadow-sm"></div>
-            <div className="absolute h-[280px] w-[280px] -rotate-3 rounded-[40px] border border-gray-100 bg-white shadow-sm"></div>
-            <div className="relative z-10 flex h-[280px] w-[280px] items-center justify-center rounded-[40px] border border-gray-100 bg-white p-8 shadow-lg">
-              <img
-                src="https://illustrations.popsy.co/amber/student-going-to-school.svg"
-                alt="No documents"
-                className="h-full w-full object-contain"
-              />
-              <div className="absolute bottom-6 flex gap-2">
-                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-                <div className="h-2 w-2 rounded-full bg-gray-800"></div>
-                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-              </div>
-            </div>
-
-            <div className="absolute top-1/2 -left-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-gray-100 bg-white shadow-lg">
-              <span className="material-symbols-outlined text-gray-700">psychology</span>
-            </div>
-            <div className="absolute top-1/4 -right-8 flex h-14 w-14 rotate-12 items-center justify-center rounded-2xl border border-gray-100 bg-white shadow-lg">
-              <span className="material-symbols-outlined text-gray-700">note_add</span>
-            </div>
+        <div className="flex h-[60vh] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center shadow-sm">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-50 text-gray-400">
+            <span className="material-symbols-outlined text-3xl">description</span>
           </div>
-
-          <h2 className="mb-4 text-3xl font-bold tracking-tight text-gray-900">No documents yet</h2>
-          <p className="mb-10 max-w-md text-center text-[15px] leading-relaxed text-gray-500">
-            Start your academic journey by uploading lecture notes, textbooks, or research papers.
-            Our AI will help you summarize, quiz, and learn faster.
+          <h2 className="mb-2 text-xl font-semibold text-gray-900">No documents found</h2>
+          <p className="mb-6 max-w-md text-gray-500">
+            {activeFolderId || activeFilter !== 'all' 
+              ? "You haven't uploaded any documents matching this filter yet." 
+              : "Upload your course materials to get AI-generated flashcards, summaries, and quizzes automatically."}
           </p>
-
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row">
-            <Link
-              href="/dashboard/upload"
-              className="flex min-w-[220px] items-center justify-center gap-2 rounded-xl bg-[#1a1c23] px-6 py-3.5 font-semibold text-white shadow-md transition-colors hover:bg-black"
-            >
-              <span className="material-symbols-outlined text-[20px]">upload_file</span>
-              Upload your first document
-            </Link>
-            <button className="flex min-w-[220px] items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-6 py-3.5 font-semibold text-gray-800 shadow-sm transition-colors hover:bg-gray-50">
-              <span className="material-symbols-outlined text-[20px]">auto_awesome</span>
-              Try Sample Document
-            </button>
-          </div>
-
-          <div className="mb-16 flex items-center gap-2 text-sm text-gray-400">
-            <span className="material-symbols-outlined text-[16px]">info</span>
-            Supported formats: PDF (Max 10MB)
-          </div>
-
-          <div className="grid w-full max-w-4xl grid-cols-1 gap-6 sm:grid-cols-3">
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 text-left shadow-sm">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
-                <span className="material-symbols-outlined text-[20px]">description</span>
-              </div>
-              <h3 className="mb-2 font-bold text-gray-900">AI Summaries</h3>
-              <p className="text-[13px] leading-relaxed text-gray-500">
-                Transform long chapters into concise bullet points in seconds.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 text-left shadow-sm">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
-                <span className="material-symbols-outlined text-[20px]">quiz</span>
-              </div>
-              <h3 className="mb-2 font-bold text-gray-900">Smart Quizzes</h3>
-              <p className="text-[13px] leading-relaxed text-gray-500">
-                Automatically generate flashcards and mock exams from your notes.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 text-left shadow-sm">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
-                <span className="material-symbols-outlined text-[20px]">chat</span>
-              </div>
-              <h3 className="mb-2 font-bold text-gray-900">Chat with PDF</h3>
-              <p className="text-[13px] leading-relaxed text-gray-500">
-                Ask questions directly to your documents and get instant citations.
-              </p>
-            </div>
-          </div>
+          <Link
+            href="/dashboard/upload"
+            className="flex items-center gap-2 rounded-lg bg-[#1a1c23] px-6 py-2.5 font-semibold text-white transition-colors hover:bg-black"
+          >
+            <span className="material-symbols-outlined">upload</span>
+            Upload First Document
+          </Link>
         </div>
       )}
+      </div>
     </div>
   );
 }

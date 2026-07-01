@@ -25,6 +25,8 @@ export interface MyDocumentListItem {
   updatedAt: Date;
   fileSizeBytes: number | null;
   subject?: any;
+  personalFolderId?: string | null;
+  personalFolder?: any;
   tags?: any[];
 }
 

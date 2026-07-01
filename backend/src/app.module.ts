@@ -12,6 +12,7 @@ import { TagsModule } from './modules/tags/tags.module';
 import { TeacherVerificationModule } from './modules/teacher-verification/teacher-verification.module';
 import { ApiResponseInterceptor } from './common/interceptors';
 import { HttpExceptionFilter } from './common/filters';
+import { PersonalFoldersModule } from './modules/personal-folders/personal-folders.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { HttpExceptionFilter } from './common/filters';
     SubjectsModule,
     TagsModule,
     TeacherVerificationModule,
+    PersonalFoldersModule,
   ],
   controllers: [],
   providers: [

@@ -77,6 +77,7 @@ describe('DocumentsController', () => {
         42,
         'user-123',
         undefined,
+        undefined,
       );
       expect(response).toEqual({
         statusCode: 201,

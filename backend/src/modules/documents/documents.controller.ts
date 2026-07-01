@@ -73,6 +73,7 @@ export class DocumentsController {
       dto.subjectId,
       userId,
       dto.tags,
+      dto.personalFolderId,
     );
 
     return {
@@ -110,6 +111,16 @@ export class DocumentsController {
       q: req.query.q as string,
       subjectId: req.query.subjectId ? parseInt(req.query.subjectId as string, 10) : undefined,
       visibilityStatus: req.query.visibilityStatus as any,
+      folderId: req.query.folderId as string,
+      unfiled: req.query.unfiled === 'true',
+      legacyFolder: req.query.legacyFolder === 'true',
+      majorCode: req.query.majorCode as string,
+      aiStatus: req.query.aiStatus as string,
+      extractionStatus: req.query.extractionStatus as string,
+      fileType: req.query.fileType as string,
+      deletionStatus: req.query.deletionStatus as string,
+      sortBy: req.query.sortBy as string,
+      sortOrder: req.query.sortOrder as string,
     };
     const documents = await this.documentsService.getDocumentsByUser(userId, query);
     return {

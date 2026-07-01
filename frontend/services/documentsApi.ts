@@ -6,6 +6,7 @@ export interface UploadDocumentPayload {
   description?: string;
   subjectId: number;
   tags?: string; // JSON string
+  personalFolderId?: string;
 }
 
 export type SignedDocumentUrlResponse = {
@@ -29,6 +30,7 @@ export interface Document {
   title: string;
   description: string | null;
   subjectId: number;
+  personalFolderId?: string | null;
   subject?: { id: number; name: string; code: string; isSystem: boolean } | null;
   fileSize: number;
   fileType: string;
@@ -84,6 +86,7 @@ export const documentsApi = {
     if (payload.description) formData.append("description", payload.description);
     formData.append("subjectId", String(payload.subjectId));
     if (payload.tags) formData.append("tags", payload.tags);
+    if (payload.personalFolderId) formData.append("personalFolderId", payload.personalFolderId);
 
     const response = await axiosClient.post<UploadDocumentResponse>(
       "/documents/upload",
@@ -105,6 +108,16 @@ export const documentsApi = {
     q?: string;
     subjectId?: number;
     visibilityStatus?: string;
+    folderId?: string;
+    unfiled?: boolean;
+    legacyFolder?: boolean;
+    majorCode?: string;
+    aiStatus?: string;
+    extractionStatus?: string;
+    fileType?: string;
+    deletionStatus?: string;
+    sortBy?: string;
+    sortOrder?: string;
   }): Promise<{ data: Document[]; meta: { total: number; page: number; limit: number; totalPages: number } }> => {
     // Clean up undefined/empty params
     const cleanParams: any = {};

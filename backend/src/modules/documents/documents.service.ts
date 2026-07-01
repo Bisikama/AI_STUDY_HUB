@@ -82,6 +82,7 @@ export class DocumentsService {
       title: document.title,
       description: document.description,
       subjectId: document.subjectId,
+      personalFolderId: isOwner ? document.personalFolderId : null,
       subject: document.subject
         ? {
             id: document.subject.id,
@@ -416,6 +417,7 @@ export class DocumentsService {
     subjectId: number,
     userId?: string,
     tagsStr?: string,
+    personalFolderId?: string,
   ): Promise<SanitizedDocument> {
     let finalUserId = userId;
     let user: any = null;
@@ -438,6 +440,13 @@ export class DocumentsService {
 
     // 2. Verify Subject exists AND user has access
     await this.subjectsService.validateSubjectAccess(subjectId, finalUserId);
+
+    if (personalFolderId) {
+      const folder = await this.prisma.personalFolder.findUnique({ where: { id: personalFolderId } });
+      if (!folder || folder.ownerId !== finalUserId) {
+        throw new NotFoundException('Personal folder not found or access denied');
+      }
+    }
 
     // 2.5 Parse and normalize tags
     let parsedTags: string[] = [];
@@ -476,6 +485,7 @@ export class DocumentsService {
         title: title.trim(),
         description: description?.trim() || null,
         subjectId,
+        personalFolderId: personalFolderId || null,
         uploadedBy: finalUserId,
         fileUrl: '', // Dummy value for schema requirement
         storagePath: null,
@@ -982,6 +992,7 @@ Quy định chặt chẽ:
         status: true,
         averageRating: true,
         ratingCount: true,
+        personalFolderId: true,
 
         tags: {
           include: {
@@ -1096,27 +1107,66 @@ Quy định chặt chẽ:
       whereClause.visibilityStatus = query.visibilityStatus;
     }
 
+    if (query?.folderId) {
+      whereClause.personalFolderId = query.folderId;
+    }
+    if (query?.unfiled) {
+      whereClause.personalFolderId = null;
+      whereClause.subject = { isSystem: true }; // and it's a new system document
+    }
+    if (query?.legacyFolder) {
+      whereClause.subject = { isSystem: false }; // Legacy documents
+    }
+    if (query?.majorCode) {
+      whereClause.subject = {
+        ...whereClause.subject,
+        majors: { some: { major: { code: query.majorCode } } },
+      };
+    }
+    if (query?.aiStatus) {
+      whereClause.aiStatus = query.aiStatus;
+    }
+    if (query?.extractionStatus) {
+      whereClause.extractionStatus = query.extractionStatus;
+    }
+    if (query?.fileType) {
+      whereClause.fileType = query.fileType;
+    }
+    if (query?.deletionStatus) {
+      whereClause.deletionStatus = query.deletionStatus;
+    }
+
+    let orderBy: any = { createdAt: 'desc' };
+    if (query?.sortBy) {
+      const order = query.sortOrder === 'asc' ? 'asc' : 'desc';
+      if (query.sortBy === 'name') orderBy = { title: order };
+      if (query.sortBy === 'size') orderBy = { fileSize: order };
+      if (query.sortBy === 'date') orderBy = { createdAt: order };
+    }
+
     const ownedDocuments = await this.prisma.document.findMany({
       where: whereClause,
       include: {
         subject: true,
+        personalFolder: true,
         tags: {
           include: {
             tag: true,
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       skip,
       take: limit,
     });
 
     const sanitizedOwned: MyDocumentListItem[] = ownedDocuments.map((doc) => {
-      const d = {
+      const d: any = {
         id: doc.id,
         title: doc.title,
         description: doc.description,
         subjectId: doc.subjectId,
+        personalFolderId: doc.personalFolderId,
         fileType: doc.fileType,
         visibilityStatus: doc.visibilityStatus,
         deletionStatus: doc.deletionStatus,
@@ -1130,6 +1180,7 @@ Quy định chặt chẽ:
             ? Number(doc.fileSize)
             : null,
         subject: (doc as any).subject,
+        personalFolder: (doc as any).personalFolder,
         tags: (doc as any).tags,
       };
       return d;
@@ -1241,7 +1292,7 @@ Quy định chặt chẽ:
   async updateDocument(
     documentId: string,
     userId: string,
-    dto: { title?: string; description?: string; subjectId?: number; tags?: string[] },
+    dto: { title?: string; description?: string; subjectId?: number; tags?: string[]; personalFolderId?: string },
   ): Promise<SanitizedDocument> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
@@ -1283,6 +1334,13 @@ Quy định chặt chẽ:
       await this.subjectsService.validateSubjectAccess(dto.subjectId, userId);
     }
 
+    if (dto.personalFolderId !== undefined && dto.personalFolderId !== null) {
+      const folder = await this.prisma.personalFolder.findUnique({ where: { id: dto.personalFolderId } });
+      if (!folder || folder.ownerId !== userId) {
+        throw new NotFoundException('Personal folder not found or access denied');
+      }
+    }
+
     let parsedTags: string[] | undefined;
 
     if (dto.tags !== undefined) {
@@ -1313,6 +1371,7 @@ Quy định chặt chẽ:
           ...(title !== undefined && { title }),
           ...(description !== undefined && { description }),
           ...(dto.subjectId !== undefined && { subjectId: dto.subjectId }),
+          ...(dto.personalFolderId !== undefined && { personalFolderId: dto.personalFolderId }),
         },
       });
 

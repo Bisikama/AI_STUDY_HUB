@@ -4,8 +4,9 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone, FileRejection } from 'react-dropzone';
 import { useUploadDocument } from '@/hooks/useUploadDocument';
 import useSWR, { mutate } from 'swr';
-import { subjectsApi, Subject } from '@/services/subjectsApi';
+import { subjectsApi, Major, CatalogItem, Subject } from '@/services/subjectsApi';
 import { tagsApi, Tag } from '@/services/tagsApi';
+import { personalFoldersApi, PersonalFolder } from '@/services/personalFoldersApi';
 
 //  Constants
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -267,8 +268,12 @@ export default function UploadZone() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [toasts, setToasts] = useState<Toast[]>([]);
-  // Study Folder state
+  // Subject (Major -> Course) state
+  const [selectedMajorCode, setSelectedMajorCode] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  
+  // Study Folder state
+  const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -283,12 +288,20 @@ export default function UploadZone() {
 
   const { trigger, isMutating } = useUploadDocument();
 
-  // Load subjects
-  const { data: subjectsResponse, mutate: mutateSubjects } = useSWR(
-    '/subjects',
-    () => subjectsApi.getSubjects(),
+  // Load majors
+  const { data: majorsResponse } = useSWR('/subjects/catalog/majors', () => subjectsApi.getMajors());
+  const majors: Major[] = majorsResponse || [];
+
+  // Load catalog courses
+  const { data: catalogResponse } = useSWR(
+    selectedMajorCode ? `/subjects/catalog/courses?majorCode=${selectedMajorCode}` : null,
+    () => subjectsApi.getCatalog(selectedMajorCode)
   );
-  const subjects: Subject[] = subjectsResponse || [];
+  const courses: CatalogItem[] = catalogResponse || [];
+
+  // Load personal folders
+  const { data: foldersResponse, mutate: mutateFolders } = useSWR('/personal-folders', () => personalFoldersApi.getFolders());
+  const folders: PersonalFolder[] = foldersResponse || [];
 
   // Load tags
   const { data: tagsResponse, error: tagsError } = useSWR(
@@ -417,7 +430,9 @@ export default function UploadZone() {
     setProgress(0);
     setTitle('');
     setDescription('');
+    setSelectedMajorCode('');
     setSelectedSubjectId(null);
+    setSelectedFolderId('');
     setShowCreateFolder(false);
     setNewFolderName('');
     setSelectedTags([]);
@@ -434,9 +449,9 @@ export default function UploadZone() {
     }
     try {
       setIsCreatingFolder(true);
-      const result = await subjectsApi.createSubject({ name });
-      await mutateSubjects();
-      setSelectedSubjectId(result.id);
+      const result = await personalFoldersApi.create({ name });
+      await mutateFolders();
+      setSelectedFolderId(result.id);
       setShowCreateFolder(false);
       setNewFolderName('');
       addToast(`Study Folder "${result.name}" created and selected!`, 'success');
@@ -457,8 +472,8 @@ export default function UploadZone() {
       addToast('Tiêu đề tài liệu là bắt buộc và tối đa 150 ký tự.', 'error');
       return;
     }
-    if (!selectedSubjectId) {
-      addToast('Vui lòng chọn Study Folder trước khi upload.', 'error');
+    if (!selectedMajorCode || !selectedSubjectId) {
+      addToast('Vui lòng chọn Major và Course trước khi upload.', 'error');
       return;
     }
 
@@ -469,11 +484,9 @@ export default function UploadZone() {
         title: title.trim(),
         description: description.trim() || undefined,
         subjectId: selectedSubjectId,
+        personalFolderId: selectedFolderId || undefined,
+        tags: selectedTags.length > 0 ? JSON.stringify(selectedTags.map((t) => t.name)) : undefined,
       };
-
-      if (selectedTags.length > 0) {
-        payload.tags = JSON.stringify(selectedTags.map((t) => t.name));
-      }
 
       const result = await trigger(payload);
 
@@ -680,33 +693,101 @@ export default function UploadZone() {
             />
           </div>
 
-          {/* Study Folder */}
+          {/* Major */}
           <div className="mb-5">
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Study Folder <span className="text-red-500">*</span>
+              Major <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selectedMajorCode}
+              onChange={(e) => {
+                setSelectedMajorCode(e.target.value);
+                setSelectedSubjectId(null);
+              }}
+              disabled={isMutating}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="">-- Select a Major --</option>
+              {majors.map((m) => (
+                <option key={m.code} value={m.code}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Course */}
+          <div className="mb-5">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Course <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selectedSubjectId ?? ''}
+              onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
+              disabled={isMutating || !selectedMajorCode}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="">-- Select a Course --</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Personal Folder */}
+          <div className="mb-5">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Personal Folder
             </label>
             <div className="flex gap-2">
               <select
-                id="doc-study-folder"
-                value={selectedSubjectId ?? ''}
-                onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
+                value={selectedFolderId}
+                onChange={(e) => setSelectedFolderId(e.target.value)}
                 disabled={isMutating}
                 className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <option value="">-- Select a folder --</option>
-                <optgroup label="System Subjects">
-                  {subjects.filter(s => s.isSystem).map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="My Personal Subjects">
-                  {subjects.filter(s => !s.isSystem).map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </optgroup>
+                <option value="">-- Unfiled (Root) --</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
               </select>
-              {/* Create folder UI hidden per Q10 requirements until P1 API exists */}
+              <button
+                type="button"
+                onClick={() => setShowCreateFolder(!showCreateFolder)}
+                disabled={isMutating}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                New Folder
+              </button>
             </div>
+            
+            {showCreateFolder && (
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  disabled={isCreatingFolder}
+                  placeholder="Folder name..."
+                  className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none transition-colors focus:border-gray-400"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCreateFolder();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateFolder}
+                  disabled={isCreatingFolder || !newFolderName.trim()}
+                  className="rounded-lg bg-[#1a1c23] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {isCreatingFolder ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Description */}

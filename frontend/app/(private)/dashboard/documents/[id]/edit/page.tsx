@@ -5,8 +5,9 @@ import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { documentsApi } from '@/services/documentsApi';
-import { subjectsApi, Subject } from '@/services/subjectsApi';
+import { subjectsApi, Subject, Major, CatalogItem } from '@/services/subjectsApi';
 import { tagsApi, Tag } from '@/services/tagsApi';
+import { personalFoldersApi, PersonalFolder } from '@/services/personalFoldersApi';
 
 export default function EditDocumentPage() {
   const { id } = useParams() as { id: string };
@@ -18,17 +19,28 @@ export default function EditDocumentPage() {
     isLoading,
   } = useSWR(id ? `/documents/${id}` : null, () => documentsApi.getDocumentById(id));
 
-  const { data: subjectsResponse, mutate: mutateSubjects } = useSWR(
-    '/subjects',
-    () => subjectsApi.getSubjects(),
-  );
+  // Load majors
+  const { data: majorsResponse } = useSWR('/subjects/catalog/majors', () => subjectsApi.getMajors());
+  const majors: Major[] = majorsResponse || [];
 
   const document = response;
-  const subjects: Subject[] = subjectsResponse || [];
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedMajorCode, setSelectedMajorCode] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>('');
+
+  // Load catalog courses
+  const { data: catalogResponse } = useSWR(
+    selectedMajorCode ? `/subjects/catalog?majorCode=${selectedMajorCode}` : null,
+    () => subjectsApi.getCatalog(selectedMajorCode)
+  );
+  const courses: CatalogItem[] = catalogResponse || [];
+
+  // Load personal folders
+  const { data: foldersResponse, mutate: mutateFolders } = useSWR('/personal-folders', () => personalFoldersApi.getFolders());
+  const folders: PersonalFolder[] = foldersResponse || [];
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
@@ -50,6 +62,14 @@ export default function EditDocumentPage() {
       setTitle(document.title || '');
       setDescription(document.description || '');
       setSelectedSubjectId(document.subjectId || null);
+      setSelectedFolderId(document.personalFolderId || '');
+      if (document.subject?.code && !selectedMajorCode) {
+        // Pre-select major if possible. (Requires a backend query or assuming subject.code prefix? Actually, we might need a way to get the major from the subject. For now, try to match it if we can, or just leave it blank to force re-selection if they want to change.)
+        // But for editing, if we don't have the major selected, the course dropdown will be empty. 
+        // We can just set it to the first 3 letters of subject code assuming that's the major, but it's risky.
+        // Let's rely on the user to select a Major if they want to change the course.
+        // Actually, if we leave it empty, the course select is disabled. Let's just set the subjectId.
+      }
       if (document.tags) {
         setSelectedTags(document.tags.map((t: any) => t.tag || t));
       }
@@ -94,9 +114,9 @@ export default function EditDocumentPage() {
     if (!name) return;
     try {
       setIsCreatingFolder(true);
-      const result = await subjectsApi.createSubject({ name });
-      await mutateSubjects();
-      setSelectedSubjectId(result.id);
+      const result = await personalFoldersApi.create({ name });
+      await mutateFolders();
+      setSelectedFolderId(result.id);
       setShowCreateFolder(false);
       setNewFolderName('');
     } catch {
@@ -124,6 +144,7 @@ export default function EditDocumentPage() {
         title: title.trim(),
         description: description.trim() || undefined,
         subjectId: selectedSubjectId,
+        personalFolderId: selectedFolderId || null,
       };
 
       if (selectedTags.length > 0) {
@@ -250,23 +271,64 @@ export default function EditDocumentPage() {
                 />
               </div>
 
-              {/* Study Folder */}
+              {/* Major */}
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
+                  <span className="material-symbols-outlined text-[18px] text-gray-500">school</span>
+                  Major (Change to re-assign)
+                </label>
+                <select
+                  value={selectedMajorCode}
+                  onChange={(e) => {
+                    setSelectedMajorCode(e.target.value);
+                    setSelectedSubjectId(null);
+                  }}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-[#1a1c23]"
+                >
+                  <option value="">-- Select a Major --</option>
+                  {majors.map((m) => (
+                    <option key={m.code} value={m.code}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Course */}
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
+                  <span className="material-symbols-outlined text-[18px] text-gray-500">book</span>
+                  Course <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedSubjectId ?? ''}
+                  onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
+                  disabled={!selectedMajorCode && !selectedSubjectId} // Allow if already set
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-[#1a1c23]"
+                >
+                  {document?.subject && !selectedMajorCode && (
+                     <option value={document.subject.id}>{document.subject.code} - {document.subject.name}</option>
+                  )}
+                  {selectedMajorCode && <option value="">-- Select a Course --</option>}
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Personal Folder */}
               <div>
                 <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
                   <span className="material-symbols-outlined text-[18px] text-gray-500">folder</span>
-                  Study Folder <span className="text-red-500">*</span>
+                  Personal Folder
                 </label>
                 <div className="flex gap-2">
                   <select
-                    value={selectedSubjectId ?? ''}
-                    onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
+                    value={selectedFolderId}
+                    onChange={(e) => setSelectedFolderId(e.target.value)}
                     className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-[#1a1c23]"
                   >
-                    <option value="">-- Select a folder --</option>
-                    {subjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}{!s.isSystem ? ' (personal)' : ''}
-                      </option>
+                    <option value="">-- Unfiled (Root) --</option>
+                    {folders.map((f) => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
                     ))}
                   </select>
                   <button

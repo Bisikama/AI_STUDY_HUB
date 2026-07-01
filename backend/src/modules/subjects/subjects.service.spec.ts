@@ -30,8 +30,8 @@ describe('SubjectsService', () => {
   describe('getSubjects', () => {
     it('should return system subjects and personal subjects belonging to user', async () => {
       mockPrisma.subject.findMany.mockResolvedValue([
-        { id: 1, name: 'System Subject', code: 'sys', isSystem: true, createdBy: null },
-        { id: 2, name: 'My Subject', code: 'my-sub', isSystem: false, createdBy: 'user-1' },
+        { id: 1, name: 'System Subject', code: 'sys', isSystem: true, isActive: true, createdBy: null },
+        { id: 2, name: 'My Subject', code: 'my-sub', isSystem: false, isActive: true, createdBy: 'user-1' },
       ]);
 
       const result = await service.getSubjects('user-1');
@@ -40,7 +40,7 @@ describe('SubjectsService', () => {
         { id: 2, name: 'My Subject', code: 'my-sub', isSystem: false },
       ]);
       expect(mockPrisma.subject.findMany).toHaveBeenCalledWith({
-        where: { OR: [{ isSystem: true }, { createdBy: 'user-1' }] },
+        where: { OR: [{ isSystem: true, isActive: true }, { createdBy: 'user-1' }] },
         orderBy: [{ isSystem: 'desc' }, { name: 'asc' }, { id: 'asc' }],
       });
     });
@@ -84,15 +84,21 @@ describe('SubjectsService', () => {
   });
 
   describe('validateSubjectAccess', () => {
-    it('should allow if system subject', async () => {
-      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, isSystem: true });
+    it('should allow if system subject and active', async () => {
+      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, isSystem: true, isActive: true });
       await expect(service.validateSubjectAccess(1, 'any-user')).resolves.not.toThrow();
+    });
+
+    it('should throw BadRequest if system subject and inactive', async () => {
+      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, isSystem: true, isActive: false });
+      await expect(service.validateSubjectAccess(1, 'any-user')).rejects.toThrow(BadRequestException);
     });
 
     it('should allow if personal subject and user is creator', async () => {
       mockPrisma.subject.findUnique.mockResolvedValue({
         id: 2,
         isSystem: false,
+        isActive: true,
         createdBy: 'user-1',
       });
       await expect(service.validateSubjectAccess(2, 'user-1')).resolves.not.toThrow();
@@ -102,6 +108,7 @@ describe('SubjectsService', () => {
       mockPrisma.subject.findUnique.mockResolvedValue({
         id: 2,
         isSystem: false,
+        isActive: true,
         createdBy: 'user-1',
       });
       await expect(service.validateSubjectAccess(2, 'user-2')).rejects.toThrow(ForbiddenException);
