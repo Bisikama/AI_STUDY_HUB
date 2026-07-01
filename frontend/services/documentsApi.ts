@@ -56,7 +56,15 @@ export interface Document {
   requestedAt?: string | null;
   tags?: any[];
   canRequestPublic?: boolean;
-  publicationEligibilityReason?: string;
+  publicationEligibilityReason?: string | null;
+  copyrightSourceType?: 'OWN_ORIGINAL' | 'OPEN_LICENSE' | 'AUTHORIZED' | 'FPT_OFFICIAL' | 'THIRD_PARTY' | 'UNKNOWN';
+  copyrightAuthorName?: string | null;
+  copyrightSourceUrl?: string | null;
+  copyrightLicense?: string | null;
+  copyrightAttribution?: string | null;
+  copyrightPermissionReference?: string | null;
+  copyrightDeclaredAt?: string | null;
+  copyrightDeclaredBy?: string | null;
 }
 
 export interface UploadDocumentResponse {
@@ -110,7 +118,6 @@ export const documentsApi = {
     visibilityStatus?: string;
     folderId?: string;
     unfiled?: boolean;
-    legacyFolder?: boolean;
     majorCode?: string;
     aiStatus?: string;
     extractionStatus?: string;
@@ -151,8 +158,23 @@ export const documentsApi = {
   /**
    * Update document metadata (title, description, subjectId).
    */
-  updateDocument: async (id: string, payload: { title?: string; description?: string; subjectId?: number; tags?: string }): Promise<Document> => {
+  updateDocument: async (id: string, payload: { title?: string; description?: string; subjectId?: number; tags?: string[]; personalFolderId?: string | null }): Promise<Document> => {
     const response = await axiosClient.patch(`/documents/${id}`, payload);
+    return response.data;
+  },
+
+  /**
+   * Update document copyright.
+   */
+  updateCopyright: async (id: string, payload: {
+    sourceType: string;
+    authorName?: string;
+    sourceUrl?: string;
+    license?: string;
+    attribution?: string;
+    permissionReference?: string;
+  }): Promise<any> => {
+    const response = await axiosClient.patch(`/documents/${id}/copyright`, payload);
     return response.data;
   },
 

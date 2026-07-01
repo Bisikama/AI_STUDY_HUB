@@ -1177,8 +1177,35 @@ function DashboardPage() {
                     {aiCache?.document.title ?? 'Loading document...'}
                   </h2>
                   {aiCache?.document.subject && (
-                    <p className="text-secondary mt-1">
-                      {aiCache.document.subject.name} • {aiCache.document.subject.code}
+                    <p className="text-secondary mt-1 flex items-center gap-2 text-sm flex-wrap">
+                      <span>{aiCache.document.subject.name} • {aiCache.document.subject.code}</span>
+                      {aiCache.document.copyrightSourceType && (
+                        <>
+                          <span className="text-gray-300">|</span>
+                          <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-xs font-semibold">
+                            <span className="material-symbols-outlined text-[14px]">copyright</span>
+                            {aiCache.document.copyrightSourceType === 'OWN_ORIGINAL' && 'Tự biên soạn'}
+                            {aiCache.document.copyrightSourceType === 'OPEN_LICENSE' && 'Nguồn mở'}
+                            {aiCache.document.copyrightSourceType === 'AUTHORIZED' && 'Được cấp quyền sử dụng'}
+                            {aiCache.document.copyrightSourceType === 'FPT_OFFICIAL' && 'Tài liệu chính thức FPT'}
+                          </span>
+                          {aiCache.document.copyrightLicense && (
+                            <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">
+                              License: {aiCache.document.copyrightLicense}
+                            </span>
+                          )}
+                          {aiCache.document.copyrightSourceUrl && (
+                            <a href={aiCache.document.copyrightSourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-0.5 text-xs">
+                              Nguồn <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                            </a>
+                          )}
+                          {aiCache.document.copyrightAttribution && (
+                            <span className="text-gray-500 text-xs italic">
+                              By: {aiCache.document.copyrightAttribution}
+                            </span>
+                          )}
+                        </>
+                      )}
                     </p>
                   )}
                 </div>

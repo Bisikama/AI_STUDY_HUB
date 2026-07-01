@@ -29,6 +29,11 @@ type ExploreDocument = {
     isTeacher: boolean;
   };
   createdAt: string;
+  copyrightSourceType?: string | null;
+  copyrightAuthorName?: string | null;
+  copyrightSourceUrl?: string | null;
+  copyrightLicense?: string | null;
+  copyrightAttribution?: string | null;
 };
 
 type ApiResponse<T> =

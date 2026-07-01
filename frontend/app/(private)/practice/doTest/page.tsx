@@ -20,6 +20,11 @@ type ExploreDocument = {
   quizCount: number;
   hasSummary: boolean;
   createdAt: string;
+  copyrightSourceType?: string | null;
+  copyrightAuthorName?: string | null;
+  copyrightSourceUrl?: string | null;
+  copyrightLicense?: string | null;
+  copyrightAttribution?: string | null;
 };
 
 type DocumentSummary = {

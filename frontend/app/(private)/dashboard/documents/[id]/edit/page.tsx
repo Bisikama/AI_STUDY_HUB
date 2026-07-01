@@ -57,24 +57,20 @@ export default function EditDocumentPage() {
   );
   const availableTags: Tag[] = tagsResponse || [];
 
+  const [hasInitialized, setHasInitialized] = useState(false);
+
   useEffect(() => {
-    if (document) {
+    if (document && !hasInitialized) {
       setTitle(document.title || '');
       setDescription(document.description || '');
       setSelectedSubjectId(document.subjectId || null);
       setSelectedFolderId(document.personalFolderId || '');
-      if (document.subject?.code && !selectedMajorCode) {
-        // Pre-select major if possible. (Requires a backend query or assuming subject.code prefix? Actually, we might need a way to get the major from the subject. For now, try to match it if we can, or just leave it blank to force re-selection if they want to change.)
-        // But for editing, if we don't have the major selected, the course dropdown will be empty. 
-        // We can just set it to the first 3 letters of subject code assuming that's the major, but it's risky.
-        // Let's rely on the user to select a Major if they want to change the course.
-        // Actually, if we leave it empty, the course select is disabled. Let's just set the subjectId.
-      }
       if (document.tags) {
         setSelectedTags(document.tags.map((t: any) => t.tag || t));
       }
+      setHasInitialized(true);
     }
-  }, [document]);
+  }, [document, hasInitialized]);
 
   // Tags logic
   const handleAddTag = (tagName: string) => {

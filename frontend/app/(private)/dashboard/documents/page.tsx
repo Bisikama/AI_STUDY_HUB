@@ -161,7 +161,7 @@ export default function MyDocumentsPage() {
   );
   
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'unfiled' | 'legacy' | null>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'unfiled' | null>('all');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Load personal folders
@@ -178,7 +178,6 @@ export default function MyDocumentsPage() {
     () => documentsApi.getMyDocuments({
       folderId: activeFolderId || undefined,
       unfiled: activeFilter === 'unfiled' ? true : undefined,
-      legacyFolder: activeFilter === 'legacy' ? true : undefined,
     })
   );
 
@@ -296,13 +295,6 @@ export default function MyDocumentsPage() {
             >
               <span className="material-symbols-outlined text-[18px]">inbox</span>
               Unfiled
-            </button>
-            <button
-              onClick={() => { setActiveFilter('legacy'); setActiveFolderId(null); }}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${activeFilter === 'legacy' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
-            >
-              <span className="material-symbols-outlined text-[18px]">archive</span>
-              Legacy (Uncategorized)
             </button>
           </div>
 

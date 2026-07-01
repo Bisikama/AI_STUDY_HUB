@@ -121,6 +121,16 @@ export default function DocumentDetailPage() {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Copyright Form State
+  const [isCopyrightModalOpen, setIsCopyrightModalOpen] = useState(false);
+  const [copyrightSourceType, setCopyrightSourceType] = useState('UNKNOWN');
+  const [copyrightAuthorName, setCopyrightAuthorName] = useState('');
+  const [copyrightSourceUrl, setCopyrightSourceUrl] = useState('');
+  const [copyrightLicense, setCopyrightLicense] = useState('');
+  const [copyrightAttribution, setCopyrightAttribution] = useState('');
+  const [copyrightPermissionReference, setCopyrightPermissionReference] = useState('');
+  const [isSubmittingCopyright, setIsSubmittingCopyright] = useState(false);
+
   const {
     data: response,
     error,
@@ -171,6 +181,30 @@ export default function DocumentDetailPage() {
       newTab.close();
       const { mapDocumentError } = await import('@/utils/errorMapper');
       addToast(mapDocumentError(err), 'error');
+    }
+  };
+
+  const handleSubmitCopyright = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    try {
+      setIsSubmittingCopyright(true);
+      await documentsApi.updateCopyright(id, {
+        sourceType: copyrightSourceType,
+        authorName: copyrightAuthorName,
+        sourceUrl: copyrightSourceUrl,
+        license: copyrightLicense,
+        attribution: copyrightAttribution,
+        permissionReference: copyrightPermissionReference,
+      });
+      addToast('Khai báo bản quyền thành công.', 'success');
+      mutate();
+      setIsCopyrightModalOpen(false);
+    } catch (err: any) {
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
+    } finally {
+      setIsSubmittingCopyright(false);
     }
   };
 
@@ -355,7 +389,7 @@ export default function DocumentDetailPage() {
             {document.title}
           </h1>
 
-          <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-gray-500 sm:gap-6">
+          <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-gray-500 sm:gap-6 mt-4">
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[18px]">calendar_today</span>
               Added {formatDate(document.createdAt)}
@@ -374,6 +408,42 @@ export default function DocumentDetailPage() {
               {document.downloadCount} downloads
             </div>
           </div>
+
+          {document.copyrightSourceType && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
+              <span className="material-symbols-outlined text-[16px] text-blue-600">copyright</span>
+              <span className="font-semibold text-blue-800">
+                {document.copyrightSourceType === 'OWN_ORIGINAL' && 'Tự biên soạn'}
+                {document.copyrightSourceType === 'OPEN_LICENSE' && 'Nguồn mở'}
+                {document.copyrightSourceType === 'AUTHORIZED' && 'Được cấp quyền sử dụng'}
+                {document.copyrightSourceType === 'FPT_OFFICIAL' && 'Tài liệu chính thức FPT'}
+              </span>
+              {document.copyrightLicense && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <span className="bg-white border border-gray-200 px-2 py-0.5 rounded text-xs font-medium">
+                    {document.copyrightLicense}
+                  </span>
+                </>
+              )}
+              {document.copyrightSourceUrl && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <a href={document.copyrightSourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5 text-xs font-medium">
+                    Nguồn gốc <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                  </a>
+                </>
+              )}
+              {document.copyrightAttribution && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <span className="text-gray-500 text-xs italic">
+                    By: {document.copyrightAttribution}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-3 lg:shrink-0 ">
@@ -764,7 +834,7 @@ export default function DocumentDetailPage() {
                     Download / Open Original
                   </button>
 
-                  {document.isOwner && (
+                  {/* {document.isOwner && (
                     <button
                       onClick={handleAnalyze}
                       disabled={isAnalyzing || document.extractionStatus === 'UNSUPPORTED'}
@@ -774,7 +844,7 @@ export default function DocumentDetailPage() {
                       <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
                       {isAnalyzing ? 'Analyzing AI...' : 'Analyze with AI'}
                     </button>
-                  )}
+                  )} */}
 
                   {/* System Info Card */}
                   {document.isOwner && (
@@ -799,13 +869,34 @@ export default function DocumentDetailPage() {
                             {document.publicationEligibilityReason === 'AI_ANALYSIS_UNSUPPORTED'
                               ? 'File này chỉ được lưu trữ riêng tư và không thể chia sẻ.'
                               : document.publicationEligibilityReason === 'AI_ANALYSIS_PROCESSING'
-                              ? 'AI Analyze đang xử lý...'
-                              : document.publicationEligibilityReason === 'AI_ANALYSIS_FAILED'
-                              ? 'AI Analyze thất bại. Vui lòng thử lại.'
-                              : document.publicationEligibilityReason === 'AI_ANALYSIS_REQUIRED'
-                              ? 'Hãy chạy AI Analyze trước khi chia sẻ tài liệu.'
-                              : 'Tài liệu cần hoàn tất AI Analyze (gồm Summary và Quiz) trước khi chia sẻ.'}
+                                ? 'AI Analyze đang xử lý...'
+                                : document.publicationEligibilityReason === 'AI_ANALYSIS_FAILED'
+                                  ? 'AI Analyze thất bại. Vui lòng thử lại.'
+                                  : document.publicationEligibilityReason === 'AI_ANALYSIS_REQUIRED'
+                                    ? 'Hãy chạy AI Analyze trước khi chia sẻ tài liệu.'
+                                    : document.publicationEligibilityReason === 'COPYRIGHT_SHARING_NOT_ALLOWED'
+                                      ? 'Nguồn gốc tài liệu này không được phép chia sẻ.'
+                                      : document.publicationEligibilityReason === 'COPYRIGHT_DECLARATION_REQUIRED' || document.publicationEligibilityReason === 'COPYRIGHT_METADATA_INCOMPLETE'
+                                        ? 'Vui lòng khai báo bản quyền để chia sẻ.'
+                                        : 'Tài liệu cần hoàn tất AI Analyze và Khai báo bản quyền trước khi chia sẻ.'}
                           </p>
+                          {(document.publicationEligibilityReason === 'COPYRIGHT_DECLARATION_REQUIRED' || document.publicationEligibilityReason === 'COPYRIGHT_METADATA_INCOMPLETE') && (
+                            <button
+                              onClick={() => {
+                                setCopyrightSourceType(document.copyrightSourceType || 'UNKNOWN');
+                                setCopyrightAuthorName(document.copyrightAuthorName || '');
+                                setCopyrightSourceUrl(document.copyrightSourceUrl || '');
+                                setCopyrightLicense(document.copyrightLicense || '');
+                                setCopyrightAttribution(document.copyrightAttribution || '');
+                                setCopyrightPermissionReference(document.copyrightPermissionReference || '');
+                                setIsCopyrightModalOpen(true);
+                              }}
+                              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">copyright</span>
+                              Khai báo nguồn / Bản quyền
+                            </button>
+                          )}
                         </div>
                       ) : !document.subject ? (
                         <div className="group relative">
@@ -1067,6 +1158,136 @@ export default function DocumentDetailPage() {
                   ) : (
                     'Submit Report'
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Copyright Modal */}
+      {isCopyrightModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-0">
+          <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => !isSubmittingCopyright && setIsCopyrightModalOpen(false)} />
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8 animate-in zoom-in-95 duration-200">
+            <div className="mb-6 flex items-center gap-3 text-blue-600">
+              <span className="material-symbols-outlined text-2xl">copyright</span>
+              <h3 className="text-xl font-bold text-gray-900">Khai báo bản quyền</h3>
+            </div>
+
+            <p className="mb-4 text-xs text-gray-500">
+              Để chia sẻ tài liệu, bạn cần khai báo nguồn gốc và quyền sử dụng theo chính sách của AI Study Hub.
+            </p>
+
+            <form onSubmit={handleSubmitCopyright} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  Nguồn tài liệu
+                </label>
+                <select
+                  value={copyrightSourceType}
+                  onChange={(e) => setCopyrightSourceType(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                >
+                  <option value="UNKNOWN">Chưa xác định</option>
+                  <option value="OWN_ORIGINAL">Tự biên soạn (Do chính bạn tạo ra)</option>
+                  <option value="OPEN_LICENSE">Nguồn mở (Open License / Creative Commons)</option>
+                  <option value="AUTHORIZED">Có quyền sử dụng (Được cấp quyền)</option>
+                  <option value="FPT_OFFICIAL">Tài liệu chính thức FPT</option>
+                  <option value="THIRD_PARTY">Nội dung bên thứ ba (Không có quyền chia sẻ)</option>
+                </select>
+              </div>
+
+              {copyrightSourceType === 'OWN_ORIGINAL' && (
+                <div className="rounded border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+                  Bạn xác nhận mình là tác giả duy nhất của tài liệu này và có toàn quyền chia sẻ nó.
+                </div>
+              )}
+
+              {(copyrightSourceType === 'OPEN_LICENSE' || copyrightSourceType === 'FPT_OFFICIAL') && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    URL Nguồn gốc (Bắt buộc)
+                  </label>
+                  <input
+                    type="url"
+                    value={copyrightSourceUrl}
+                    onChange={(e) => setCopyrightSourceUrl(e.target.value)}
+                    required
+                    placeholder="https://..."
+                    className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
+                  />
+                </div>
+              )}
+
+              {copyrightSourceType === 'OPEN_LICENSE' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                      Giấy phép (Bắt buộc)
+                    </label>
+                    <input
+                      type="text"
+                      value={copyrightLicense}
+                      onChange={(e) => setCopyrightLicense(e.target.value)}
+                      required
+                      placeholder="VD: CC BY 4.0, MIT, GPL..."
+                      className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                      Ghi công tác giả (Bắt buộc)
+                    </label>
+                    <input
+                      type="text"
+                      value={copyrightAttribution}
+                      onChange={(e) => setCopyrightAttribution(e.target.value)}
+                      required
+                      placeholder="Tên tác giả gốc..."
+                      className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {(copyrightSourceType === 'AUTHORIZED' || copyrightSourceType === 'FPT_OFFICIAL') && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    Minh chứng quyền sử dụng {copyrightSourceType === 'AUTHORIZED' ? '(Bắt buộc)' : '(Nếu không có URL)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={copyrightPermissionReference}
+                    onChange={(e) => setCopyrightPermissionReference(e.target.value)}
+                    required={copyrightSourceType === 'AUTHORIZED'}
+                    placeholder="Tham chiếu email, văn bản cấp quyền..."
+                    className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
+                  />
+                </div>
+              )}
+
+              {(copyrightSourceType === 'UNKNOWN' || copyrightSourceType === 'THIRD_PARTY') && (
+                <div className="rounded border border-red-100 bg-red-50 p-3 text-xs text-red-800">
+                  Tài liệu có nguồn gốc chưa xác định hoặc thuộc bên thứ ba sẽ không được phép chia sẻ công khai trên hệ thống.
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCopyrightModalOpen(false)}
+                  disabled={isSubmittingCopyright}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingCopyright || copyrightSourceType === 'UNKNOWN' || copyrightSourceType === 'THIRD_PARTY'}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSubmittingCopyright ? 'Đang lưu...' : 'Lưu khai báo'}
                 </button>
               </div>
             </form>
