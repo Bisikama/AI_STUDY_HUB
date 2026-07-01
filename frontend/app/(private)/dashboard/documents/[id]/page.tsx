@@ -790,12 +790,22 @@ export default function DocumentDetailPage() {
 
                   {document.visibilityStatus === 'PRIVATE' && (
                     <div className="mt-2 border-t border-gray-100 pt-3">
-                      {document.extractionStatus !== 'READY' ? (
+                      {!document.canRequestPublic ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
                             <span className="material-symbols-outlined text-[18px]">public</span> {publishCtaText}
                           </button>
-                          <p className="mt-1.5 text-xs text-red-500 text-center">PDF extraction must be successful before submitting for review.</p>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">
+                            {document.publicationEligibilityReason === 'AI_ANALYSIS_UNSUPPORTED'
+                              ? 'File này chỉ được lưu trữ riêng tư và không thể chia sẻ.'
+                              : document.publicationEligibilityReason === 'AI_ANALYSIS_PROCESSING'
+                              ? 'AI Analyze đang xử lý...'
+                              : document.publicationEligibilityReason === 'AI_ANALYSIS_FAILED'
+                              ? 'AI Analyze thất bại. Vui lòng thử lại.'
+                              : document.publicationEligibilityReason === 'AI_ANALYSIS_REQUIRED'
+                              ? 'Hãy chạy AI Analyze trước khi chia sẻ tài liệu.'
+                              : 'Tài liệu cần hoàn tất AI Analyze (gồm Summary và Quiz) trước khi chia sẻ.'}
+                          </p>
                         </div>
                       ) : !document.subject ? (
                         <div className="group relative">

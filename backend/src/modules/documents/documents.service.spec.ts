@@ -889,20 +889,24 @@ describe('DocumentsService', () => {
   });
 
   describe('Q9 - requestPublic', () => {
+    const validAiDocument = {
+      id: 'doc-1',
+      uploadedBy: 'user-1',
+      visibilityStatus: 'PRIVATE',
+      deletionStatus: 'ACTIVE',
+      deletedAt: null,
+      storagePath: 'path/to/file.pdf',
+      extractionStatus: 'READY',
+      aiStatus: 'READY',
+      subject: { isSystem: true },
+      summary: { content: 'test' },
+      quizzes: [{ questions: [{ id: 'q1' }] }],
+    };
+
     it('1. Owner requests public on valid PRIVATE document with system subject', async () => {
       mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.document.findUnique
-        .mockResolvedValueOnce({
-          id: 'doc-1',
-          uploadedBy: 'user-1',
-          visibilityStatus: 'PRIVATE',
-          deletionStatus: 'ACTIVE',
-          deletedAt: null,
-          storagePath: 'path/to/file.pdf',
-          extractionStatus: 'READY',
-          aiStatus: 'READY',
-          subject: { isSystem: true },
-        })
+        .mockResolvedValueOnce(validAiDocument)
         .mockResolvedValueOnce({
           id: 'doc-1',
           visibilityStatus: 'PENDING_REVIEW',
@@ -927,15 +931,9 @@ describe('DocumentsService', () => {
       mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.document.findUnique
         .mockResolvedValueOnce({
+          ...validAiDocument,
           id: 'doc-teacher',
           uploadedBy: 'teacher-1',
-          visibilityStatus: 'PRIVATE',
-          deletionStatus: 'ACTIVE',
-          deletedAt: null,
-          storagePath: 'path/to/file.pdf',
-          extractionStatus: 'READY',
-          aiStatus: 'READY',
-          subject: { isSystem: true },
         })
         .mockResolvedValueOnce({
           id: 'doc-teacher',
@@ -954,8 +952,8 @@ describe('DocumentsService', () => {
 
     it('2. Personal Subject -> 422 DOCUMENT_PUBLIC_SUBJECT_REQUIRED', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
+        ...validAiDocument,
         id: 'doc-2',
-        uploadedBy: 'user-1',
         subject: { isSystem: false },
       });
       await expect(service.requestPublic('doc-2', 'user-1')).rejects.toThrow('DOCUMENT_PUBLIC_SUBJECT_REQUIRED');
@@ -963,74 +961,95 @@ describe('DocumentsService', () => {
 
     it('3. Invalid lifecycle -> 409 DOCUMENT_INVALID_STATE', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
+        ...validAiDocument,
         id: 'doc-3',
-        uploadedBy: 'user-1',
-        subject: { isSystem: true },
         visibilityStatus: 'PENDING_REVIEW', // Already pending
-        deletionStatus: 'ACTIVE',
-        deletedAt: null,
-        storagePath: 'path',
-        extractionStatus: 'READY',
-        aiStatus: 'READY',
       });
       await expect(service.requestPublic('doc-3', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
     });
 
     it('3a. Owner, extractionStatus = FAILED -> 409', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
-        id: 'doc-4', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'FAILED', aiStatus: 'READY',
+        ...validAiDocument, id: 'doc-4', extractionStatus: 'FAILED',
       });
-      await expect(service.requestPublic('doc-4', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+      await expect(service.requestPublic('doc-4', 'user-1')).rejects.toThrow('Tài liệu phải hoàn tất AI Analyze');
     });
 
     it('3b. Owner, aiStatus = NOT_REQUESTED -> 409', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
-        id: 'doc-5', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'NOT_REQUESTED',
+        ...validAiDocument, id: 'doc-5', aiStatus: 'NOT_REQUESTED',
       });
-      await expect(service.requestPublic('doc-5', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+      await expect(service.requestPublic('doc-5', 'user-1')).rejects.toThrow('Tài liệu phải hoàn tất AI Analyze');
     });
 
-    it('3c. Owner, aiStatus = FAILED -> 409', async () => {
+    it('3c. Owner, aiStatus = PROCESSING -> 409', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
-        id: 'doc-6', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'FAILED',
+        ...validAiDocument, id: 'doc-6', aiStatus: 'PROCESSING',
       });
-      await expect(service.requestPublic('doc-6', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+      await expect(service.requestPublic('doc-6', 'user-1')).rejects.toThrow('Tài liệu phải hoàn tất AI Analyze');
     });
 
     it('3d. Owner, storagePath = null -> 409', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
-        id: 'doc-7', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: null, extractionStatus: 'READY', aiStatus: 'READY',
+        ...validAiDocument, id: 'doc-7', storagePath: null,
       });
       await expect(service.requestPublic('doc-7', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
     });
 
     it('3e. Owner, already PENDING_REVIEW -> 409', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
-        id: 'doc-8', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PENDING_REVIEW', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+        ...validAiDocument, id: 'doc-8', visibilityStatus: 'PENDING_REVIEW',
       });
       await expect(service.requestPublic('doc-8', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
     });
 
     it('3f. Owner, already PUBLIC -> 409', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
-        id: 'doc-9', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PUBLIC', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+        ...validAiDocument, id: 'doc-9', visibilityStatus: 'PUBLIC',
       });
       await expect(service.requestPublic('doc-9', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
     });
 
     it('3g. Owner, SOFT_DELETED / non-ACTIVE -> 409', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
-        id: 'doc-10', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'SOFT_DELETED', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
+        ...validAiDocument, id: 'doc-10', deletionStatus: 'SOFT_DELETED',
       });
       await expect(service.requestPublic('doc-10', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
     });
 
     it('3h. Race condition handled by updateMany returning 0 count -> 409', async () => {
-      mockPrisma.document.findUnique.mockResolvedValue({
-        id: 'doc-1', uploadedBy: 'user-1', subject: { isSystem: true }, visibilityStatus: 'PRIVATE', deletionStatus: 'ACTIVE', storagePath: 'path', extractionStatus: 'READY', aiStatus: 'READY',
-      });
+      mockPrisma.document.findUnique.mockResolvedValue(validAiDocument);
       mockPrisma.document.updateMany.mockResolvedValue({ count: 0 }); // State changed concurrently
       await expect(service.requestPublic('doc-1', 'user-1')).rejects.toThrow('DOCUMENT_INVALID_STATE');
+    });
+
+    it('3i. Owner, aiStatus = READY but Summary missing -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...validAiDocument, id: 'doc-11', summary: null,
+      });
+      await expect(service.requestPublic('doc-11', 'user-1')).rejects.toThrow('Tài liệu phải hoàn tất AI Analyze');
+    });
+
+    it('3j. Owner, aiStatus = READY but Quiz/Questions missing -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...validAiDocument, id: 'doc-12', quizzes: [],
+      });
+      await expect(service.requestPublic('doc-12', 'user-1')).rejects.toThrow('Tài liệu phải hoàn tất AI Analyze');
+    });
+
+    it('3k. Document extraction UNSUPPORTED -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...validAiDocument, id: 'doc-13', extractionStatus: 'UNSUPPORTED',
+      });
+      await expect(service.requestPublic('doc-13', 'user-1')).rejects.toThrow('Tài liệu phải hoàn tất AI Analyze');
+    });
+
+    it('3l. Teacher, extraction READY + aiStatus NOT_REQUESTED -> 409', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...validAiDocument, id: 'doc-teacher-fail', uploadedBy: 'teacher-1', aiStatus: 'NOT_REQUESTED',
+      });
+      // Role isn't fetched yet because it fails early
+      await expect(service.requestPublic('doc-teacher-fail', 'teacher-1')).rejects.toThrow('Tài liệu phải hoàn tất AI Analyze');
     });
 
     it('4. Owner-only: User B cannot request public for User A document', async () => {

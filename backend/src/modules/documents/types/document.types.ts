@@ -45,6 +45,8 @@ export interface SanitizedQuiz extends Quiz {
 export interface SanitizedDocumentDetails extends SanitizedDocument {
   summary: DocumentSummary | null;
   quizzes: SanitizedQuiz[];
+  canRequestPublic?: boolean;
+  publicationEligibilityReason?: string;
 }
 
 export interface AnalyzeResult {

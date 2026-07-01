@@ -842,7 +842,15 @@ Quy định chặt chẽ:
       isFollowed = !!followRecord;
     }
 
-    return this.mapSafeDocumentResponse(document, isOwner, isFollowed);
+    const mappedDocument = this.mapSafeDocumentResponse(document, isOwner, isFollowed) as SanitizedDocumentDetails;
+
+    if (isOwner) {
+      const eligibility = this.checkPublicationEligibility(document);
+      mappedDocument.canRequestPublic = eligibility.isEligible;
+      mappedDocument.publicationEligibilityReason = eligibility.reason;
+    }
+
+    return mappedDocument;
   }
 
   /**
@@ -1389,11 +1397,52 @@ Quy định chặt chẽ:
     });
   }
 
+  /**
+   * Helper to verify if a document is eligible to be requested for public sharing.
+   */
+  checkPublicationEligibility(document: any): { isEligible: boolean; reason?: string } {
+    if (document.extractionStatus === 'UNSUPPORTED') {
+      return { isEligible: false, reason: 'AI_ANALYSIS_UNSUPPORTED' };
+    }
+    if (document.extractionStatus !== 'READY') {
+      return { isEligible: false, reason: 'AI_ANALYSIS_REQUIRED' };
+    }
+    if (document.aiStatus === 'NOT_REQUESTED') {
+      return { isEligible: false, reason: 'AI_ANALYSIS_REQUIRED' };
+    }
+    if (document.aiStatus === 'PROCESSING') {
+      return { isEligible: false, reason: 'AI_ANALYSIS_PROCESSING' };
+    }
+    if (document.aiStatus === 'FAILED') {
+      return { isEligible: false, reason: 'AI_ANALYSIS_FAILED' };
+    }
+    if (document.aiStatus !== 'READY') {
+      return { isEligible: false, reason: 'AI_ANALYSIS_REQUIRED' };
+    }
+    if (!document.summary) {
+      return { isEligible: false, reason: 'AI_SUMMARY_OR_QUIZ_MISSING' };
+    }
+    if (!document.quizzes || document.quizzes.length === 0) {
+      return { isEligible: false, reason: 'AI_SUMMARY_OR_QUIZ_MISSING' };
+    }
+    const hasQuestions = document.quizzes.some((q: any) => q.questions && q.questions.length > 0);
+    if (!hasQuestions) {
+      return { isEligible: false, reason: 'AI_SUMMARY_OR_QUIZ_MISSING' };
+    }
+    return { isEligible: true };
+  }
+
   async requestPublic(documentId: string, userId: string) {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
       include: {
         subject: { select: { isSystem: true } },
+        summary: true,
+        quizzes: {
+          include: {
+            questions: true,
+          },
+        },
       },
     });
 
@@ -1415,10 +1464,18 @@ Quy định chặt chẽ:
       document.deletionStatus !== 'ACTIVE' ||
       document.deletedAt !== null ||
       !document.storagePath ||
-      document.visibilityStatus !== 'PRIVATE' ||
-      document.extractionStatus !== 'READY'
+      document.visibilityStatus !== 'PRIVATE'
     ) {
       throw new ConflictException('DOCUMENT_INVALID_STATE');
+    }
+
+    const eligibility = this.checkPublicationEligibility(document);
+    if (!eligibility.isEligible) {
+      throw new ConflictException({
+        message: 'Tài liệu phải hoàn tất AI Analyze, bao gồm Summary và Quiz, trước khi có thể chia sẻ.',
+        error: eligibility.reason || 'AI_NOT_READY_FOR_PUBLICATION',
+        statusCode: 409,
+      });
     }
 
     const user = await this.prisma.user.findUnique({
@@ -1438,6 +1495,7 @@ Quy định chặt chẽ:
         deletedAt: null,
         storagePath: { not: null },
         extractionStatus: 'READY',
+        aiStatus: 'READY',
       },
       data: {
         visibilityStatus: targetVisibility,

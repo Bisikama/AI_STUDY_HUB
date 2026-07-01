@@ -44,6 +44,8 @@ export interface Document {
   updatedAt: string;
   requestedAt?: string | null;
   tags?: any[];
+  canRequestPublic?: boolean;
+  publicationEligibilityReason?: string;
 }
 
 export interface UploadDocumentResponse {
