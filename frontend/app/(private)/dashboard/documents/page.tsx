@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { documentsApi, Document } from '@/services/documentsApi';
+import { documentsApi, Document, StorageSummary } from '@/services/documentsApi';
 
 const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
 const FOLLOWED_DOCUMENTS_STORAGE_KEY = 'studyhub_followed_documents';
@@ -165,6 +165,10 @@ export default function MyDocumentsPage() {
     isLoading,
     mutate,
   } = useSWR('/documents/me', () => documentsApi.getMyDocuments());
+
+  const {
+    data: storageSummary,
+  } = useSWR('/documents/me/storage-summary', () => documentsApi.getStorageSummary());
 
   useEffect(() => {
     const syncFollowedDocuments = () => {
@@ -463,26 +467,50 @@ export default function MyDocumentsPage() {
           <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="col-span-1 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
               <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-900">PDF Storage</h3>
+                <h3 className="text-xl font-bold text-gray-900">Storage Overview</h3>
                 <span className="text-sm font-medium text-gray-500">
-                  {formatSize(storageAnalysis.pdfSize)} stored
+                  {storageSummary ? `${formatSize(storageSummary.usedBytes)} used` : 'Loading...'}
                 </span>
               </div>
 
-              <div className="flex flex-col gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-[#1a1c23]"></span>
-                  <span className="text-gray-700 font-medium">PDF ({formatSize(storageAnalysis.pdfSize)})</span>
-                </div>
-
-                {storageAnalysis.noSizeCount > 0 && (
-                  <div className="mt-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-md text-xs font-medium">
-                    {storageAnalysis.noSizeCount === storageAnalysis.pdfDocsCount 
-                      ? 'Size data is not available for existing PDF documents yet'
-                      : `${storageAnalysis.noSizeCount} PDF document${storageAnalysis.noSizeCount > 1 ? 's' : ''} have no recorded size yet`}
+              {storageSummary ? (
+                <div className="flex flex-col gap-4 text-sm">
+                  <div className="h-3 w-full rounded-full bg-gray-100 overflow-hidden flex">
+                    <div
+                      className="h-full bg-[#1a1c23] transition-all"
+                      style={{ width: `${storageSummary.usedPercent}%` }}
+                    ></div>
                   </div>
-                )}
-              </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-[#1a1c23]"></span>
+                      <span className="text-gray-700 font-medium">Used: {formatSize(storageSummary.usedBytes)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-gray-300"></span>
+                      <span className="text-gray-700 font-medium">Available: {formatSize(storageSummary.availableBytes)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-amber-500"></span>
+                      <span className="text-gray-700 font-medium">Reserved: {formatSize(storageSummary.reservedBytes)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-red-400"></span>
+                      <span className="text-gray-700 font-medium">Trash: {formatSize(storageSummary.trashBytes)}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 text-gray-500 text-xs italic">
+                    Note: Files in trash do not consume your personal quota.
+                  </div>
+                </div>
+              ) : (
+                <div className="animate-pulse flex flex-col gap-4">
+                  <div className="h-3 w-full bg-gray-200 rounded-full"></div>
+                  <div className="h-4 w-1/2 bg-gray-200 rounded"></div>
+                </div>
+              )}
             </div>
 
             <div className="relative col-span-1 flex flex-col justify-center overflow-hidden rounded-2xl bg-[#1a1c23] p-8 text-white shadow-md">

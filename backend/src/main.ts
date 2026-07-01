@@ -24,8 +24,7 @@ async function bootstrap() {
   // Bật CORS (Bắt buộc phải có credentials: true để nhận Cookie)
   const configService = app.get(ConfigService);
   const allowedOrigins =
-    configService.get<string>('ALLOWED_ORIGINS') ||
-    'http://localhost:3000,http://localhost:5000';
+    configService.get<string>('ALLOWED_ORIGINS') || 'http://localhost:3000,http://localhost:5000';
   const originArray = allowedOrigins.split(',').map((origin) => origin.trim().replace(/\/$/, ''));
 
   app.enableCors({
@@ -34,12 +33,12 @@ async function bootstrap() {
       if (!origin) {
         return callback(null, true);
       }
-      
+
       const isAllowed = originArray.includes(origin) || origin.endsWith('.vercel.app');
       if (isAllowed) {
         return callback(null, true);
       }
-      
+
       return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,

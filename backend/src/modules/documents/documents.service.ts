@@ -49,7 +49,7 @@ export class DocumentsService {
     private readonly subjectsService: SubjectsService,
     private readonly tagsService: TagsService,
     private readonly documentAccessService: DocumentAccessService,
-  ) { }
+  ) {}
 
   /**
    * Helper function to convert BigInt to Number/String in objects to prevent serialization crashes.
@@ -84,11 +84,11 @@ export class DocumentsService {
       subjectId: document.subjectId,
       subject: document.subject
         ? {
-          id: document.subject.id,
-          name: document.subject.name,
-          code: document.subject.code,
-          isSystem: document.subject.isSystem,
-        }
+            id: document.subject.id,
+            name: document.subject.name,
+            code: document.subject.code,
+            isSystem: document.subject.isSystem,
+          }
         : null,
       fileType: document.fileType,
       fileSize:
@@ -103,9 +103,10 @@ export class DocumentsService {
       status: document.status,
       averageRating: document.averageRating ?? 0,
       ratingCount: document.ratingCount ?? 0,
-      moderationWarning: document.status === 'UNDER_REVIEW'
-        ? 'Tài liệu này đang được kiểm tra bởi quản trị viên. Một số sinh viên đã báo cáo vấn đề về độ chính xác.'
-        : null,
+      moderationWarning:
+        document.status === 'UNDER_REVIEW'
+          ? 'Tài liệu này đang được kiểm tra bởi quản trị viên. Một số sinh viên đã báo cáo vấn đề về độ chính xác.'
+          : null,
       createdAt: document.createdAt
         ? document.createdAt instanceof Date
           ? document.createdAt.toISOString()
@@ -125,10 +126,10 @@ export class DocumentsService {
       isFollowed,
       tags: document.tags
         ? document.tags.map((t: any) => ({
-          id: t.tag.id,
-          name: t.tag.name,
-          slug: t.tag.slug,
-        }))
+            id: t.tag.id,
+            name: t.tag.name,
+            slug: t.tag.slug,
+          }))
         : [],
       isAIGenerated: document.isAIGenerated,
       summary: document.summary || null,
@@ -207,6 +208,205 @@ export class DocumentsService {
   }
 
   /**
+   * Quota constraint: 1 GiB = 1073741824 bytes
+   */
+  private readonly MAX_QUOTA_BYTES = 1073741824n;
+
+  /**
+   * Helper to ensure UserStorageUsage exists for a user.
+   */
+  private async ensureStorageUsageExists(userId: string, tx?: any) {
+    const db = tx || this.prisma;
+    let usage = await db.userStorageUsage.findUnique({
+      where: { userId },
+    });
+    if (!usage) {
+      usage = await db.userStorageUsage.create({
+        data: {
+          userId,
+          quotaBytes: this.MAX_QUOTA_BYTES,
+          usedBytes: 0n,
+          reservedBytes: 0n,
+          trashBytes: 0n,
+        },
+      });
+    }
+    return usage;
+  }
+
+  /**
+   * Helper to release stale reservations for a user to free up reservedBytes.
+   */
+  private async releaseStaleReservations(userId: string, tx: any) {
+    const now = new Date();
+    const staleReservations = await tx.storageReservation.findMany({
+      where: {
+        userId,
+        status: 'PENDING',
+        expiresAt: { lt: now },
+      },
+    });
+
+    if (staleReservations.length > 0) {
+      const staleIds = staleReservations.map((r: any) => r.id);
+      const staleBytes = staleReservations.reduce((acc: bigint, curr: any) => acc + curr.bytes, 0n);
+
+      await tx.storageReservation.updateMany({
+        where: { id: { in: staleIds } },
+        data: {
+          status: 'RELEASED',
+          releasedAt: now,
+        },
+      });
+
+      await tx.userStorageUsage.update({
+        where: { userId },
+        data: {
+          reservedBytes: { decrement: staleBytes },
+        },
+      });
+    }
+  }
+
+  /**
+   * Helper to reserve storage quota for an incoming upload.
+   */
+  private async reserveStorage(userId: string, fileSize: number): Promise<string> {
+    const bytesToReserve = BigInt(fileSize);
+
+    return await this.prisma.$transaction(async (tx: any) => {
+      // 1. Ensure user has a storage usage record
+      await this.ensureStorageUsageExists(userId, tx);
+
+      // 2. Release any stale reservations
+      await this.releaseStaleReservations(userId, tx);
+
+      // 3. Conditional Update atomic check
+      const updatedCount = await tx.$executeRaw`
+        UPDATE "user_storage_usages"
+        SET "reserved_bytes" = "reserved_bytes" + ${bytesToReserve},
+            "updated_at" = CURRENT_TIMESTAMP
+        WHERE "user_id" = ${userId}::uuid
+          AND "used_bytes" + "reserved_bytes" + ${bytesToReserve} <= "quota_bytes"
+      `;
+
+      if (updatedCount === 0) {
+        const usage = await tx.userStorageUsage.findUnique({
+          where: { userId },
+        });
+
+        const used = usage.usedBytes;
+        const reserved = usage.reservedBytes;
+        const quota = usage.quotaBytes;
+
+        const availableBytes = quota - used - reserved;
+
+        throw new ConflictException({
+          message: 'Storage quota exceeded',
+          error: 'STORAGE_QUOTA_EXCEEDED',
+          statusCode: 409,
+          data: {
+            quotaBytes: quota.toString(),
+            usedBytes: used.toString(),
+            reservedBytes: reserved.toString(),
+            availableBytes: (availableBytes > 0n ? availableBytes : 0n).toString(),
+            incomingFileSize: bytesToReserve.toString(),
+          },
+        });
+      }
+
+      // 4. Create reservation
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour expiration
+      const reservation = await tx.storageReservation.create({
+        data: {
+          userId,
+          bytes: bytesToReserve,
+          status: 'PENDING',
+          expiresAt,
+        },
+      });
+
+      return reservation.id;
+    });
+  }
+
+  /**
+   * Helper to finalize a reservation after successful upload.
+   */
+  private async finalizeReservation(reservationId: string, documentId: string) {
+    await this.prisma.$transaction(async (tx: any) => {
+      const reservation = await tx.storageReservation.findUnique({
+        where: { id: reservationId },
+      });
+      if (!reservation || reservation.status !== 'PENDING') return;
+
+      await tx.storageReservation.update({
+        where: { id: reservationId },
+        data: {
+          status: 'FINALIZED',
+          finalizedAt: new Date(),
+          documentId,
+        },
+      });
+
+      await tx.userStorageUsage.update({
+        where: { userId: reservation.userId },
+        data: {
+          reservedBytes: { decrement: reservation.bytes },
+          usedBytes: { increment: reservation.bytes },
+        },
+      });
+    });
+  }
+
+  /**
+   * Helper to release a reservation if upload fails.
+   */
+  private async releaseReservation(reservationId: string) {
+    await this.prisma.$transaction(async (tx: any) => {
+      const reservation = await tx.storageReservation.findUnique({
+        where: { id: reservationId },
+      });
+      if (!reservation || reservation.status !== 'PENDING') return;
+
+      await tx.storageReservation.update({
+        where: { id: reservationId },
+        data: {
+          status: 'RELEASED',
+          releasedAt: new Date(),
+        },
+      });
+
+      await tx.userStorageUsage.update({
+        where: { userId: reservation.userId },
+        data: {
+          reservedBytes: { decrement: reservation.bytes },
+        },
+      });
+    });
+  }
+
+  /**
+   * Retrieves the storage summary for a user.
+   */
+  async getStorageSummary(userId: string) {
+    const usage = await this.ensureStorageUsageExists(userId);
+    const quota = Number(usage.quotaBytes);
+    const used = Number(usage.usedBytes);
+    const reserved = Number(usage.reservedBytes);
+    const trash = Number(usage.trashBytes);
+    const available = quota - used - reserved;
+    return {
+      quotaBytes: quota.toString(),
+      usedBytes: used.toString(),
+      reservedBytes: reserved.toString(),
+      trashBytes: trash.toString(),
+      availableBytes: (available > 0 ? available : 0).toString(),
+      usedPercent: Math.min(100, ((used + reserved) / quota) * 100),
+    };
+  }
+
+  /**
    * Uploads and parses a file, saving it and its extracted text to the DB.
    */
   async uploadAndParse(
@@ -267,6 +467,9 @@ export class DocumentsService {
       }
     }
 
+    // 3. Reserve storage quota
+    const reservationId = await this.reserveStorage(finalUserId, file.size);
+
     // 4. Create technical staging Document record in database
     const document = await this.prisma.document.create({
       data: {
@@ -303,7 +506,8 @@ export class DocumentsService {
     } catch (error) {
       // Compensation: Delete technical stage record on storage failure
       await this.prisma.document.delete({ where: { id: document.id } });
-      console.error(`Storage upload failed for doc ${document.id}`);
+      await this.releaseReservation(reservationId);
+      console.error(`Storage upload failed for doc ${document.id}`, error);
       throw new BadGatewayException({
         statusCode: 502,
         message: 'Storage operation failed',
@@ -320,6 +524,8 @@ export class DocumentsService {
           fileUrl: storagePath, // Populate with actual path
         },
       });
+      // Finalize quota since physical file and DB are now successfully persisted
+      await this.finalizeReservation(reservationId, document.id);
     } catch (error) {
       console.error(`DB commit failed for doc ${document.id} after upload`);
       try {
@@ -332,6 +538,7 @@ export class DocumentsService {
           data: { deletionStatus: 'DELETE_FAILED' },
         });
       }
+      await this.releaseReservation(reservationId);
       throw new BadGatewayException({
         statusCode: 502,
         message: 'Storage operation failed',
@@ -450,7 +657,7 @@ export class DocumentsService {
       throw new UnprocessableEntityException({
         statusCode: 422,
         message: 'AI_ANALYSIS_UNSUPPORTED_FILE_TYPE',
-        error: 'Unsupported File Type for AI Analysis'
+        error: 'Unsupported File Type for AI Analysis',
       });
     }
 
@@ -731,7 +938,8 @@ Quy định chặt chẽ:
         });
       } catch (dbUpdateError) {
         this.logger.error(
-          `Failed to update FAILED status in DB for document ${documentId}: ${dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
+          `Failed to update FAILED status in DB for document ${documentId}: ${
+            dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
           }`,
         );
       }
@@ -842,7 +1050,11 @@ Quy định chặt chẽ:
       isFollowed = !!followRecord;
     }
 
-    const mappedDocument = this.mapSafeDocumentResponse(document, isOwner, isFollowed) as SanitizedDocumentDetails;
+    const mappedDocument = this.mapSafeDocumentResponse(
+      document,
+      isOwner,
+      isFollowed,
+    ) as SanitizedDocumentDetails;
 
     if (isOwner) {
       const eligibility = this.checkPublicationEligibility(document);
@@ -997,13 +1209,27 @@ Quy định chặt chẽ:
       throw new ForbiddenException('You do not have permission to delete this document');
     }
 
-    await this.prisma.document.update({
-      where: { id: documentId },
-      data: {
-        deletedAt: new Date(),
-        deletionStatus: 'SOFT_DELETED',
-        visibilityStatus: 'PRIVATE',
-      },
+    await this.prisma.$transaction(async (tx: any) => {
+      await tx.document.update({
+        where: { id: documentId },
+        data: {
+          deletedAt: new Date(),
+          deletionStatus: 'SOFT_DELETED',
+          visibilityStatus: 'PRIVATE',
+        },
+      });
+
+      // Storage accounting: move bytes from used to trash
+      if (document.fileSize != null) {
+        await this.ensureStorageUsageExists(userId, tx);
+        await tx.userStorageUsage.update({
+          where: { userId },
+          data: {
+            usedBytes: { decrement: document.fileSize },
+            trashBytes: { increment: document.fileSize },
+          },
+        });
+      }
     });
 
     return { message: 'Document deleted successfully' };
@@ -1324,7 +1550,7 @@ Quy định chặt chẽ:
           where: { id: input.documentId },
           data: { extractionStatus: 'FAILED' },
         })
-        .catch(() => { });
+        .catch(() => {});
       return { extractionStatus: 'FAILED', chunkCount: 0 };
     }
 
@@ -1472,7 +1698,8 @@ Quy định chặt chẽ:
     const eligibility = this.checkPublicationEligibility(document);
     if (!eligibility.isEligible) {
       throw new ConflictException({
-        message: 'Tài liệu phải hoàn tất AI Analyze, bao gồm Summary và Quiz, trước khi có thể chia sẻ.',
+        message:
+          'Tài liệu phải hoàn tất AI Analyze, bao gồm Summary và Quiz, trước khi có thể chia sẻ.',
         error: eligibility.reason || 'AI_NOT_READY_FOR_PUBLICATION',
         statusCode: 409,
       });
@@ -1736,7 +1963,9 @@ Quy định chặt chẽ:
     });
 
     if (existingReport) {
-      throw new ConflictException('Bạn đã gửi báo cáo cho tài liệu này và báo cáo đang được xử lý.');
+      throw new ConflictException(
+        'Bạn đã gửi báo cáo cho tài liệu này và báo cáo đang được xử lý.',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {

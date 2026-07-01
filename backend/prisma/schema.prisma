@@ -98,6 +98,12 @@ enum AIStatus {
   FAILED
 }
 
+enum ReservationStatus {
+  PENDING
+  FINALIZED
+  RELEASED
+}
+
 /// Quản lý thông tin tài khoản người dùng
 model User {
   id           String   @id @default(uuid()) @db.Uuid
@@ -124,6 +130,8 @@ model User {
   documentReportsMade     DocumentReport[] @relation("DocumentReporter")
   documentReportsReviewed DocumentReport[] @relation("DocumentReviewer")
   teacherVerification     TeacherVerification?
+  storageUsage            UserStorageUsage?
+  storageReservations     StorageReservation[]
 
   @@map("users")
 }
@@ -252,6 +260,7 @@ model Document {
   chunks         DocumentChunk[]
   ratings        DocumentRating[]
   reports        DocumentReport[]
+  storageReservations StorageReservation[]
 
   @@index([subjectId, status])
   @@map("documents")
@@ -439,5 +448,37 @@ model DocumentReport {
   reviewer    User?        @relation("DocumentReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@map("document_reports")
+}
+
+model UserStorageUsage {
+  userId        String   @id @map("user_id") @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotaBytes    BigInt   @map("quota_bytes")
+  usedBytes     BigInt   @map("used_bytes")
+  reservedBytes BigInt   @map("reserved_bytes")
+  trashBytes    BigInt   @map("trash_bytes")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("user_storage_usages")
+}
+
+model StorageReservation {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @map("user_id") @db.Uuid
+  documentId  String?           @map("document_id") @db.Uuid
+  bytes       BigInt
+  status      ReservationStatus @default(PENDING)
+  expiresAt   DateTime          @map("expires_at")
+  finalizedAt DateTime?         @map("finalized_at")
+  releasedAt  DateTime?         @map("released_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  document    Document?         @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, expiresAt])
+  @@map("storage_reservations")
 }
 

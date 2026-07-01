@@ -22,7 +22,7 @@ export class SubjectsService {
       },
       orderBy: [{ isSystem: 'desc' }, { name: 'asc' }, { id: 'asc' }],
     });
-    
+
     return subjects.map((subject) => ({
       id: subject.id,
       name: subject.name,
@@ -98,9 +98,7 @@ export class SubjectsService {
     }
 
     if (!subject.isSystem && subject.createdBy !== userId) {
-      throw new ForbiddenException(
-        `You do not have access to subject with ID ${subjectId}`,
-      );
+      throw new ForbiddenException(`You do not have access to subject with ID ${subjectId}`);
     }
   }
 }

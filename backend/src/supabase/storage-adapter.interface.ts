@@ -7,10 +7,7 @@ export interface StorageAdapter {
     contentType: string;
   }): Promise<{ storagePath: string }>;
 
-  createPreviewUrl(input: {
-    storagePath: string;
-    expiresInSeconds?: number;
-  }): Promise<{
+  createPreviewUrl(input: { storagePath: string; expiresInSeconds?: number }): Promise<{
     url: string;
     expiresAt: Date;
   }>;
@@ -28,11 +25,7 @@ export interface StorageAdapter {
   deleteObject(storagePath: string): Promise<void>;
 
   // Legacy compatibility methods
-  uploadToSupabase(
-    fileBuffer: Buffer,
-    originalFileName: string,
-    mimetype: string,
-  ): Promise<string>;
+  uploadToSupabase(fileBuffer: Buffer, originalFileName: string, mimetype: string): Promise<string>;
 
   deleteFromSupabase(publicUrl: string): Promise<void>;
 }

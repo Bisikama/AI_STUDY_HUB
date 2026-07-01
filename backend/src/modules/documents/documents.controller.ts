@@ -23,7 +23,13 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ValidateFilePipe } from './pipes';
-import { UploadDocumentDto, UpdateDocumentDto, GetDocumentsDto, CreateOrUpdateRatingDto, CreateReportDto } from './dto';
+import {
+  UploadDocumentDto,
+  UpdateDocumentDto,
+  GetDocumentsDto,
+  CreateOrUpdateRatingDto,
+  CreateReportDto,
+} from './dto';
 import { DocumentsService } from './documents.service';
 import { DocumentAccessService } from './document-access.service';
 import type { StorageAdapter } from '../../supabase/storage-adapter.interface';
@@ -55,7 +61,6 @@ export class DocumentsController {
   @Post('/upload')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
-
   async upload(
     @UploadedFile(new ValidateFilePipe()) file: Express.Multer.File,
     @Body() dto: UploadDocumentDto,
@@ -77,6 +82,17 @@ export class DocumentsController {
     };
   }
 
+  @Get('me/storage-summary')
+  @UseGuards(JwtAuthGuard)
+  async getStorageSummary(@CurrentUser('id') userId: string) {
+    const summary = await this.documentsService.getStorageSummary(userId);
+    return {
+      statusCode: 200,
+      message: 'Storage summary retrieved successfully',
+      data: summary,
+    };
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async getMyDocuments(
@@ -84,7 +100,9 @@ export class DocumentsController {
     @Req() req: any,
   ): Promise<{ statusCode: number; message: string; data: MyDocumentListItem[] }> {
     if ('status' in req.query) {
-      throw new BadRequestException('The "status" query parameter is not supported. Use "visibilityStatus" instead.');
+      throw new BadRequestException(
+        'The "status" query parameter is not supported. Use "visibilityStatus" instead.',
+      );
     }
     const query = {
       page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
@@ -122,7 +140,11 @@ export class DocumentsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser('id') userId: string,
   ) {
-    const result = await this.documentsService.getSignedDocumentAccess(id, userId, 'SIGNED_PREVIEW');
+    const result = await this.documentsService.getSignedDocumentAccess(
+      id,
+      userId,
+      'SIGNED_PREVIEW',
+    );
     return {
       statusCode: 200,
       message: 'Preview URL generated successfully',
@@ -137,7 +159,11 @@ export class DocumentsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser('id') userId: string,
   ) {
-    const result = await this.documentsService.getSignedDocumentAccess(id, userId, 'SIGNED_DOWNLOAD');
+    const result = await this.documentsService.getSignedDocumentAccess(
+      id,
+      userId,
+      'SIGNED_DOWNLOAD',
+    );
     return {
       statusCode: 200,
       message: 'Download URL generated successfully',
@@ -255,7 +281,12 @@ export class DocumentsController {
     @Body() dto: CreateOrUpdateRatingDto,
     @CurrentUser('id') userId: string,
   ) {
-    const rating = await this.documentsService.rateDocument(documentId, userId, dto.rating, dto.comment);
+    const rating = await this.documentsService.rateDocument(
+      documentId,
+      userId,
+      dto.rating,
+      dto.comment,
+    );
     return {
       statusCode: 201,
       message: 'Document rated successfully',
@@ -264,9 +295,7 @@ export class DocumentsController {
   }
 
   @Get(':documentId/ratings')
-  async getRatings(
-    @Param('documentId', new ParseUUIDPipe({ version: '4' })) documentId: string,
-  ) {
+  async getRatings(@Param('documentId', new ParseUUIDPipe({ version: '4' })) documentId: string) {
     const ratings = await this.documentsService.getRatings(documentId);
     return {
       statusCode: 200,
@@ -282,7 +311,12 @@ export class DocumentsController {
     @Body() dto: CreateOrUpdateRatingDto,
     @CurrentUser('id') userId: string,
   ) {
-    const rating = await this.documentsService.rateDocument(documentId, userId, dto.rating, dto.comment);
+    const rating = await this.documentsService.rateDocument(
+      documentId,
+      userId,
+      dto.rating,
+      dto.comment,
+    );
     return {
       statusCode: 200,
       message: 'Document rating updated successfully',
@@ -310,7 +344,12 @@ export class DocumentsController {
     @Body() dto: CreateReportDto,
     @CurrentUser('id') userId: string,
   ) {
-    const report = await this.documentsService.reportDocument(documentId, userId, dto.reason, dto.description);
+    const report = await this.documentsService.reportDocument(
+      documentId,
+      userId,
+      dto.reason,
+      dto.description,
+    );
     return {
       statusCode: 201,
       message: 'Document reported successfully',

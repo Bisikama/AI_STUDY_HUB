@@ -52,7 +52,7 @@ describe('ValidateFilePipe', () => {
 
   it('should throw for dangerous extensions', () => {
     const dangerous = ['.exe', '.msi', '.dll', '.bat', '.cmd', '.apk', '.scr', '.sh'];
-    dangerous.forEach(ext => {
+    dangerous.forEach((ext) => {
       const file = createMockFile({ originalname: `virus${ext}` });
       expect(() => pipe.transform(file)).toThrow(UnprocessableEntityException);
 
@@ -78,8 +78,14 @@ describe('ValidateFilePipe', () => {
   });
 
   it('should pass TXT, DOCX, DOC files for storage safely', () => {
-    const txtFile = createMockFile({ originalname: 'notes.txt', buffer: Buffer.from('Hello world') });
-    const docxFile = createMockFile({ originalname: 'lecture.final.docx', buffer: Buffer.from('PK...') });
+    const txtFile = createMockFile({
+      originalname: 'notes.txt',
+      buffer: Buffer.from('Hello world'),
+    });
+    const docxFile = createMockFile({
+      originalname: 'lecture.final.docx',
+      buffer: Buffer.from('PK...'),
+    });
     const docFile = createMockFile({ originalname: 'old.doc', buffer: Buffer.from('D0CF...') });
 
     expect(pipe.transform(txtFile)).toBeDefined();

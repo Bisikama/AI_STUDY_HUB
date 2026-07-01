@@ -7,7 +7,7 @@ import { ExploreDocumentItem } from './types/exploreDocumentItem.type';
 
 @Controller('explore')
 export class ExploreController {
-  constructor(private readonly exploreService: ExploreService) { }
+  constructor(private readonly exploreService: ExploreService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()

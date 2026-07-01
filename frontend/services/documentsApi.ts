@@ -15,6 +15,15 @@ export type SignedDocumentUrlResponse = {
   disposition: 'inline' | 'attachment';
 };
 
+export interface StorageSummary {
+  quotaBytes: string;
+  usedBytes: string;
+  reservedBytes: string;
+  trashBytes: string;
+  availableBytes: string;
+  usedPercent: number;
+}
+
 export interface Document {
   id: string;
   title: string;
@@ -220,6 +229,14 @@ export const documentsApi = {
   reportDocument: async (documentId: string, payload: { reason: string; description?: string }): Promise<any> => {
     const response = await axiosClient.post(`/documents/${documentId}/reports`, payload);
     return response.data;
+  },
+
+  /**
+   * Get storage summary for the current user.
+   */
+  getStorageSummary: async (): Promise<StorageSummary> => {
+    const response = await axiosClient.get(`/documents/me/storage-summary`);
+    return response.data.data;
   },
 };
 

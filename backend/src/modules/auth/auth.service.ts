@@ -42,6 +42,9 @@ export class AuthService {
         passwordHash: hashedPassword,
         fullName: dto.name,
         role: 'STUDENT',
+        storageUsage: {
+          create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
+        },
       },
     });
 
@@ -124,6 +127,9 @@ export class AuthService {
             fullName: name,
             avatarUrl,
             role: 'STUDENT',
+            storageUsage: {
+              create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
+            },
           },
         });
       }

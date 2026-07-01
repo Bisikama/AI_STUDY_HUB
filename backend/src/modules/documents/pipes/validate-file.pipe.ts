@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  PipeTransform,
-  UnprocessableEntityException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, PipeTransform, UnprocessableEntityException, Logger } from '@nestjs/common';
 import * as path from 'path';
 
 @Injectable()
@@ -12,7 +7,14 @@ export class ValidateFilePipe implements PipeTransform {
   private readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
   private readonly DANGEROUS_EXTENSIONS = [
-    '.exe', '.msi', '.dll', '.bat', '.cmd', '.apk', '.scr', '.sh'
+    '.exe',
+    '.msi',
+    '.dll',
+    '.bat',
+    '.cmd',
+    '.apk',
+    '.scr',
+    '.sh',
   ];
 
   transform(file: Express.Multer.File): Express.Multer.File {

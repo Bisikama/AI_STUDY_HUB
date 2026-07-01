@@ -6,7 +6,7 @@ import { ExploreDocumentItem } from './types/exploreDocumentItem.type';
 
 @Injectable()
 export class ExploreService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async getExploreDocuments(query: GetExploreQueryDto): Promise<ExploreDocumentItem[]> {
     const search = query?.search?.trim();
@@ -24,37 +24,37 @@ export class ExploreService {
         },
         ...(search
           ? {
-            OR: [
-              {
-                title: {
-                  contains: search,
-                  mode: 'insensitive',
-                },
-              },
-              {
-                description: {
-                  contains: search,
-                  mode: 'insensitive',
-                },
-              },
-              {
-                subject: {
-                  name: {
+              OR: [
+                {
+                  title: {
                     contains: search,
                     mode: 'insensitive',
                   },
                 },
-              },
-              {
-                subject: {
-                  code: {
+                {
+                  description: {
                     contains: search,
                     mode: 'insensitive',
                   },
                 },
-              },
-            ],
-          }
+                {
+                  subject: {
+                    name: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+                {
+                  subject: {
+                    code: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+              ],
+            }
           : {}),
       },
       include: {

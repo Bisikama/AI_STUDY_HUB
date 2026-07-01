@@ -38,4 +38,3 @@ export class UpdateDocumentDto {
   @ArrayMaxSize(10, { message: 'Maximum 10 tags allowed' })
   tags?: string[];
 }
-
