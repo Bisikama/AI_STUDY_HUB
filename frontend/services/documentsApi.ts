@@ -236,7 +236,7 @@ export const documentsApi = {
    */
   getStorageSummary: async (): Promise<StorageSummary> => {
     const response = await axiosClient.get(`/documents/me/storage-summary`);
-    return response.data.data;
+    return response.data;
   },
 };
 
