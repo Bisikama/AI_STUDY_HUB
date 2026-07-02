@@ -12,8 +12,10 @@ import { ApiResponse } from '../interfaces/apiResponse.interface';
 import { ApiResponsePayload } from './apiResponsePayload';
 
 @Injectable()
-export class ApiResponseInterceptor<TData, TMetadata = unknown>
-  implements NestInterceptor<TData, ApiResponse<TData, TMetadata> | unknown> {
+export class ApiResponseInterceptor<TData, TMetadata = unknown> implements NestInterceptor<
+  TData,
+  ApiResponse<TData, TMetadata> | unknown
+> {
   intercept(
     context: ExecutionContext,
     next: CallHandler<TData>,

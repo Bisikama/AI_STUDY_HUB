@@ -22,16 +22,27 @@ type ExploreDocument = {
   viewCount: number;
   quizCount: number;
   hasSummary: boolean;
+  uploader: {
+    id: string;
+    fullName: string;
+    role: string;
+    isTeacher: boolean;
+  };
   createdAt: string;
+  copyrightSourceType?: string | null;
+  copyrightAuthorName?: string | null;
+  copyrightSourceUrl?: string | null;
+  copyrightLicense?: string | null;
+  copyrightAttribution?: string | null;
 };
 
 type ApiResponse<T> =
   | T
   | {
-      statusCode: number;
-      message: string;
-      data: T;
-    };
+    statusCode: number;
+    message: string;
+    data: T;
+  };
 
 type DocumentSummary = {
   id: string;
@@ -88,8 +99,10 @@ const FOLLOWED_DOCUMENTS_STORAGE_KEY = 'studyhub_followed_documents';
 
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
   const response = await fetch(url, { credentials: 'include' });
-
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      if (typeof window !== 'undefined') window.location.href = '/login';
+    }
     throw new Error('Failed to fetch explore documents');
   }
 
@@ -104,8 +117,10 @@ const fetcher = async (url: string): Promise<ExploreDocument[]> => {
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
   const response = await fetch(url, { credentials: 'include' });
-
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      if (typeof window !== 'undefined') window.location.href = '/login';
+    }
     throw new Error('Failed to fetch AI cache');
   }
 
@@ -538,7 +553,7 @@ function SearchExplore() {
                 router.push('/');
               }}
             >
-              ScholarHub
+              AI STUDY HUB
             </a>
 
             <div className="relative w-full max-w-xl">
@@ -660,9 +675,8 @@ function SearchExplore() {
               >
                 <h3 className="font-label-md text-primary">Sort By</h3>
                 <span
-                  className={`material-symbols-outlined text-secondary transition-transform ${
-                    collapsedSections.sort ? 'rotate-[-90deg]' : ''
-                  }`}
+                  className={`material-symbols-outlined text-secondary transition-transform ${collapsedSections.sort ? 'rotate-[-90deg]' : ''
+                    }`}
                 >
                   expand_more
                 </span>
@@ -706,9 +720,8 @@ function SearchExplore() {
               >
                 <h3 className="font-label-md text-primary">University</h3>
                 <span
-                  className={`material-symbols-outlined text-secondary transition-transform ${
-                    collapsedSections.uni ? 'rotate-[-90deg]' : ''
-                  }`}
+                  className={`material-symbols-outlined text-secondary transition-transform ${collapsedSections.uni ? 'rotate-[-90deg]' : ''
+                    }`}
                 >
                   expand_more
                 </span>
@@ -747,9 +760,8 @@ function SearchExplore() {
               >
                 <h3 className="font-label-md text-primary">Document Type</h3>
                 <span
-                  className={`material-symbols-outlined text-secondary transition-transform ${
-                    collapsedSections.type ? 'rotate-[-90deg]' : ''
-                  }`}
+                  className={`material-symbols-outlined text-secondary transition-transform ${collapsedSections.type ? 'rotate-[-90deg]' : ''
+                    }`}
                 >
                   expand_more
                 </span>
@@ -782,9 +794,8 @@ function SearchExplore() {
               >
                 <h3 className="font-label-md text-primary">Academic Year</h3>
                 <span
-                  className={`material-symbols-outlined text-secondary transition-transform ${
-                    collapsedSections.year ? 'rotate-[-90deg]' : ''
-                  }`}
+                  className={`material-symbols-outlined text-secondary transition-transform ${collapsedSections.year ? 'rotate-[-90deg]' : ''
+                    }`}
                 >
                   expand_more
                 </span>
@@ -872,14 +883,26 @@ function SearchExplore() {
                             <h3 className="font-headline-md text-primary group-hover:text-primary-container leading-tight">
                               {doc.title}
                             </h3>
+                            {doc.uploader && (
+                              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-medium text-gray-700">
+                                  {doc.uploader.fullName}
+                                </span>
+                                {doc.uploader.isTeacher && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+                                    <span className="material-symbols-outlined text-[14px]">verified</span>
+                                    Giảng viên đã xác minh
+                                  </span>
+                                )}
+                              </div>
+                            )}
                             <button
                               type="button"
                               onClick={(e) => toggleFollow(doc, e)}
-                              className={`font-label-sm text-label-sm flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 transition-colors ${
-                                followedDocumentIds.includes(doc.id)
+                              className={`font-label-sm text-label-sm flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 transition-colors ${followedDocumentIds.includes(doc.id)
                                   ? 'border-primary bg-primary-container/20 text-primary'
                                   : 'border-outline-variant text-secondary hover:border-primary hover:text-primary'
-                              }`}
+                                }`}
                               title={
                                 followedDocumentIds.includes(doc.id)
                                   ? 'Unfollow this document'
@@ -887,9 +910,8 @@ function SearchExplore() {
                               }
                             >
                               <span
-                                className={`material-symbols-outlined text-[18px] ${
-                                  followedDocumentIds.includes(doc.id) ? 'filled' : ''
-                                }`}
+                                className={`material-symbols-outlined text-[18px] ${followedDocumentIds.includes(doc.id) ? 'filled' : ''
+                                  }`}
                               >
                                 bookmark_add
                               </span>
@@ -1093,11 +1115,10 @@ function SearchExplore() {
                   <button
                     type="button"
                     onClick={() => setActiveAiCacheTab('summary')}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
-                      activeAiCacheTab === 'summary'
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${activeAiCacheTab === 'summary'
                         ? 'bg-surface text-primary shadow-sm'
                         : 'text-secondary hover:text-primary'
-                    }`}
+                      }`}
                   >
                     <span className="material-symbols-outlined text-[18px]">summarize</span>
                     Summary
@@ -1109,11 +1130,10 @@ function SearchExplore() {
                   <button
                     type="button"
                     onClick={() => setActiveAiCacheTab('quiz')}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
-                      activeAiCacheTab === 'quiz'
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${activeAiCacheTab === 'quiz'
                         ? 'bg-surface text-primary shadow-sm'
                         : 'text-secondary hover:text-primary'
-                    }`}
+                      }`}
                   >
                     <span className="material-symbols-outlined text-[18px]">quiz</span>
                     Quiz
@@ -1258,16 +1278,14 @@ function SearchExplore() {
                                             onClick={() =>
                                               handleSelectOption(question.id, option.id)
                                             }
-                                            className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
-                                              isQuizSubmitted ? 'cursor-default' : 'cursor-pointer'
-                                            }`}
+                                            className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${isQuizSubmitted ? 'cursor-default' : 'cursor-pointer'
+                                              }`}
                                           >
                                             <span
-                                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                                                isSelected
+                                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${isSelected
                                                   ? 'border-primary bg-primary text-on-primary'
                                                   : 'border-outline-variant bg-surface'
-                                              }`}
+                                                }`}
                                             >
                                               {isSelected && (
                                                 <span className="material-symbols-outlined text-[14px]">
@@ -1319,11 +1337,10 @@ function SearchExplore() {
                                       type="button"
                                       onClick={() => void handleSubmitQuiz(quizQuestions)}
                                       disabled={!hasAllAnswers || isQuizSubmitting}
-                                      className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                                        hasAllAnswers && !isQuizSubmitting
+                                      className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${hasAllAnswers && !isQuizSubmitting
                                           ? 'bg-primary text-on-primary hover:shadow-md'
                                           : 'bg-surface-container-high text-secondary cursor-not-allowed'
-                                      }`}
+                                        }`}
                                     >
                                       <span className="material-symbols-outlined text-[18px]">
                                         task_alt

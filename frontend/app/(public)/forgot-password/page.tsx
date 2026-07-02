@@ -69,7 +69,7 @@ export default function ForgotPasswordPage() {
                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
               </svg>
             </div>
-            <span className="text-lg font-bold tracking-tight text-gray-950">ScholarHub</span>
+            <span className="text-lg font-bold tracking-tight text-gray-950">AI STUDY HUB</span>
           </div>
 
           {/* Tiêu đề */}
@@ -182,7 +182,7 @@ export default function ForgotPasswordPage() {
             </svg>
           </div>
           <p className="text-[9px] font-bold tracking-[0.2em] text-gray-400 uppercase">
-            Recover Access to ScholarHub
+            Recover Access to AI STUDY HUB
           </p>
         </div>
       </div>

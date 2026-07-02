@@ -13,7 +13,10 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { TeacherVerificationService } from './teacher-verification.service';
-import { CreateTeacherVerificationDto, ReviewTeacherVerificationDto } from './dto/teacher-verification.dto';
+import {
+  CreateTeacherVerificationDto,
+  ReviewTeacherVerificationDto,
+} from './dto/teacher-verification.dto';
 
 @Controller('teacher-verification')
 export class TeacherVerificationController {
@@ -21,10 +24,7 @@ export class TeacherVerificationController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  async submit(
-    @CurrentUser('id') userId: string,
-    @Body() dto: CreateTeacherVerificationDto,
-  ) {
+  async submit(@CurrentUser('id') userId: string, @Body() dto: CreateTeacherVerificationDto) {
     return this.verificationService.submitRequest(userId, dto);
   }
 

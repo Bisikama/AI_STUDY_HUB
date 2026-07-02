@@ -17,7 +17,7 @@ export class MailService {
     try {
       const supabase = this.supabaseService.getClient();
       const redirectTo = `${this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5000'}/reset-password`;
-      
+
       // 1. Gọi Supabase Auth API để gửi yêu cầu reset password
       const { error } = await supabase.auth.resetPasswordForEmail(to, {
         redirectTo,

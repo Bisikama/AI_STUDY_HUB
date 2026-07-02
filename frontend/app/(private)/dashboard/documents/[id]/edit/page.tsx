@@ -5,8 +5,9 @@ import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { documentsApi } from '@/services/documentsApi';
-import { subjectsApi, Subject } from '@/services/subjectsApi';
+import { subjectsApi, Subject, Major, CatalogItem } from '@/services/subjectsApi';
 import { tagsApi, Tag } from '@/services/tagsApi';
+import { personalFoldersApi, PersonalFolder } from '@/services/personalFoldersApi';
 
 export default function EditDocumentPage() {
   const { id } = useParams() as { id: string };
@@ -18,17 +19,28 @@ export default function EditDocumentPage() {
     isLoading,
   } = useSWR(id ? `/documents/${id}` : null, () => documentsApi.getDocumentById(id));
 
-  const { data: subjectsResponse, mutate: mutateSubjects } = useSWR(
-    '/subjects',
-    () => subjectsApi.getSubjects(),
-  );
+  // Load majors
+  const { data: majorsResponse } = useSWR('/subjects/catalog/majors', () => subjectsApi.getMajors());
+  const majors: Major[] = majorsResponse || [];
 
   const document = response;
-  const subjects: Subject[] = subjectsResponse || [];
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedMajorCode, setSelectedMajorCode] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>('');
+
+  // Load catalog courses
+  const { data: catalogResponse } = useSWR(
+    selectedMajorCode ? `/subjects/catalog?majorCode=${selectedMajorCode}` : null,
+    () => subjectsApi.getCatalog(selectedMajorCode)
+  );
+  const courses: CatalogItem[] = catalogResponse || [];
+
+  // Load personal folders
+  const { data: foldersResponse, mutate: mutateFolders } = useSWR('/personal-folders', () => personalFoldersApi.getFolders());
+  const folders: PersonalFolder[] = foldersResponse || [];
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
@@ -45,22 +57,29 @@ export default function EditDocumentPage() {
   );
   const availableTags: Tag[] = tagsResponse || [];
 
+  const [hasInitialized, setHasInitialized] = useState(false);
+
   useEffect(() => {
-    if (document) {
+    if (document && !hasInitialized) {
       setTitle(document.title || '');
       setDescription(document.description || '');
       setSelectedSubjectId(document.subjectId || null);
+      if (document.subject?.majors && document.subject.majors.length > 0) {
+        setSelectedMajorCode(document.subject.majors[0].major.code);
+      }
+      setSelectedFolderId(document.personalFolderId || '');
       if (document.tags) {
         setSelectedTags(document.tags.map((t: any) => t.tag || t));
       }
+      setHasInitialized(true);
     }
-  }, [document]);
+  }, [document, hasInitialized]);
 
   // Tags logic
   const handleAddTag = (tagName: string) => {
     const trimmed = tagName.trim();
     if (!trimmed) return;
-    
+
     const slug = trimmed.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w-]/g, '');
     if (!slug) return;
 
@@ -80,7 +99,7 @@ export default function EditDocumentPage() {
     } else {
       setSelectedTags([...selectedTags, { id: -1, name: trimmed, slug, isSystem: false }]);
     }
-    
+
     setNewTagName('');
     setShowTagDropdown(false);
   };
@@ -94,9 +113,9 @@ export default function EditDocumentPage() {
     if (!name) return;
     try {
       setIsCreatingFolder(true);
-      const result = await subjectsApi.createSubject({ name });
-      await mutateSubjects();
-      setSelectedSubjectId(result.id);
+      const result = await personalFoldersApi.create({ name });
+      await mutateFolders();
+      setSelectedFolderId(result.id);
       setShowCreateFolder(false);
       setNewFolderName('');
     } catch {
@@ -119,11 +138,12 @@ export default function EditDocumentPage() {
     try {
       setIsSaving(true);
       setSaveError(null);
-      
+
       const payload: any = {
         title: title.trim(),
         description: description.trim() || undefined,
         subjectId: selectedSubjectId,
+        personalFolderId: selectedFolderId || null,
       };
 
       if (selectedTags.length > 0) {
@@ -250,23 +270,64 @@ export default function EditDocumentPage() {
                 />
               </div>
 
-              {/* Study Folder */}
+              {/* Major */}
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
+                  <span className="material-symbols-outlined text-[18px] text-gray-500">school</span>
+                  Major (Change to re-assign)
+                </label>
+                <select
+                  value={selectedMajorCode}
+                  onChange={(e) => {
+                    setSelectedMajorCode(e.target.value);
+                    setSelectedSubjectId(null);
+                  }}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-[#1a1c23]"
+                >
+                  <option value="">-- Select a Major --</option>
+                  {majors.map((m) => (
+                    <option key={m.code} value={m.code}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Course */}
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
+                  <span className="material-symbols-outlined text-[18px] text-gray-500">book</span>
+                  Course <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedSubjectId ?? ''}
+                  onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
+                  disabled={!selectedMajorCode && !selectedSubjectId} // Allow if already set
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-[#1a1c23]"
+                >
+                  {document?.subject && !selectedMajorCode && (
+                    <option value={document.subject.id}>{document.subject.code} - {document.subject.name}</option>
+                  )}
+                  {selectedMajorCode && <option value="">-- Select a Course --</option>}
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Personal Folder */}
               <div>
                 <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
                   <span className="material-symbols-outlined text-[18px] text-gray-500">folder</span>
-                  Study Folder <span className="text-red-500">*</span>
+                  Personal Folder
                 </label>
                 <div className="flex gap-2">
                   <select
-                    value={selectedSubjectId ?? ''}
-                    onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
+                    value={selectedFolderId}
+                    onChange={(e) => setSelectedFolderId(e.target.value)}
                     className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-[#1a1c23]"
                   >
-                    <option value="">-- Select a folder --</option>
-                    {subjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}{!s.isSystem ? ' (personal)' : ''}
-                      </option>
+                    <option value="">-- Unfiled (Root) --</option>
+                    {folders.map((f) => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
                     ))}
                   </select>
                   <button
@@ -314,7 +375,7 @@ export default function EditDocumentPage() {
                   <span className="material-symbols-outlined text-[18px] text-gray-500">sell</span>
                   Study Tags <span className="text-gray-400 font-normal">(Max 10)</span>
                 </label>
-                
+
                 <div className="flex min-h-[44px] flex-wrap items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 transition-all focus-within:border-[#1a1c23] focus-within:ring-1 focus-within:ring-[#1a1c23]">
                   {selectedTags.map((tag) => (
                     <span
@@ -334,7 +395,7 @@ export default function EditDocumentPage() {
                       </button>
                     </span>
                   ))}
-                  
+
                   <div className="relative flex-1 min-w-[120px]">
                     <input
                       type="text"
@@ -355,7 +416,7 @@ export default function EditDocumentPage() {
                       placeholder={selectedTags.length >= 10 ? 'Max tags reached' : 'Type or select a tag...'}
                       className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:cursor-not-allowed"
                     />
-                    
+
                     {/* Dropdown */}
                     {showTagDropdown && availableTags.length > 0 && (
                       <div className="absolute left-0 top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
@@ -371,7 +432,7 @@ export default function EditDocumentPage() {
                               <span className="font-medium">{tag.name}</span>
                               {tag.isSystem && <span className="ml-2 text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">System</span>}
                             </div>
-                        ))}
+                          ))}
                       </div>
                     )}
                   </div>

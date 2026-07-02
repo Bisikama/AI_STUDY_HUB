@@ -25,6 +25,8 @@ export interface MyDocumentListItem {
   updatedAt: Date;
   fileSizeBytes: number | null;
   subject?: any;
+  personalFolderId?: string | null;
+  personalFolder?: any;
   tags?: any[];
 }
 
@@ -45,6 +47,8 @@ export interface SanitizedQuiz extends Quiz {
 export interface SanitizedDocumentDetails extends SanitizedDocument {
   summary: DocumentSummary | null;
   quizzes: SanitizedQuiz[];
+  canRequestPublic?: boolean;
+  publicationEligibilityReason?: string;
 }
 
 export interface AnalyzeResult {

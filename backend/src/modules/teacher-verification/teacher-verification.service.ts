@@ -5,7 +5,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { CreateTeacherVerificationDto, ReviewTeacherVerificationDto } from './dto/teacher-verification.dto';
+import {
+  CreateTeacherVerificationDto,
+  ReviewTeacherVerificationDto,
+} from './dto/teacher-verification.dto';
 
 @Injectable()
 export class TeacherVerificationService {

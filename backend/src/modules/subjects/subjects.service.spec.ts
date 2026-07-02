@@ -20,10 +20,7 @@ describe('SubjectsService', () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SubjectsService,
-        { provide: PrismaService, useValue: mockPrisma },
-      ],
+      providers: [SubjectsService, { provide: PrismaService, useValue: mockPrisma }],
     }).compile();
 
     service = module.get<SubjectsService>(SubjectsService);
@@ -33,8 +30,8 @@ describe('SubjectsService', () => {
   describe('getSubjects', () => {
     it('should return system subjects and personal subjects belonging to user', async () => {
       mockPrisma.subject.findMany.mockResolvedValue([
-        { id: 1, name: 'System Subject', code: 'sys', isSystem: true, createdBy: null },
-        { id: 2, name: 'My Subject', code: 'my-sub', isSystem: false, createdBy: 'user-1' },
+        { id: 1, name: 'System Subject', code: 'sys', isSystem: true, isActive: true, createdBy: null },
+        { id: 2, name: 'My Subject', code: 'my-sub', isSystem: false, isActive: true, createdBy: 'user-1' },
       ]);
 
       const result = await service.getSubjects('user-1');
@@ -43,7 +40,7 @@ describe('SubjectsService', () => {
         { id: 2, name: 'My Subject', code: 'my-sub', isSystem: false },
       ]);
       expect(mockPrisma.subject.findMany).toHaveBeenCalledWith({
-        where: { OR: [{ isSystem: true }, { createdBy: 'user-1' }] },
+        where: { OR: [{ isSystem: true, isActive: true }, { createdBy: 'user-1' }] },
         orderBy: [{ isSystem: 'desc' }, { name: 'asc' }, { id: 'asc' }],
       });
     });
@@ -67,13 +64,17 @@ describe('SubjectsService', () => {
 
     it('should throw if name is duplicated', async () => {
       mockPrisma.subject.findFirst.mockResolvedValue({ id: 1 });
-      await expect(service.createSubject('user-1', { name: 'Existing' })).rejects.toThrow(BadRequestException);
+      await expect(service.createSubject('user-1', { name: 'Existing' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw if code is duplicated', async () => {
       mockPrisma.subject.findFirst.mockResolvedValue(null);
       mockPrisma.subject.findUnique.mockResolvedValue({ id: 2 });
-      await expect(service.createSubject('user-1', { name: 'Existing Code' })).rejects.toThrow(BadRequestException);
+      await expect(service.createSubject('user-1', { name: 'Existing Code' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should ignore isSystem in dto (implicit from signature not accepting it)', () => {
@@ -83,18 +84,33 @@ describe('SubjectsService', () => {
   });
 
   describe('validateSubjectAccess', () => {
-    it('should allow if system subject', async () => {
-      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, isSystem: true });
+    it('should allow if system subject and active', async () => {
+      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, isSystem: true, isActive: true });
       await expect(service.validateSubjectAccess(1, 'any-user')).resolves.not.toThrow();
     });
 
+    it('should throw BadRequest if system subject and inactive', async () => {
+      mockPrisma.subject.findUnique.mockResolvedValue({ id: 1, isSystem: true, isActive: false });
+      await expect(service.validateSubjectAccess(1, 'any-user')).rejects.toThrow(BadRequestException);
+    });
+
     it('should allow if personal subject and user is creator', async () => {
-      mockPrisma.subject.findUnique.mockResolvedValue({ id: 2, isSystem: false, createdBy: 'user-1' });
+      mockPrisma.subject.findUnique.mockResolvedValue({
+        id: 2,
+        isSystem: false,
+        isActive: true,
+        createdBy: 'user-1',
+      });
       await expect(service.validateSubjectAccess(2, 'user-1')).resolves.not.toThrow();
     });
 
     it('should throw Forbidden if personal subject and user is not creator', async () => {
-      mockPrisma.subject.findUnique.mockResolvedValue({ id: 2, isSystem: false, createdBy: 'user-1' });
+      mockPrisma.subject.findUnique.mockResolvedValue({
+        id: 2,
+        isSystem: false,
+        isActive: true,
+        createdBy: 'user-1',
+      });
       await expect(service.validateSubjectAccess(2, 'user-2')).rejects.toThrow(ForbiddenException);
     });
 

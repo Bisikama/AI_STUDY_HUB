@@ -1,6 +1,6 @@
-# ScholarHub Frontend
+# AI STUDY HUB Frontend
 
-Dự án Frontend cho hệ thống ScholarHub (AI Study Hub), được xây dựng bằng **Next.js** (App Router), **Tailwind CSS v4**, **HeroUI**, **SWR** và **Axios**.
+Dự án Frontend cho hệ thống AI STUDY HUB (AI Study Hub), được xây dựng bằng **Next.js** (App Router), **Tailwind CSS v4**, **HeroUI**, **SWR** và **Axios**.
 
 ## 🚀 Hướng dẫn khởi chạy
 

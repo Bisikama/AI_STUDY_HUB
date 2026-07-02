@@ -13,10 +13,7 @@ describe('DocumentAccessService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        DocumentAccessService,
-        { provide: PrismaService, useValue: mockPrisma },
-      ],
+      providers: [DocumentAccessService, { provide: PrismaService, useValue: mockPrisma }],
     }).compile();
 
     service = module.get<DocumentAccessService>(DocumentAccessService);
@@ -26,7 +23,9 @@ describe('DocumentAccessService', () => {
   describe('authorizeAccess', () => {
     it('throws NotFoundException if document not found', async () => {
       mockPrisma.document.findUnique.mockResolvedValue(null);
-      await expect(service.authorizeAccess('doc-1', 'user-1', 'SIGNED_PREVIEW')).rejects.toThrow(NotFoundException);
+      await expect(service.authorizeAccess('doc-1', 'user-1', 'SIGNED_PREVIEW')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws ForbiddenException if private and not owner or admin', async () => {
@@ -37,7 +36,9 @@ describe('DocumentAccessService', () => {
       });
       mockPrisma.user.findUnique.mockResolvedValue({ role: 'STUDENT' });
 
-      await expect(service.authorizeAccess('doc-1', 'user-1', 'SIGNED_PREVIEW')).rejects.toThrow(ForbiddenException);
+      await expect(service.authorizeAccess('doc-1', 'user-1', 'SIGNED_PREVIEW')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('throws ConflictException if document is soft deleted', async () => {
@@ -51,7 +52,9 @@ describe('DocumentAccessService', () => {
       });
       mockPrisma.user.findUnique.mockResolvedValue({ role: 'STUDENT' });
 
-      await expect(service.authorizeAccess('doc-1', 'user-1', 'SIGNED_PREVIEW')).rejects.toThrow(ConflictException);
+      await expect(service.authorizeAccess('doc-1', 'user-1', 'SIGNED_PREVIEW')).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('returns safe access record if active public document', async () => {

@@ -23,7 +23,8 @@ export class SupabaseService implements StorageAdapter {
     const supabaseKey = this.configService.getOrThrow<string>('SUPABASE_SERVICE_ROLE_KEY');
 
     // For legacy uploads
-    this.legacyBucketName = this.configService.get<string>('SUPABASE_STORAGE_BUCKET') || 'documents';
+    this.legacyBucketName =
+      this.configService.get<string>('SUPABASE_STORAGE_BUCKET') || 'documents';
 
     // For private document uploads
     this.documentsBucketName = this.configService.getOrThrow<string>('SUPABASE_DOCUMENTS_BUCKET');
@@ -207,9 +208,7 @@ export class SupabaseService implements StorageAdapter {
 
     this.logger.log(`Đang xóa file trên Supabase Storage: ${filePath}`);
 
-    const { error } = await this.supabase.storage
-      .from(this.legacyBucketName)
-      .remove([filePath]);
+    const { error } = await this.supabase.storage.from(this.legacyBucketName).remove([filePath]);
 
     if (error) {
       this.logger.error(`Xóa file thất bại: ${error.message}`, error.stack);

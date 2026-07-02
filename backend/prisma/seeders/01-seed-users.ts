@@ -18,6 +18,9 @@ export async function seedUsers(prisma: PrismaClient) {
         avatarUrl: 'https://api.example.com/avatars/teacher1.jpg',
         role: UserRole.TEACHER,
         isActive: true,
+        storageUsage: {
+          create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
+        },
       },
     }),
     prisma.user.create({
@@ -28,6 +31,9 @@ export async function seedUsers(prisma: PrismaClient) {
         avatarUrl: 'https://api.example.com/avatars/teacher2.jpg',
         role: UserRole.TEACHER,
         isActive: true,
+        storageUsage: {
+          create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
+        },
       },
     }),
     // Admin
@@ -39,6 +45,9 @@ export async function seedUsers(prisma: PrismaClient) {
         avatarUrl: 'https://api.example.com/avatars/admin.jpg',
         role: UserRole.ADMIN,
         isActive: true,
+        storageUsage: {
+          create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
+        },
       },
     }),
     // Students
@@ -49,6 +58,9 @@ export async function seedUsers(prisma: PrismaClient) {
         fullName: 'Phạm Thị D',
         role: UserRole.STUDENT,
         isActive: true,
+        storageUsage: {
+          create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
+        },
       },
     }),
     prisma.user.create({
@@ -58,6 +70,9 @@ export async function seedUsers(prisma: PrismaClient) {
         fullName: 'Hoàng Văn E',
         role: UserRole.STUDENT,
         isActive: true,
+        storageUsage: {
+          create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
+        },
       },
     }),
     prisma.user.create({
@@ -67,6 +82,9 @@ export async function seedUsers(prisma: PrismaClient) {
         fullName: 'Vũ Thị F',
         role: UserRole.STUDENT,
         isActive: true,
+        storageUsage: {
+          create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
+        },
       },
     }),
   ]);
