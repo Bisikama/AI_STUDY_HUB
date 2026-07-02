@@ -21,6 +21,7 @@ export class ExploreService {
         deletedAt: null,
         subject: {
           isSystem: true,
+          isActive: true,
         },
         ...(search
           ? {
@@ -122,6 +123,7 @@ export class ExploreService {
         deletedAt: null,
         subject: {
           isSystem: true,
+          isActive: true,
         },
       },
       include: {
@@ -219,6 +221,7 @@ export class ExploreService {
               deletedAt: null,
               subject: {
                 isSystem: true,
+                isActive: true,
               },
             },
           },
