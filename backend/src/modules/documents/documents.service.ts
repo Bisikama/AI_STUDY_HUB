@@ -89,6 +89,7 @@ export class DocumentsService {
             name: document.subject.name,
             code: document.subject.code,
             isSystem: document.subject.isSystem,
+            ...(document.subject.majors && { majors: document.subject.majors }),
           }
         : null,
       fileType: document.fileType,
@@ -994,6 +995,11 @@ Quy định chặt chẽ:
             name: true,
             code: true,
             isSystem: true,
+            majors: {
+              include: {
+                major: true,
+              },
+            },
           },
         },
         fileType: true,

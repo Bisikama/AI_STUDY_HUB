@@ -39,7 +39,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         isSystem: true,
         majors: {
           create: [{ majorId: se.id }],
-        }
+        },
       },
     }),
     prisma.subject.create({
@@ -50,7 +50,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         isSystem: true,
         majors: {
           create: [{ majorId: se.id }, { majorId: is.id }],
-        }
+        },
       },
     }),
     prisma.subject.create({
@@ -61,7 +61,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         isSystem: true,
         majors: {
           create: [{ majorId: se.id }],
-        }
+        },
       },
     }),
 
@@ -74,7 +74,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         isSystem: true,
         majors: {
           create: [{ majorId: is.id }, { majorId: se.id }],
-        }
+        },
       },
     }),
     prisma.subject.create({
@@ -85,7 +85,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         isSystem: true,
         majors: {
           create: [{ majorId: is.id }, { majorId: se.id }],
-        }
+        },
       },
     }),
 
@@ -98,7 +98,7 @@ export async function seedSubjects(prisma: PrismaClient) {
         isSystem: true,
         majors: {
           create: [{ majorId: ai.id }],
-        }
+        },
       },
     }),
   ]);

@@ -31,7 +31,7 @@ export interface Document {
   description: string | null;
   subjectId: number;
   personalFolderId?: string | null;
-  subject?: { id: number; name: string; code: string; isSystem: boolean } | null;
+  subject?: { id: number; name: string; code: string; isSystem: boolean; majors?: { major: { id: string; name: string; code: string } }[] } | null;
   fileSize: number;
   fileType: string;
   downloadCount: number;

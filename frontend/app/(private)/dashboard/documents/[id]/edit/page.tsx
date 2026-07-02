@@ -64,6 +64,9 @@ export default function EditDocumentPage() {
       setTitle(document.title || '');
       setDescription(document.description || '');
       setSelectedSubjectId(document.subjectId || null);
+      if (document.subject?.majors && document.subject.majors.length > 0) {
+        setSelectedMajorCode(document.subject.majors[0].major.code);
+      }
       setSelectedFolderId(document.personalFolderId || '');
       if (document.tags) {
         setSelectedTags(document.tags.map((t: any) => t.tag || t));
@@ -76,7 +79,7 @@ export default function EditDocumentPage() {
   const handleAddTag = (tagName: string) => {
     const trimmed = tagName.trim();
     if (!trimmed) return;
-    
+
     const slug = trimmed.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w-]/g, '');
     if (!slug) return;
 
@@ -96,7 +99,7 @@ export default function EditDocumentPage() {
     } else {
       setSelectedTags([...selectedTags, { id: -1, name: trimmed, slug, isSystem: false }]);
     }
-    
+
     setNewTagName('');
     setShowTagDropdown(false);
   };
@@ -135,7 +138,7 @@ export default function EditDocumentPage() {
     try {
       setIsSaving(true);
       setSaveError(null);
-      
+
       const payload: any = {
         title: title.trim(),
         description: description.trim() || undefined,
@@ -301,7 +304,7 @@ export default function EditDocumentPage() {
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition-all focus:border-[#1a1c23]"
                 >
                   {document?.subject && !selectedMajorCode && (
-                     <option value={document.subject.id}>{document.subject.code} - {document.subject.name}</option>
+                    <option value={document.subject.id}>{document.subject.code} - {document.subject.name}</option>
                   )}
                   {selectedMajorCode && <option value="">-- Select a Course --</option>}
                   {courses.map((c) => (
@@ -372,7 +375,7 @@ export default function EditDocumentPage() {
                   <span className="material-symbols-outlined text-[18px] text-gray-500">sell</span>
                   Study Tags <span className="text-gray-400 font-normal">(Max 10)</span>
                 </label>
-                
+
                 <div className="flex min-h-[44px] flex-wrap items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 transition-all focus-within:border-[#1a1c23] focus-within:ring-1 focus-within:ring-[#1a1c23]">
                   {selectedTags.map((tag) => (
                     <span
@@ -392,7 +395,7 @@ export default function EditDocumentPage() {
                       </button>
                     </span>
                   ))}
-                  
+
                   <div className="relative flex-1 min-w-[120px]">
                     <input
                       type="text"
@@ -413,7 +416,7 @@ export default function EditDocumentPage() {
                       placeholder={selectedTags.length >= 10 ? 'Max tags reached' : 'Type or select a tag...'}
                       className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:cursor-not-allowed"
                     />
-                    
+
                     {/* Dropdown */}
                     {showTagDropdown && availableTags.length > 0 && (
                       <div className="absolute left-0 top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
@@ -429,7 +432,7 @@ export default function EditDocumentPage() {
                               <span className="font-medium">{tag.name}</span>
                               {tag.isSystem && <span className="ml-2 text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">System</span>}
                             </div>
-                        ))}
+                          ))}
                       </div>
                     )}
                   </div>

@@ -175,12 +175,32 @@ export default function DocumentDetailPage() {
       return;
     }
     try {
-      const data = await documentsApi.getDownloadSignedUrl(id);
+      const data = await documentsApi.getPreviewSignedUrl(id);
       newTab.location.href = data.url;
     } catch (err: any) {
       newTab.close();
       const { mapDocumentError } = await import('@/utils/errorMapper');
       addToast(mapDocumentError(err), 'error');
+    }
+  };
+
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!id) return;
+    setIsDownloading(true);
+    try {
+      const data = await documentsApi.getDownloadSignedUrl(id);
+      const a = window.document.createElement('a');
+      a.href = data.url;
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
+    } catch (err: any) {
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -832,6 +852,14 @@ export default function DocumentDetailPage() {
                   >
                     <span className="material-symbols-outlined text-[18px]">open_in_new</span>
                     Download / Open Original
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">download</span>
+                    {isDownloading ? 'Downloading...' : 'Download'}
                   </button>
 
                   {/* {document.isOwner && (
