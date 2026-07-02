@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { authApi } from '@/services/authApi';
+import { toast } from 'sonner';
 
 const resetPasswordSchema = z
   .object({
@@ -54,7 +55,7 @@ function ResetPasswordForm() {
         otp: data.otp,
         password: data.password,
       });
-      alert('Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.');
+      toast.success('Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.');
       router.push('/login');
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { message?: string } } };

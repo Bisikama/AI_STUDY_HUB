@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
+import { toast } from 'sonner';
 
 type Subject = {
   id: number;
@@ -126,7 +127,9 @@ export default function DoTestPage() {
 
   // Tự động nộp bài khi hết giờ
   function handleAutoSubmit() {
-    alert('Hết thời gian làm bài! Hệ thống đang tự động nộp bài làm của bạn.');
+    toast.warning('Hết thời gian làm bài! Hệ thống đang tự động nộp bài làm của bạn.', {
+      duration: 5000,
+    });
     handleSubmitQuiz();
   }
 
@@ -314,14 +317,16 @@ export default function DoTestPage() {
                         key={option.id}
                         disabled={isSubmitted}
                         onClick={() => handleSelectOption(currentQuestion.id, option.id)}
-                        className={`group flex items-start gap-4 rounded-xl border p-4 text-left transition-all ${isSubmitted ? 'cursor-default' : 'cursor-pointer active:scale-[0.98]'
-                          } ${optStyle}`}
+                        className={`group flex items-start gap-4 rounded-xl border p-4 text-left transition-all ${
+                          isSubmitted ? 'cursor-default' : 'cursor-pointer active:scale-[0.98]'
+                        } ${optStyle}`}
                       >
                         <div
-                          className={`bg-surface flex h-7 w-7 flex-shrink-0 items-center justify-center rounded border text-sm font-extrabold ${isSelected && !isSubmitted
+                          className={`bg-surface flex h-7 w-7 flex-shrink-0 items-center justify-center rounded border text-sm font-extrabold ${
+                            isSelected && !isSubmitted
                               ? 'bg-primary-container border-transparent text-white'
                               : 'text-primary border-outline-variant/60 bg-surface-container-lowest'
-                            }`}
+                          }`}
                         >
                           {label}
                         </div>
@@ -373,8 +378,9 @@ export default function DoTestPage() {
 
         {/* Right Sidebar (Bảng tiến độ & Hàng đợi làm bài) */}
         <aside
-          className={`${mobileSidebarOpen ? 'translate-x-0' : 'translate-x-full'
-            } bg-surface-container-low border-outline-variant fixed top-0 right-0 z-40 flex h-full w-72 flex-col border-l shadow-md transition-transform duration-300 md:translate-x-0`}
+          className={`${
+            mobileSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+          } bg-surface-container-low border-outline-variant fixed top-0 right-0 z-40 flex h-full w-72 flex-col border-l shadow-md transition-transform duration-300 md:translate-x-0`}
         >
           {/* Header Sidebar */}
           <div className="border-outline-variant/60 mt-16 flex items-center justify-between border-b p-5">

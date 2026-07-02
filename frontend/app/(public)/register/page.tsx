@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Script from 'next/script';
+import { toast } from 'sonner';
 
 interface CustomWindow extends Window {
   google?: {
@@ -96,7 +97,7 @@ export default function RegisterPage() {
         email: data.email,
         password: data.password,
       });
-      alert('Đăng ký thành công! Hãy đăng nhập.');
+      toast.success('Đăng ký thành công! Hãy đăng nhập.');
       router.push('/login');
     } catch (err) {
       // eslint-disable-next-line no-console

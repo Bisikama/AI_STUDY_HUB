@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import axiosClient from '@/utils/axios';
 import TeacherVerificationModal from '@/components/TeacherVerificationModal';
+import { toast } from 'sonner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -51,8 +52,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${mobileMenuOpen ? 'flex' : 'hidden'
-          } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
+        className={`${
+          mobileMenuOpen ? 'flex' : 'hidden'
+        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
         <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
@@ -87,10 +89,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/dashboard"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname === '/dashboard'
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
+                pathname === '/dashboard'
                   ? 'bg-surface-container-low text-primary font-semibold'
                   : 'text-secondary hover:bg-surface-container-low'
-                }`}
+              }`}
             >
               <span className="material-symbols-outlined">search</span> Discover
             </Link>
@@ -98,10 +101,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/dashboard/documents"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname.includes('/dashboard/documents')
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
+                pathname.includes('/dashboard/documents')
                   ? 'bg-surface-container-low text-primary font-semibold'
                   : 'text-secondary hover:bg-surface-container-low'
-                }`}
+              }`}
             >
               <span className="material-symbols-outlined">description</span> My Documents
             </Link>
@@ -109,10 +113,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/practice"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname.includes('/practice')
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
+                pathname.includes('/practice')
                   ? 'bg-surface-container-low text-primary font-semibold'
                   : 'text-secondary hover:bg-surface-container-low'
-                }`}
+              }`}
             >
               <span className="material-symbols-outlined">lightbulb</span> Practice Mode
             </Link>
@@ -122,7 +127,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
           <li>
             <button
-              onClick={() => alert('Settings clicked (Simulated)')}
+              onClick={() => toast.info('Settings clicked (Simulated)')}
               className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
             >
               <span className="material-symbols-outlined">settings</span> Settings
@@ -130,7 +135,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </li>
           <li>
             <button
-              onClick={() => alert('Help clicked (Simulated)')}
+              onClick={() => toast.info('Help clicked (Simulated)')}
               className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
             >
               <span className="material-symbols-outlined">help</span> Help
@@ -142,7 +147,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               href="#"
               onClick={handleLogout}
             >
-              <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
+              <span className="material-symbols-outlined text-error">logout</span> Log out
             </a>
           </li>
         </ul>
