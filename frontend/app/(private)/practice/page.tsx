@@ -21,6 +21,11 @@ type ExploreDocument = {
   quizCount: number;
   hasSummary: boolean;
   createdAt: string;
+  copyrightSourceType?: string | null;
+  copyrightAuthorName?: string | null;
+  copyrightSourceUrl?: string | null;
+  copyrightLicense?: string | null;
+  copyrightAttribution?: string | null;
 };
 
 type DocumentSummary = {
@@ -313,16 +318,15 @@ export default function PracticePage() {
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${
-          mobileMenuOpen ? 'flex' : 'hidden'
-        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
+        className={`${mobileMenuOpen ? 'flex' : 'hidden'
+          } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
         <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
               <h1 className="font-headline-md text-headline-md text-primary font-bold">
-                ScholarHub
+                AI STUDY HUB
               </h1>
               <p className="font-label-sm text-label-sm text-secondary text-[10px] tracking-wider uppercase">
                 Academic Excellence
@@ -371,7 +375,7 @@ export default function PracticePage() {
               <span className="material-symbols-outlined">lightbulb</span> Practice Mode
             </Link>
           </li>
-          
+
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
@@ -415,7 +419,7 @@ export default function PracticePage() {
               >
                 <span className="material-symbols-outlined">menu</span>
               </button>
-              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
+              <span className="font-headline-md text-headline-md text-primary">AI STUDY HUB</span>
             </div>
 
             {/* Search Form */}
@@ -667,9 +671,8 @@ export default function PracticePage() {
                 <div className="flex flex-col items-center">
                   <div
                     onClick={() => setIsFlipped((prev) => !prev)}
-                    className={`group perspective-1000 relative h-[480px] w-full max-w-[700px] cursor-pointer ${
-                      isFlipped ? 'flashcard-flipped' : ''
-                    }`}
+                    className={`group perspective-1000 relative h-[480px] w-full max-w-[700px] cursor-pointer ${isFlipped ? 'flashcard-flipped' : ''
+                      }`}
                   >
                     <div className="flashcard-inner border-outline-variant relative h-full w-full rounded-xl border text-center shadow-[0px_4px_16px_rgba(0,0,0,0.06)]">
                       {/* Mặt Trước (Front Side): Câu hỏi + 4 đáp án A, B, C, D */}

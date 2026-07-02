@@ -11,15 +11,21 @@ export default function DocumentPreviewPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
 
-  const { data: response, error: docError, isLoading: isDocLoading } = useSWR(
-    id ? `/documents/${id}` : null,
-    () => documentsApi.getDocumentById(id)
-  );
+  const {
+    data: response,
+    error: docError,
+    isLoading: isDocLoading,
+  } = useSWR(id ? `/documents/${id}` : null, () => documentsApi.getDocumentById(id));
 
   const document = response;
 
-  const [previewData, setPreviewData] = React.useState<{ url: string; disposition: string } | null>(null);
-  const [previewError, setPreviewError] = React.useState<{ status: number; message: string } | null>(null);
+  const [previewData, setPreviewData] = React.useState<{ url: string; disposition: string } | null>(
+    null,
+  );
+  const [previewError, setPreviewError] = React.useState<{
+    status: number;
+    message: string;
+  } | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -52,10 +58,30 @@ export default function DocumentPreviewPage() {
   const handleOpenOriginal = async (e: React.MouseEvent) => {
     e.preventDefault();
     try {
-      const data = await documentsApi.getDownloadSignedUrl(id);
+      const data = await documentsApi.getPreviewSignedUrl(id);
       window.open(data.url, '_blank', 'noopener,noreferrer');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       alert(`Could not open original file: ${err.response?.data?.message || err.message}`);
+    }
+  };
+
+  const [isDownloading, setIsDownloading] = React.useState(false);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDownloading(true);
+    try {
+      const data = await documentsApi.getDownloadSignedUrl(id);
+      const a = window.document.createElement('a');
+      a.href = data.url;
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
+    } catch (err: any) {
+      alert(`Could not download file: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -106,11 +132,12 @@ export default function DocumentPreviewPage() {
       message = 'This document is currently inactive, soft-deleted, or unavailable for preview.';
     } else if (status === 502) {
       title = 'Preview Generation Failed';
-      message = 'We could not generate a temporary preview URL at this time. Please try again later.';
+      message =
+        'We could not generate a temporary preview URL at this time. Please try again later.';
     }
 
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center p-8 text-center bg-gray-50">
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-gray-50 p-8 text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-500">
           <span className="material-symbols-outlined text-3xl">error</span>
         </div>
@@ -129,25 +156,26 @@ export default function DocumentPreviewPage() {
   const iframeSrc = previewData?.url;
 
   return (
-    <div className="flex h-screen w-full flex-col lg:flex-row bg-[#F8F9FA] overflow-hidden font-sans">
-      
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-[#F8F9FA] font-sans lg:flex-row">
       {/* Left Column (Preview Area) */}
       <div className="flex flex-1 flex-col overflow-hidden border-r border-gray-200 bg-white">
-        
         {/* Header inside Preview */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => router.push(`/dashboard/documents/${document.id}`)}
-              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-600"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
             >
               <span className="material-symbols-outlined">arrow_back</span>
             </button>
             <div>
-              <h1 className="font-semibold text-gray-900 truncate max-w-sm sm:max-w-md lg:max-w-lg" title={document.title}>
+              <h1
+                className="max-w-sm truncate font-semibold text-gray-900 sm:max-w-md lg:max-w-lg"
+                title={document.title}
+              >
                 {document.title}
               </h1>
-              <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+              <p className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
                 <span>{document.fileType.split('/')[1] || document.fileType}</span>
                 <span>•</span>
                 <span>{formatSize(document.fileSize)}</span>
@@ -156,20 +184,28 @@ export default function DocumentPreviewPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={handleOpenOriginal}
-              className="hidden sm:flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-700 hover:bg-gray-200 transition-colors"
+              className="hidden items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-200 sm:flex"
             >
               <span className="material-symbols-outlined text-[18px]">open_in_new</span>
               Open Original
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="hidden items-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-2 font-medium text-white transition-colors hover:bg-black disabled:opacity-50 sm:flex"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              {isDownloading ? 'Downloading...' : 'Download'}
             </button>
           </div>
         </div>
 
         {/* Iframe Container */}
-        <div className="flex-1 bg-gray-100 relative p-4 lg:p-8 overflow-hidden">
+        <div className="relative flex-1 overflow-hidden bg-gray-100 p-4 lg:p-8">
           {iframeSrc ? (
-            <div className="h-full w-full rounded-lg shadow-sm border border-gray-200 bg-white overflow-hidden">
+            <div className="h-full w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
               <iframe
                 src={iframeSrc}
                 className="h-full w-full border-none"
@@ -183,84 +219,95 @@ export default function DocumentPreviewPage() {
                 <span className="material-symbols-outlined text-3xl">visibility_off</span>
               </div>
               <h3 className="mb-2 font-semibold text-gray-900">No Preview Available</h3>
-              <p className="mb-6 text-sm text-gray-500 max-w-sm">
-                This file type cannot be previewed directly in the browser, or the preview URL is missing.
+              <p className="mb-6 max-w-sm text-sm text-gray-500">
+                This file type cannot be previewed directly in the browser, or the preview URL is
+                missing.
               </p>
-              <button
-                onClick={handleOpenOriginal}
-                className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 flex items-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[18px]">download</span>
-                Download / Open Original
-              </button>
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={handleOpenOriginal}
+                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-6 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+                >
+                  <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                  Open Original
+                </button>
+                <button
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  className="bg-primary flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[18px]">download</span>
+                  {isDownloading ? 'Downloading...' : 'Download'}
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
 
       {/* Right Column (Metadata / Assistant) */}
-      <div className="flex w-full lg:w-[350px] xl:w-[400px] flex-col overflow-y-auto bg-white">
+      <div className="flex w-full flex-col overflow-y-auto bg-white lg:w-[350px] xl:w-[400px]">
         <div className="flex border-b border-gray-200">
-          <button className="flex-1 border-b-2 border-gray-900 py-4 text-sm font-semibold text-gray-900 flex items-center justify-center gap-2">
+          <button className="flex flex-1 items-center justify-center gap-2 border-b-2 border-gray-900 py-4 text-sm font-semibold text-gray-900">
             <span className="material-symbols-outlined text-[18px]">info</span>
             Metadata
           </button>
-         
         </div>
 
         <div className="flex flex-col gap-6 p-6">
           {/* Metadata Card */}
           <div className="rounded-xl border border-gray-100 bg-gray-50 p-5">
-            <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-gray-500">Document Info</h3>
+            <h3 className="mb-4 text-xs font-bold tracking-wider text-gray-500 uppercase">
+              Document Info
+            </h3>
             <div className="flex flex-col gap-4 text-sm">
               <div>
-                <p className="text-gray-500 mb-1">Status</p>
-                <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${getVisibilityPresentation(document.visibilityStatus).className}`}>
+                <p className="mb-1 text-gray-500">Status</p>
+                <span
+                  className={`inline-flex rounded px-2 py-0.5 text-xs font-bold uppercase ${getVisibilityPresentation(document.visibilityStatus).className}`}
+                >
                   {getVisibilityPresentation(document.visibilityStatus).label}
                 </span>
               </div>
-              
+
               <div>
-                <p className="text-gray-500 mb-1">File Type</p>
+                <p className="mb-1 text-gray-500">File Type</p>
                 <p className="font-medium text-gray-900">{document.fileType}</p>
               </div>
 
               <div>
-                <p className="text-gray-500 mb-1">Size</p>
+                <p className="mb-1 text-gray-500">Size</p>
                 <p className="font-medium text-gray-900">{formatSize(document.fileSize)}</p>
               </div>
 
               <div>
-                <p className="text-gray-500 mb-1">Uploaded At</p>
+                <p className="mb-1 text-gray-500">Uploaded At</p>
                 <p className="font-medium text-gray-900">{formatDate(document.createdAt)}</p>
               </div>
 
               {document.description && (
                 <div>
-                  <p className="text-gray-500 mb-1">Description</p>
+                  <p className="mb-1 text-gray-500">Description</p>
                   <p className="font-medium text-gray-900">{document.description}</p>
                 </div>
               )}
 
               <div>
-                <p className="text-gray-500 mb-1">AI Status</p>
+                <p className="mb-1 text-gray-500">AI Status</p>
                 <p className="font-medium text-gray-900">{document.aiStatus || '—'}</p>
               </div>
 
               <div>
-                <p className="text-gray-500 mb-1">Extraction</p>
+                <p className="mb-1 text-gray-500">Extraction</p>
                 <p className="font-medium text-gray-900">{document.extractionStatus || '—'}</p>
               </div>
 
               <div>
-                <p className="text-gray-500 mb-1">Pages</p>
+                <p className="mb-1 text-gray-500">Pages</p>
                 <p className="font-medium text-gray-900">{document.pageCount || '—'}</p>
               </div>
             </div>
           </div>
-
-         
-
         </div>
       </div>
     </div>

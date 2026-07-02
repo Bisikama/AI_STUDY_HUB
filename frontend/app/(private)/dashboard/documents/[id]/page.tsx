@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -121,6 +121,16 @@ export default function DocumentDetailPage() {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Copyright Form State
+  const [isCopyrightModalOpen, setIsCopyrightModalOpen] = useState(false);
+  const [copyrightSourceType, setCopyrightSourceType] = useState('UNKNOWN');
+  const [copyrightAuthorName, setCopyrightAuthorName] = useState('');
+  const [copyrightSourceUrl, setCopyrightSourceUrl] = useState('');
+  const [copyrightLicense, setCopyrightLicense] = useState('');
+  const [copyrightAttribution, setCopyrightAttribution] = useState('');
+  const [copyrightPermissionReference, setCopyrightPermissionReference] = useState('');
+  const [isSubmittingCopyright, setIsSubmittingCopyright] = useState(false);
+
   const {
     data: response,
     error,
@@ -165,12 +175,117 @@ export default function DocumentDetailPage() {
       return;
     }
     try {
-      const data = await documentsApi.getDownloadSignedUrl(id);
+      const data = await documentsApi.getPreviewSignedUrl(id);
       newTab.location.href = data.url;
     } catch (err: any) {
       newTab.close();
       const { mapDocumentError } = await import('@/utils/errorMapper');
       addToast(mapDocumentError(err), 'error');
+    }
+  };
+
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!id) return;
+    setIsDownloading(true);
+    try {
+      const data = await documentsApi.getDownloadSignedUrl(id);
+      const a = window.document.createElement('a');
+      a.href = data.url;
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
+    } catch (err: any) {
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleOpenCopyrightModal = () => {
+    let typeToSet = document?.copyrightSourceType || 'UNKNOWN';
+    if (!document?.copyrightDeclaredAt && typeToSet === 'UNKNOWN') {
+      typeToSet = 'UNKNOWN';
+    }
+    setCopyrightSourceType(typeToSet);
+    setCopyrightAuthorName(document?.copyrightAuthorName || '');
+    setCopyrightSourceUrl(document?.copyrightSourceUrl || '');
+    setCopyrightLicense(document?.copyrightLicense || '');
+    setCopyrightAttribution(document?.copyrightAttribution || '');
+    setCopyrightPermissionReference(document?.copyrightPermissionReference || '');
+    setIsCopyrightModalOpen(true);
+  };
+
+  useEffect(() => {
+    if (isCopyrightModalOpen && document) {
+      let typeToSet = document.copyrightSourceType || 'UNKNOWN';
+      if (!document.copyrightDeclaredAt && typeToSet === 'UNKNOWN') {
+        typeToSet = 'UNKNOWN';
+      }
+      setCopyrightSourceType(typeToSet);
+      setCopyrightAuthorName(document.copyrightAuthorName || '');
+      setCopyrightSourceUrl(document.copyrightSourceUrl || '');
+      setCopyrightLicense(document.copyrightLicense || '');
+      setCopyrightAttribution(document.copyrightAttribution || '');
+      setCopyrightPermissionReference(document.copyrightPermissionReference || '');
+    }
+  }, [isCopyrightModalOpen, document]);
+
+  const handleSubmitCopyright = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    try {
+      setIsSubmittingCopyright(true);
+      
+      const cleanStr = (val: string) => {
+        const trimmed = val.trim();
+        return trimmed === '' ? undefined : trimmed;
+      };
+
+      const payload: any = {
+        sourceType: copyrightSourceType,
+      };
+
+      if (copyrightSourceType === 'OPEN_LICENSE') {
+        payload.sourceUrl = cleanStr(copyrightSourceUrl);
+        payload.license = cleanStr(copyrightLicense);
+        payload.attribution = cleanStr(copyrightAttribution);
+      } else if (copyrightSourceType === 'AUTHORIZED') {
+        payload.permissionReference = cleanStr(copyrightPermissionReference);
+      } else if (copyrightSourceType === 'FPT_OFFICIAL') {
+        payload.sourceUrl = cleanStr(copyrightSourceUrl);
+        payload.permissionReference = cleanStr(copyrightPermissionReference);
+      } else if (copyrightSourceType === 'THIRD_PARTY') {
+        payload.authorName = cleanStr(copyrightAuthorName);
+        payload.sourceUrl = cleanStr(copyrightSourceUrl);
+      }
+
+      await documentsApi.updateCopyright(id, payload);
+      addToast('Khai báo bản quyền thành công.', 'success');
+      
+      // Update cache optimistically so that document state reflects new data before async load finishes
+      mutate((currentData: any) => {
+        if (!currentData) return currentData;
+        return {
+          ...currentData,
+          copyrightSourceType: payload.sourceType,
+          copyrightAuthorName: payload.authorName || null,
+          copyrightSourceUrl: payload.sourceUrl || null,
+          copyrightLicense: payload.license || null,
+          copyrightAttribution: payload.attribution || null,
+          copyrightPermissionReference: payload.permissionReference || null,
+          copyrightDeclaredAt: new Date().toISOString(),
+        };
+      }, { revalidate: true });
+      
+      setIsCopyrightModalOpen(false);
+    } catch (err: any) {
+      const { mapDocumentError } = await import('@/utils/errorMapper');
+      addToast(mapDocumentError(err), 'error');
+    } finally {
+      setIsSubmittingCopyright(false);
     }
   };
 
@@ -281,6 +396,15 @@ export default function DocumentDetailPage() {
           border: 'border-yellow-200',
           detail: 'Please check back in a few minutes.',
         };
+      case 'UNSUPPORTED':
+        return {
+          title: 'File format not supported for AI analysis.',
+          icon: 'do_not_disturb',
+          color: 'text-gray-600',
+          bg: 'bg-gray-100',
+          border: 'border-gray-300',
+          detail: 'You can still view/download the original file, but AI features are disabled.',
+        };
       default:
         return {
           title: 'No extraction info available.',
@@ -294,6 +418,7 @@ export default function DocumentDetailPage() {
   };
 
   const extractionUI = getExtractionStatusUI();
+  const publishCtaText = currentUser?.role === 'STUDENT' ? 'Gửi yêu cầu chia sẻ' : 'Chia sẻ trong AI Study Hub';
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-6xl bg-[#F8F9FA] p-6 font-sans md:p-8">
@@ -345,7 +470,7 @@ export default function DocumentDetailPage() {
             {document.title}
           </h1>
 
-          <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-gray-500 sm:gap-6">
+          <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-gray-500 sm:gap-6 mt-4">
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[18px]">calendar_today</span>
               Added {formatDate(document.createdAt)}
@@ -364,6 +489,42 @@ export default function DocumentDetailPage() {
               {document.downloadCount} downloads
             </div>
           </div>
+
+          {document.copyrightSourceType && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
+              <span className="material-symbols-outlined text-[16px] text-blue-600">copyright</span>
+              <span className="font-semibold text-blue-800">
+                {document.copyrightSourceType === 'OWN_ORIGINAL' && 'Tự biên soạn'}
+                {document.copyrightSourceType === 'OPEN_LICENSE' && 'Nguồn mở'}
+                {document.copyrightSourceType === 'AUTHORIZED' && 'Được cấp quyền sử dụng'}
+                {document.copyrightSourceType === 'FPT_OFFICIAL' && 'Tài liệu chính thức FPT'}
+              </span>
+              {document.copyrightLicense && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <span className="bg-white border border-gray-200 px-2 py-0.5 rounded text-xs font-medium">
+                    {document.copyrightLicense}
+                  </span>
+                </>
+              )}
+              {document.copyrightSourceUrl && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <a href={document.copyrightSourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5 text-xs font-medium">
+                    Nguồn gốc <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                  </a>
+                </>
+              )}
+              {document.copyrightAttribution && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <span className="text-gray-500 text-xs italic">
+                    By: {document.copyrightAttribution}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-3 lg:shrink-0 ">
@@ -725,6 +886,67 @@ export default function DocumentDetailPage() {
 
         {/* Right Column (Sidebar) */}
         <div className="flex flex-col gap-6">
+          {/* Copyright Section */}
+          {document.isOwner && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[18px]">copyright</span>
+                Bản quyền & nguồn tài liệu
+              </h3>
+
+              {!document.copyrightSourceType ? (
+                <div className="flex flex-col gap-3">
+                  <p className="text-sm text-gray-600">
+                    Bạn cần khai báo nguồn trước khi chia sẻ tài liệu.
+                  </p>
+                  <button
+                    onClick={handleOpenCopyrightModal}
+                    className="flex items-center justify-center gap-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 text-sm font-semibold hover:bg-blue-100 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                    Khai báo nguồn
+                  </button>
+                </div>
+              ) : (document.copyrightSourceType === 'THIRD_PARTY' || document.copyrightSourceType === 'UNKNOWN') ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2 text-red-700 bg-red-50 p-3 rounded-xl border border-red-200">
+                    <span className="material-symbols-outlined text-[18px] shrink-0">warning</span>
+                    <p className="text-sm font-medium">
+                      Tài liệu này chỉ có thể lưu riêng tư và chưa thể chia sẻ.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleOpenCopyrightModal}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">update</span>
+                    Cập nhật nguồn
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2 text-emerald-700 bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                    <span className="material-symbols-outlined text-[18px] shrink-0">check_circle</span>
+                    <div className="text-sm">
+                      <p className="font-bold">Thông tin nguồn tài liệu đã hợp lệ.</p>
+                      <p className="text-emerald-600 mt-0.5">
+                        Loại nguồn:{' '}
+                        {document.copyrightSourceType === 'OWN_ORIGINAL' ? 'Tự biên soạn' : document.copyrightSourceType === 'OPEN_LICENSE' ? 'Nguồn mở' : document.copyrightSourceType === 'AUTHORIZED' ? 'Có quyền sử dụng' : 'Tài liệu chính thức FPT'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleOpenCopyrightModal}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                    Chỉnh sửa
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Actions Card */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
@@ -753,17 +975,26 @@ export default function DocumentDetailPage() {
                     <span className="material-symbols-outlined text-[18px]">open_in_new</span>
                     Download / Open Original
                   </button>
+                  <button
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">download</span>
+                    {isDownloading ? 'Downloading...' : 'Download'}
+                  </button>
 
-                  {document.isOwner && (
+                  {/* {document.isOwner && (
                     <button
                       onClick={handleAnalyze}
-                      disabled={isAnalyzing}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                      disabled={isAnalyzing || document.extractionStatus === 'UNSUPPORTED'}
+                      title={document.extractionStatus === 'UNSUPPORTED' ? 'AI Analysis not supported for this file format' : ''}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
                       {isAnalyzing ? 'Analyzing AI...' : 'Analyze with AI'}
                     </button>
-                  )}
+                  )} */}
 
                   {/* System Info Card */}
                   {document.isOwner && (
@@ -779,24 +1010,47 @@ export default function DocumentDetailPage() {
 
                   {document.visibilityStatus === 'PRIVATE' && (
                     <div className="mt-2 border-t border-gray-100 pt-3">
-                      {document.extractionStatus !== 'READY' ? (
+                      {!document.canRequestPublic ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
-                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                            <span className="material-symbols-outlined text-[18px]">public</span> {publishCtaText}
                           </button>
-                          <p className="mt-1.5 text-xs text-red-500 text-center">PDF extraction must be successful before submitting for review.</p>
+                          <p className="mt-1.5 text-xs text-red-500 text-center">
+                            {document.publicationEligibilityReason === 'AI_ANALYSIS_UNSUPPORTED'
+                              ? 'File này chỉ được lưu trữ riêng tư và không thể chia sẻ.'
+                              : document.publicationEligibilityReason === 'AI_ANALYSIS_PROCESSING'
+                                ? 'AI Analyze đang xử lý...'
+                                : document.publicationEligibilityReason === 'AI_ANALYSIS_FAILED'
+                                  ? 'AI Analyze thất bại. Vui lòng thử lại.'
+                                  : document.publicationEligibilityReason === 'AI_ANALYSIS_REQUIRED'
+                                    ? 'Hãy chạy AI Analyze trước khi chia sẻ tài liệu.'
+                                    : document.publicationEligibilityReason === 'COPYRIGHT_SHARING_NOT_ALLOWED'
+                                      ? 'Nguồn gốc tài liệu này không được phép chia sẻ.'
+                                      : document.publicationEligibilityReason === 'COPYRIGHT_DECLARATION_REQUIRED' || document.publicationEligibilityReason === 'COPYRIGHT_METADATA_INCOMPLETE'
+                                        ? 'Vui lòng khai báo bản quyền để chia sẻ.'
+                                        : 'Tài liệu cần hoàn tất AI Analyze và Khai báo bản quyền trước khi chia sẻ.'}
+                          </p>
+                          {(document.publicationEligibilityReason === 'COPYRIGHT_DECLARATION_REQUIRED' || document.publicationEligibilityReason === 'COPYRIGHT_METADATA_INCOMPLETE') && (
+                            <button
+                              onClick={handleOpenCopyrightModal}
+                              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">copyright</span>
+                              Khai báo nguồn / Bản quyền
+                            </button>
+                          )}
                         </div>
                       ) : !document.subject ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
-                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                            <span className="material-symbols-outlined text-[18px]">public</span> {publishCtaText}
                           </button>
                           <p className="mt-1.5 text-xs text-gray-500 text-center">Checking subject eligibility.</p>
                         </div>
                       ) : !document.subject.isSystem ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
-                            <span className="material-symbols-outlined text-[18px]">public</span> Request Public
+                            <span className="material-symbols-outlined text-[18px]">public</span> {publishCtaText}
                           </button>
                           <p className="mt-1.5 text-xs text-red-500 text-center">Only System Subjects can be submitted for public review.</p>
                         </div>
@@ -806,7 +1060,7 @@ export default function DocumentDetailPage() {
                           className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black"
                         >
                           <span className="material-symbols-outlined text-[18px]">public</span>
-                          Request Public
+                          {publishCtaText}
                         </button>
                       )}
                     </div>
@@ -887,8 +1141,9 @@ export default function DocumentDetailPage() {
               <div className="flex flex-col gap-3">
                 <button
                   onClick={handleAnalyze}
-                  disabled={isAnalyzing}
-                  className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-gray-700 disabled:opacity-50 w-full"
+                  disabled={isAnalyzing || document.extractionStatus === 'UNSUPPORTED'}
+                  title={document.extractionStatus === 'UNSUPPORTED' ? 'AI Analysis not supported for this file format' : ''}
+                  className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed w-full"
                 >
                   <span className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-[18px] text-blue-400">auto_awesome</span>
@@ -1045,6 +1300,136 @@ export default function DocumentDetailPage() {
                   ) : (
                     'Submit Report'
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Copyright Modal */}
+      {document.isOwner && isCopyrightModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-0">
+          <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => !isSubmittingCopyright && setIsCopyrightModalOpen(false)} />
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8 animate-in zoom-in-95 duration-200">
+            <div className="mb-6 flex items-center gap-3 text-blue-600">
+              <span className="material-symbols-outlined text-2xl">copyright</span>
+              <h3 className="text-xl font-bold text-gray-900">Khai báo bản quyền</h3>
+            </div>
+
+            <p className="mb-4 text-xs text-gray-500">
+              Để chia sẻ tài liệu, bạn cần khai báo nguồn gốc và quyền sử dụng theo chính sách của AI Study Hub.
+            </p>
+
+            <form onSubmit={handleSubmitCopyright} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  Nguồn tài liệu
+                </label>
+                <select
+                  value={copyrightSourceType}
+                  onChange={(e) => setCopyrightSourceType(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                >
+                  <option value="UNKNOWN">Chưa xác định</option>
+                  <option value="OWN_ORIGINAL">Tự biên soạn (Do chính bạn tạo ra)</option>
+                  <option value="OPEN_LICENSE">Nguồn mở (Open License / Creative Commons)</option>
+                  <option value="AUTHORIZED">Có quyền sử dụng (Được cấp quyền)</option>
+                  <option value="FPT_OFFICIAL">Tài liệu chính thức FPT</option>
+                  <option value="THIRD_PARTY">Nội dung bên thứ ba (Không có quyền chia sẻ)</option>
+                </select>
+              </div>
+
+              {copyrightSourceType === 'OWN_ORIGINAL' && (
+                <div className="rounded border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+                  Bạn xác nhận mình là tác giả duy nhất của tài liệu này và có toàn quyền chia sẻ nó.
+                </div>
+              )}
+
+              {(copyrightSourceType === 'OPEN_LICENSE' || copyrightSourceType === 'FPT_OFFICIAL') && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    URL Nguồn gốc (Bắt buộc)
+                  </label>
+                  <input
+                    type="url"
+                    value={copyrightSourceUrl}
+                    onChange={(e) => setCopyrightSourceUrl(e.target.value)}
+                    required
+                    placeholder="https://..."
+                    className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
+                  />
+                </div>
+              )}
+
+              {copyrightSourceType === 'OPEN_LICENSE' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                      Giấy phép (Bắt buộc)
+                    </label>
+                    <input
+                      type="text"
+                      value={copyrightLicense}
+                      onChange={(e) => setCopyrightLicense(e.target.value)}
+                      required
+                      placeholder="VD: CC BY 4.0, MIT, GPL..."
+                      className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                      Ghi công tác giả (Bắt buộc)
+                    </label>
+                    <input
+                      type="text"
+                      value={copyrightAttribution}
+                      onChange={(e) => setCopyrightAttribution(e.target.value)}
+                      required
+                      placeholder="Tên tác giả gốc..."
+                      className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {(copyrightSourceType === 'AUTHORIZED' || copyrightSourceType === 'FPT_OFFICIAL') && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    Minh chứng quyền sử dụng {copyrightSourceType === 'AUTHORIZED' ? '(Bắt buộc)' : '(Nếu không có URL)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={copyrightPermissionReference}
+                    onChange={(e) => setCopyrightPermissionReference(e.target.value)}
+                    required={copyrightSourceType === 'AUTHORIZED'}
+                    placeholder="Tham chiếu email, văn bản cấp quyền..."
+                    className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
+                  />
+                </div>
+              )}
+
+              {(copyrightSourceType === 'UNKNOWN' || copyrightSourceType === 'THIRD_PARTY') && (
+                <div className="rounded border border-red-100 bg-red-50 p-3 text-xs text-red-800">
+                  Tài liệu có nguồn gốc chưa xác định hoặc thuộc bên thứ ba sẽ không được phép chia sẻ công khai trên hệ thống.
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCopyrightModalOpen(false)}
+                  disabled={isSubmittingCopyright}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingCopyright || copyrightSourceType === 'UNKNOWN' || copyrightSourceType === 'THIRD_PARTY'}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSubmittingCopyright ? 'Đang lưu...' : 'Lưu khai báo'}
                 </button>
               </div>
             </form>

@@ -14,6 +14,8 @@ export const mapDocumentError = (error: any): string => {
       return 'Trạng thái tài liệu đã thay đổi hoặc không hợp lệ. Vui lòng tải lại trang.';
     case 'DOCUMENT_NOT_ACTIVE':
       return 'Tài liệu không còn hoạt động hoặc đã bị xoá.';
+    case 'STORAGE_QUOTA_EXCEEDED':
+      return 'Dung lượng lưu trữ của bạn đã đầy (1 GiB). Vui lòng xoá bớt tài liệu cũ để tiếp tục.';
     default:
       if (error?.response?.status === 401) {
         return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';

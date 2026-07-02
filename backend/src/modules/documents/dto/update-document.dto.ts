@@ -8,6 +8,7 @@ import {
   IsInt,
   IsArray,
   ArrayMaxSize,
+  IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -37,5 +38,8 @@ export class UpdateDocumentDto {
   @IsString({ each: true, message: 'Each tag must be a string' })
   @ArrayMaxSize(10, { message: 'Maximum 10 tags allowed' })
   tags?: string[];
-}
 
+  @IsOptional()
+  @IsUUID('4', { message: 'Personal Folder ID must be a valid UUID' })
+  personalFolderId?: string;
+}

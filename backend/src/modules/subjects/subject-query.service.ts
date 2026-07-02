@@ -40,7 +40,7 @@ export class SubjectQueryService {
       orderBy: { name: 'asc' },
     });
 
-    return subjects.map(s => ({
+    return subjects.map((s) => ({
       id: s.id,
       name: s.name,
       code: s.code,

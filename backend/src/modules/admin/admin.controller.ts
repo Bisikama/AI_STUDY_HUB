@@ -123,7 +123,14 @@ export class AdminController {
    */
   @Get('reports')
   async getReports(
-    @Query() query: { status?: string; reason?: string; documentId?: string; page?: number; limit?: number },
+    @Query()
+    query: {
+      status?: string;
+      reason?: string;
+      documentId?: string;
+      page?: number;
+      limit?: number;
+    },
   ) {
     return this.adminService.getReports(query);
   }

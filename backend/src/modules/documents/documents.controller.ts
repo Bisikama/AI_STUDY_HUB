@@ -23,7 +23,14 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ValidateFilePipe } from './pipes';
-import { UploadDocumentDto, UpdateDocumentDto, GetDocumentsDto, CreateOrUpdateRatingDto, CreateReportDto } from './dto';
+import {
+  UploadDocumentDto,
+  UpdateDocumentDto,
+  GetDocumentsDto,
+  CreateOrUpdateRatingDto,
+  CreateReportDto,
+  UpdateCopyrightDto,
+} from './dto';
 import { DocumentsService } from './documents.service';
 import { DocumentAccessService } from './document-access.service';
 import type { StorageAdapter } from '../../supabase/storage-adapter.interface';
@@ -55,7 +62,6 @@ export class DocumentsController {
   @Post('/upload')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
-
   async upload(
     @UploadedFile(new ValidateFilePipe()) file: Express.Multer.File,
     @Body() dto: UploadDocumentDto,
@@ -68,12 +74,24 @@ export class DocumentsController {
       dto.subjectId,
       userId,
       dto.tags,
+      dto.personalFolderId,
     );
 
     return {
       statusCode: 201,
       message: 'Document uploaded and parsed successfully',
       data: document,
+    };
+  }
+
+  @Get('me/storage-summary')
+  @UseGuards(JwtAuthGuard)
+  async getStorageSummary(@CurrentUser('id') userId: string) {
+    const summary = await this.documentsService.getStorageSummary(userId);
+    return {
+      statusCode: 200,
+      message: 'Storage summary retrieved successfully',
+      data: summary,
     };
   }
 
@@ -84,7 +102,9 @@ export class DocumentsController {
     @Req() req: any,
   ): Promise<{ statusCode: number; message: string; data: MyDocumentListItem[] }> {
     if ('status' in req.query) {
-      throw new BadRequestException('The "status" query parameter is not supported. Use "visibilityStatus" instead.');
+      throw new BadRequestException(
+        'The "status" query parameter is not supported. Use "visibilityStatus" instead.',
+      );
     }
     const query = {
       page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
@@ -92,6 +112,16 @@ export class DocumentsController {
       q: req.query.q as string,
       subjectId: req.query.subjectId ? parseInt(req.query.subjectId as string, 10) : undefined,
       visibilityStatus: req.query.visibilityStatus as any,
+      folderId: req.query.folderId as string,
+      unfiled: req.query.unfiled === 'true',
+      legacyFolder: req.query.legacyFolder === 'true',
+      majorCode: req.query.majorCode as string,
+      aiStatus: req.query.aiStatus as string,
+      extractionStatus: req.query.extractionStatus as string,
+      fileType: req.query.fileType as string,
+      deletionStatus: req.query.deletionStatus as string,
+      sortBy: req.query.sortBy as string,
+      sortOrder: req.query.sortOrder as string,
     };
     const documents = await this.documentsService.getDocumentsByUser(userId, query);
     return {
@@ -115,6 +145,21 @@ export class DocumentsController {
     };
   }
 
+  @Patch(':id/copyright')
+  @UseGuards(JwtAuthGuard)
+  async updateCopyright(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateCopyrightDto,
+  ) {
+    const document = await this.documentsService.updateCopyright(id, userId, dto);
+    return {
+      statusCode: 200,
+      message: 'Copyright information updated successfully',
+      data: document,
+    };
+  }
+
   @Get(':id/preview')
   @UseGuards(JwtAuthGuard)
   @Header('Cache-Control', 'no-store')
@@ -122,7 +167,11 @@ export class DocumentsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser('id') userId: string,
   ) {
-    const result = await this.documentsService.getSignedDocumentAccess(id, userId, 'SIGNED_PREVIEW');
+    const result = await this.documentsService.getSignedDocumentAccess(
+      id,
+      userId,
+      'SIGNED_PREVIEW',
+    );
     return {
       statusCode: 200,
       message: 'Preview URL generated successfully',
@@ -137,7 +186,11 @@ export class DocumentsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser('id') userId: string,
   ) {
-    const result = await this.documentsService.getSignedDocumentAccess(id, userId, 'SIGNED_DOWNLOAD');
+    const result = await this.documentsService.getSignedDocumentAccess(
+      id,
+      userId,
+      'SIGNED_DOWNLOAD',
+    );
     return {
       statusCode: 200,
       message: 'Download URL generated successfully',
@@ -180,12 +233,15 @@ export class DocumentsController {
     @CurrentUser('id') userId: string,
   ): Promise<{ statusCode: number; message: string; data: SanitizedDocument }> {
     // Only allow title, description, subjectId, tags
-    const safeDto = {
+    const safeDto: any = {
       title: dto.title,
       description: dto.description,
       subjectId: dto.subjectId,
       tags: dto.tags,
     };
+    if (dto.personalFolderId !== undefined) {
+      safeDto.personalFolderId = dto.personalFolderId;
+    }
     const document = await this.documentsService.updateDocument(id, userId, safeDto);
     return {
       statusCode: 200,
@@ -255,7 +311,12 @@ export class DocumentsController {
     @Body() dto: CreateOrUpdateRatingDto,
     @CurrentUser('id') userId: string,
   ) {
-    const rating = await this.documentsService.rateDocument(documentId, userId, dto.rating, dto.comment);
+    const rating = await this.documentsService.rateDocument(
+      documentId,
+      userId,
+      dto.rating,
+      dto.comment,
+    );
     return {
       statusCode: 201,
       message: 'Document rated successfully',
@@ -264,9 +325,7 @@ export class DocumentsController {
   }
 
   @Get(':documentId/ratings')
-  async getRatings(
-    @Param('documentId', new ParseUUIDPipe({ version: '4' })) documentId: string,
-  ) {
+  async getRatings(@Param('documentId', new ParseUUIDPipe({ version: '4' })) documentId: string) {
     const ratings = await this.documentsService.getRatings(documentId);
     return {
       statusCode: 200,
@@ -282,7 +341,12 @@ export class DocumentsController {
     @Body() dto: CreateOrUpdateRatingDto,
     @CurrentUser('id') userId: string,
   ) {
-    const rating = await this.documentsService.rateDocument(documentId, userId, dto.rating, dto.comment);
+    const rating = await this.documentsService.rateDocument(
+      documentId,
+      userId,
+      dto.rating,
+      dto.comment,
+    );
     return {
       statusCode: 200,
       message: 'Document rating updated successfully',
@@ -310,7 +374,12 @@ export class DocumentsController {
     @Body() dto: CreateReportDto,
     @CurrentUser('id') userId: string,
   ) {
-    const report = await this.documentsService.reportDocument(documentId, userId, dto.reason, dto.description);
+    const report = await this.documentsService.reportDocument(
+      documentId,
+      userId,
+      dto.reason,
+      dto.description,
+    );
     return {
       statusCode: 201,
       message: 'Document reported successfully',

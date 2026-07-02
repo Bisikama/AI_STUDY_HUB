@@ -48,7 +48,7 @@ export default function LandingPage() {
                 </svg>
               </div>
               <span className="text-xl font-bold tracking-tight text-slate-900 transition-colors group-hover:text-black">
-                ScholarHub
+                AI STUDY HUB
               </span>
             </div>
 
@@ -410,7 +410,7 @@ export default function LandingPage() {
             </h2>
             <p className="relative z-10 max-w-md text-[14px] leading-relaxed text-slate-400">
               Join thousands of university students who have transformed their study habits with
-              ScholarHub.
+              AI STUDY HUB.
             </p>
             <button
               onClick={() => handleNavigation('/login')}
@@ -428,7 +428,7 @@ export default function LandingPage() {
           <div className="flex flex-col justify-between gap-12 md:flex-row">
             {/* Column 1: Info */}
             <div className="flex max-w-sm flex-col gap-4">
-              <span className="text-xl font-bold tracking-tight text-slate-900">ScholarHub</span>
+              <span className="text-xl font-bold tracking-tight text-slate-900">AI STUDY HUB</span>
               <p className="text-[13px] leading-relaxed text-slate-500">
                 Bridging the gap between traditional learning and modern artificial intelligence for
                 students worldwide.
@@ -549,7 +549,7 @@ export default function LandingPage() {
           {/* Copyright Area */}
           <div className="flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-8 md:flex-row">
             <p className="text-[12px] text-slate-400">
-              © 2024 ScholarHub. All rights reserved. Built for academic excellence.
+              © 2024 AI STUDY HUB. All rights reserved. Built for academic excellence.
             </p>
           </div>
         </div>

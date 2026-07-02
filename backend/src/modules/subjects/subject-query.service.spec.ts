@@ -16,10 +16,7 @@ describe('SubjectQueryService', () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SubjectQueryService,
-        { provide: PrismaService, useValue: mockPrisma },
-      ],
+      providers: [SubjectQueryService, { provide: PrismaService, useValue: mockPrisma }],
     }).compile();
 
     service = module.get<SubjectQueryService>(SubjectQueryService);
@@ -38,22 +35,22 @@ describe('SubjectQueryService', () => {
       ]);
 
       const result = await service.getEligiblePublicSubjects();
-      expect(result).toEqual([
-        { id: 1, name: 'Math', code: 'math', documentCount: 5 },
-      ]);
-      expect(mockPrisma.subject.findMany).toHaveBeenCalledWith(expect.objectContaining({
-        where: expect.objectContaining({
-          isSystem: true,
-          documents: {
-            some: {
-              visibilityStatus: 'PUBLIC',
-              deletionStatus: 'ACTIVE',
-              extractionStatus: 'READY',
-              aiStatus: 'READY',
+      expect(result).toEqual([{ id: 1, name: 'Math', code: 'math', documentCount: 5 }]);
+      expect(mockPrisma.subject.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            isSystem: true,
+            documents: {
+              some: {
+                visibilityStatus: 'PUBLIC',
+                deletionStatus: 'ACTIVE',
+                extractionStatus: 'READY',
+                aiStatus: 'READY',
+              },
             },
-          },
+          }),
         }),
-      }));
+      );
     });
   });
 });

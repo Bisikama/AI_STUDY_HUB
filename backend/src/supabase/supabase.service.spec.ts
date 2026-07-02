@@ -77,7 +77,7 @@ describe('SupabaseService', () => {
       expect(mockUpload).toHaveBeenCalledWith(
         'documents/user123/doc456/file.name_.pdf',
         expect.any(Buffer),
-        expect.objectContaining({ contentType: 'application/pdf', upsert: true })
+        expect.objectContaining({ contentType: 'application/pdf', upsert: true }),
       );
       expect(result.storagePath).toBe('documents/user123/doc456/file.name_.pdf');
       expect(mockGetPublicUrl).not.toHaveBeenCalled();
@@ -96,7 +96,7 @@ describe('SupabaseService', () => {
           fileName: 'test.pdf',
           buffer: Buffer.from('test'),
           contentType: 'application/pdf',
-        })
+        }),
       ).rejects.toThrow(new BadGatewayException('STORAGE_OPERATION_FAILED'));
 
       expect(loggerSpy).toHaveBeenCalledWith('Private upload failed: STORAGE_OPERATION_FAILED');
@@ -109,7 +109,10 @@ describe('SupabaseService', () => {
 
   describe('createPreviewUrl', () => {
     it('clamps TTL to 300 seconds max', async () => {
-      mockCreateSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://preview.url' }, error: null });
+      mockCreateSignedUrl.mockResolvedValue({
+        data: { signedUrl: 'https://preview.url' },
+        error: null,
+      });
 
       const result = await service.createPreviewUrl({
         storagePath: 'documents/u1/d1/test.pdf',
@@ -126,7 +129,7 @@ describe('SupabaseService', () => {
       const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
 
       await expect(
-        service.createPreviewUrl({ storagePath: 'documents/u1/d1/test.pdf' })
+        service.createPreviewUrl({ storagePath: 'documents/u1/d1/test.pdf' }),
       ).rejects.toThrow(new BadGatewayException('STORAGE_OPERATION_FAILED'));
 
       expect(loggerSpy).toHaveBeenCalledWith('Create preview URL failed: STORAGE_OPERATION_FAILED');
@@ -137,7 +140,10 @@ describe('SupabaseService', () => {
 
   describe('createDownloadUrl', () => {
     it('clamps TTL to 300 seconds max and passes download filename', async () => {
-      mockCreateSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://download.url' }, error: null });
+      mockCreateSignedUrl.mockResolvedValue({
+        data: { signedUrl: 'https://download.url' },
+        error: null,
+      });
 
       const result = await service.createDownloadUrl({
         storagePath: 'documents/u1/d1/test.pdf',
@@ -145,7 +151,9 @@ describe('SupabaseService', () => {
         expiresInSeconds: 999,
       });
 
-      expect(mockCreateSignedUrl).toHaveBeenCalledWith('documents/u1/d1/test.pdf', 300, { download: 'downloaded.pdf' });
+      expect(mockCreateSignedUrl).toHaveBeenCalledWith('documents/u1/d1/test.pdf', 300, {
+        download: 'downloaded.pdf',
+      });
       expect(result.url).toBe('https://download.url');
     });
 
@@ -155,10 +163,12 @@ describe('SupabaseService', () => {
       const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
 
       await expect(
-        service.createDownloadUrl({ storagePath: 'documents/u1/d1/test.pdf', fileName: 'dl.pdf' })
+        service.createDownloadUrl({ storagePath: 'documents/u1/d1/test.pdf', fileName: 'dl.pdf' }),
       ).rejects.toThrow(new BadGatewayException('STORAGE_OPERATION_FAILED'));
 
-      expect(loggerSpy).toHaveBeenCalledWith('Create download URL failed: STORAGE_OPERATION_FAILED');
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Create download URL failed: STORAGE_OPERATION_FAILED',
+      );
       expect(loggerSpy).not.toHaveBeenCalledWith(expect.stringContaining(rawError));
       loggerSpy.mockRestore();
     });
@@ -179,7 +189,9 @@ describe('SupabaseService', () => {
       mockRemove.mockResolvedValue({ data: null, error: { message: rawError } });
       const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
 
-      await expect(service.deleteObject('documents/u1/d1/test.pdf')).rejects.toThrow(new BadGatewayException('STORAGE_OPERATION_FAILED'));
+      await expect(service.deleteObject('documents/u1/d1/test.pdf')).rejects.toThrow(
+        new BadGatewayException('STORAGE_OPERATION_FAILED'),
+      );
 
       expect(loggerSpy).toHaveBeenCalledWith('Delete object failed: STORAGE_OPERATION_FAILED');
       expect(loggerSpy).not.toHaveBeenCalledWith(expect.stringContaining(rawError));
