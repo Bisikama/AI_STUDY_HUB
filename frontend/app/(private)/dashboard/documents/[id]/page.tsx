@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -204,21 +204,82 @@ export default function DocumentDetailPage() {
     }
   };
 
+  const handleOpenCopyrightModal = () => {
+    let typeToSet = document?.copyrightSourceType || 'UNKNOWN';
+    if (!document?.copyrightDeclaredAt && typeToSet === 'UNKNOWN') {
+      typeToSet = 'UNKNOWN';
+    }
+    setCopyrightSourceType(typeToSet);
+    setCopyrightAuthorName(document?.copyrightAuthorName || '');
+    setCopyrightSourceUrl(document?.copyrightSourceUrl || '');
+    setCopyrightLicense(document?.copyrightLicense || '');
+    setCopyrightAttribution(document?.copyrightAttribution || '');
+    setCopyrightPermissionReference(document?.copyrightPermissionReference || '');
+    setIsCopyrightModalOpen(true);
+  };
+
+  useEffect(() => {
+    if (isCopyrightModalOpen && document) {
+      let typeToSet = document.copyrightSourceType || 'UNKNOWN';
+      if (!document.copyrightDeclaredAt && typeToSet === 'UNKNOWN') {
+        typeToSet = 'UNKNOWN';
+      }
+      setCopyrightSourceType(typeToSet);
+      setCopyrightAuthorName(document.copyrightAuthorName || '');
+      setCopyrightSourceUrl(document.copyrightSourceUrl || '');
+      setCopyrightLicense(document.copyrightLicense || '');
+      setCopyrightAttribution(document.copyrightAttribution || '');
+      setCopyrightPermissionReference(document.copyrightPermissionReference || '');
+    }
+  }, [isCopyrightModalOpen, document]);
+
   const handleSubmitCopyright = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
     try {
       setIsSubmittingCopyright(true);
-      await documentsApi.updateCopyright(id, {
+      
+      const cleanStr = (val: string) => {
+        const trimmed = val.trim();
+        return trimmed === '' ? undefined : trimmed;
+      };
+
+      const payload: any = {
         sourceType: copyrightSourceType,
-        authorName: copyrightAuthorName,
-        sourceUrl: copyrightSourceUrl,
-        license: copyrightLicense,
-        attribution: copyrightAttribution,
-        permissionReference: copyrightPermissionReference,
-      });
+      };
+
+      if (copyrightSourceType === 'OPEN_LICENSE') {
+        payload.sourceUrl = cleanStr(copyrightSourceUrl);
+        payload.license = cleanStr(copyrightLicense);
+        payload.attribution = cleanStr(copyrightAttribution);
+      } else if (copyrightSourceType === 'AUTHORIZED') {
+        payload.permissionReference = cleanStr(copyrightPermissionReference);
+      } else if (copyrightSourceType === 'FPT_OFFICIAL') {
+        payload.sourceUrl = cleanStr(copyrightSourceUrl);
+        payload.permissionReference = cleanStr(copyrightPermissionReference);
+      } else if (copyrightSourceType === 'THIRD_PARTY') {
+        payload.authorName = cleanStr(copyrightAuthorName);
+        payload.sourceUrl = cleanStr(copyrightSourceUrl);
+      }
+
+      await documentsApi.updateCopyright(id, payload);
       addToast('Khai báo bản quyền thành công.', 'success');
-      mutate();
+      
+      // Update cache optimistically so that document state reflects new data before async load finishes
+      mutate((currentData: any) => {
+        if (!currentData) return currentData;
+        return {
+          ...currentData,
+          copyrightSourceType: payload.sourceType,
+          copyrightAuthorName: payload.authorName || null,
+          copyrightSourceUrl: payload.sourceUrl || null,
+          copyrightLicense: payload.license || null,
+          copyrightAttribution: payload.attribution || null,
+          copyrightPermissionReference: payload.permissionReference || null,
+          copyrightDeclaredAt: new Date().toISOString(),
+        };
+      }, { revalidate: true });
+      
       setIsCopyrightModalOpen(false);
     } catch (err: any) {
       const { mapDocumentError } = await import('@/utils/errorMapper');
@@ -825,6 +886,67 @@ export default function DocumentDetailPage() {
 
         {/* Right Column (Sidebar) */}
         <div className="flex flex-col gap-6">
+          {/* Copyright Section */}
+          {document.isOwner && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[18px]">copyright</span>
+                Bản quyền & nguồn tài liệu
+              </h3>
+
+              {!document.copyrightSourceType ? (
+                <div className="flex flex-col gap-3">
+                  <p className="text-sm text-gray-600">
+                    Bạn cần khai báo nguồn trước khi chia sẻ tài liệu.
+                  </p>
+                  <button
+                    onClick={handleOpenCopyrightModal}
+                    className="flex items-center justify-center gap-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 text-sm font-semibold hover:bg-blue-100 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                    Khai báo nguồn
+                  </button>
+                </div>
+              ) : (document.copyrightSourceType === 'THIRD_PARTY' || document.copyrightSourceType === 'UNKNOWN') ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2 text-red-700 bg-red-50 p-3 rounded-xl border border-red-200">
+                    <span className="material-symbols-outlined text-[18px] shrink-0">warning</span>
+                    <p className="text-sm font-medium">
+                      Tài liệu này chỉ có thể lưu riêng tư và chưa thể chia sẻ.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleOpenCopyrightModal}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">update</span>
+                    Cập nhật nguồn
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2 text-emerald-700 bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                    <span className="material-symbols-outlined text-[18px] shrink-0">check_circle</span>
+                    <div className="text-sm">
+                      <p className="font-bold">Thông tin nguồn tài liệu đã hợp lệ.</p>
+                      <p className="text-emerald-600 mt-0.5">
+                        Loại nguồn:{' '}
+                        {document.copyrightSourceType === 'OWN_ORIGINAL' ? 'Tự biên soạn' : document.copyrightSourceType === 'OPEN_LICENSE' ? 'Nguồn mở' : document.copyrightSourceType === 'AUTHORIZED' ? 'Có quyền sử dụng' : 'Tài liệu chính thức FPT'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleOpenCopyrightModal}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                    Chỉnh sửa
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Actions Card */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
@@ -910,15 +1032,7 @@ export default function DocumentDetailPage() {
                           </p>
                           {(document.publicationEligibilityReason === 'COPYRIGHT_DECLARATION_REQUIRED' || document.publicationEligibilityReason === 'COPYRIGHT_METADATA_INCOMPLETE') && (
                             <button
-                              onClick={() => {
-                                setCopyrightSourceType(document.copyrightSourceType || 'UNKNOWN');
-                                setCopyrightAuthorName(document.copyrightAuthorName || '');
-                                setCopyrightSourceUrl(document.copyrightSourceUrl || '');
-                                setCopyrightLicense(document.copyrightLicense || '');
-                                setCopyrightAttribution(document.copyrightAttribution || '');
-                                setCopyrightPermissionReference(document.copyrightPermissionReference || '');
-                                setIsCopyrightModalOpen(true);
-                              }}
+                              onClick={handleOpenCopyrightModal}
                               className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
                             >
                               <span className="material-symbols-outlined text-[18px]">copyright</span>
@@ -1194,7 +1308,7 @@ export default function DocumentDetailPage() {
       )}
 
       {/* Copyright Modal */}
-      {isCopyrightModalOpen && (
+      {document.isOwner && isCopyrightModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-0">
           <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => !isSubmittingCopyright && setIsCopyrightModalOpen(false)} />
           <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8 animate-in zoom-in-95 duration-200">

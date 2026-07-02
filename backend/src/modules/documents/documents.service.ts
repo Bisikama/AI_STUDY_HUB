@@ -49,7 +49,7 @@ export class DocumentsService {
     private readonly subjectsService: SubjectsService,
     private readonly tagsService: TagsService,
     private readonly documentAccessService: DocumentAccessService,
-  ) {}
+  ) { }
 
   /**
    * Helper function to convert BigInt to Number/String in objects to prevent serialization crashes.
@@ -85,12 +85,12 @@ export class DocumentsService {
       personalFolderId: isOwner ? document.personalFolderId : null,
       subject: document.subject
         ? {
-            id: document.subject.id,
-            name: document.subject.name,
-            code: document.subject.code,
-            isSystem: document.subject.isSystem,
-            ...(document.subject.majors && { majors: document.subject.majors }),
-          }
+          id: document.subject.id,
+          name: document.subject.name,
+          code: document.subject.code,
+          isSystem: document.subject.isSystem,
+          ...(document.subject.majors && { majors: document.subject.majors }),
+        }
         : null,
       fileType: document.fileType,
       fileSize:
@@ -128,10 +128,10 @@ export class DocumentsService {
       isFollowed,
       tags: document.tags
         ? document.tags.map((t: any) => ({
-            id: t.tag.id,
-            name: t.tag.name,
-            slug: t.tag.slug,
-          }))
+          id: t.tag.id,
+          name: t.tag.name,
+          slug: t.tag.slug,
+        }))
         : [],
       isAIGenerated: document.isAIGenerated,
       summary: document.summary || null,
@@ -969,8 +969,7 @@ Quy định chặt chẽ:
         });
       } catch (dbUpdateError) {
         this.logger.error(
-          `Failed to update FAILED status in DB for document ${documentId}: ${
-            dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
+          `Failed to update FAILED status in DB for document ${documentId}: ${dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
           }`,
         );
       }
@@ -1019,6 +1018,14 @@ Quy định chặt chẽ:
         averageRating: true,
         ratingCount: true,
         personalFolderId: true,
+        copyrightSourceType: true,
+        copyrightAuthorName: true,
+        copyrightSourceUrl: true,
+        copyrightLicense: true,
+        copyrightAttribution: true,
+        copyrightPermissionReference: true,
+        copyrightDeclaredAt: true,
+        copyrightDeclaredBy: true,
 
         tags: {
           include: {
@@ -1635,7 +1642,7 @@ Quy định chặt chẽ:
           where: { id: input.documentId },
           data: { extractionStatus: 'FAILED' },
         })
-        .catch(() => {});
+        .catch(() => { });
       return { extractionStatus: 'FAILED', chunkCount: 0 };
     }
 
