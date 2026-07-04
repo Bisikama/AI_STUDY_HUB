@@ -8,6 +8,8 @@ import { documentsApi } from '@/services/documentsApi';
 import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
 import Link from 'next/link';
+import TeacherVerificationModal from '@/components/TeacherVerificationModal';
+import { toast } from 'sonner';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
@@ -179,6 +181,7 @@ function DashboardPage() {
   const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
   const [showEditAccountModal, setShowEditAccountModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [editFullName, setEditFullName] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem('user');
@@ -267,7 +270,7 @@ function DashboardPage() {
   const myDocumentItems = myDocumentsResponse?.data ?? [];
 
   const isDocumentOwner = myDocumentItems.some(
-    (d: any) => d.id === selectedDocumentId && d.isOwner,
+    (d: { id: string; isOwner?: boolean }) => d.id === selectedDocumentId && d.isOwner,
   );
   const isDocumentFollowed = selectedDocumentId
     ? followedDocumentIds.includes(selectedDocumentId)
@@ -496,7 +499,7 @@ function DashboardPage() {
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
               <h1 className="font-headline-md text-headline-md text-primary font-bold">
-                ScholarHub
+                AI STUDY HUB
               </h1>
               <p className="font-label-sm text-label-sm text-secondary text-[10px] tracking-wider uppercase">
                 Academic Excellence
@@ -569,7 +572,7 @@ function DashboardPage() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                alert('Settings clicked (Simulated)');
+                toast.info('Settings clicked (Simulated)');
               }}
             >
               <span className="material-symbols-outlined">settings</span> Settings
@@ -581,7 +584,7 @@ function DashboardPage() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                alert('Help clicked (Simulated)');
+                toast.info('Help clicked (Simulated)');
               }}
             >
               <span className="material-symbols-outlined">help</span> Help
@@ -593,7 +596,7 @@ function DashboardPage() {
               href="#"
               onClick={handleLogout}
             >
-              <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
+              <span className="material-symbols-outlined text-error">logout</span> Log out
             </a>
           </li>
         </ul>
@@ -611,7 +614,7 @@ function DashboardPage() {
               >
                 <span className="material-symbols-outlined">menu</span>
               </button>
-              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
+              <span className="font-headline-md text-headline-md text-primary">AI STUDY HUB</span>
             </div>
 
             {/* Search Form */}
@@ -674,6 +677,16 @@ function DashboardPage() {
                           manage_accounts
                         </span>{' '}
                         Edit Account
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAvatarDropdown(false);
+                          setShowVerificationModal(true);
+                        }}
+                        className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
+                        Xác thực Giảng viên
                       </button>
                       <hr className="border-outline-variant my-1" />
                       <button
@@ -1167,8 +1180,48 @@ function DashboardPage() {
                     {aiCache?.document.title ?? 'Loading document...'}
                   </h2>
                   {aiCache?.document.subject && (
-                    <p className="text-secondary mt-1">
-                      {aiCache.document.subject.name} • {aiCache.document.subject.code}
+                    <p className="text-secondary mt-1 flex flex-wrap items-center gap-2 text-sm">
+                      <span>
+                        {aiCache.document.subject.name} • {aiCache.document.subject.code}
+                      </span>
+                      {aiCache.document.copyrightSourceType && (
+                        <>
+                          <span className="text-gray-300">|</span>
+                          <span className="flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-600">
+                            <span className="material-symbols-outlined text-[14px]">copyright</span>
+                            {aiCache.document.copyrightSourceType === 'OWN_ORIGINAL' &&
+                              'Tự biên soạn'}
+                            {aiCache.document.copyrightSourceType === 'OPEN_LICENSE' && 'Nguồn mở'}
+                            {aiCache.document.copyrightSourceType === 'AUTHORIZED' &&
+                              'Được cấp quyền sử dụng'}
+                            {aiCache.document.copyrightSourceType === 'FPT_OFFICIAL' &&
+                              'Tài liệu chính thức FPT'}
+                          </span>
+                          {aiCache.document.copyrightLicense && (
+                            <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                              License: {aiCache.document.copyrightLicense}
+                            </span>
+                          )}
+                          {aiCache.document.copyrightSourceUrl && (
+                            <a
+                              href={aiCache.document.copyrightSourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-0.5 text-xs text-blue-500 hover:underline"
+                            >
+                              Nguồn{' '}
+                              <span className="material-symbols-outlined text-[12px]">
+                                open_in_new
+                              </span>
+                            </a>
+                          )}
+                          {aiCache.document.copyrightAttribution && (
+                            <span className="text-xs text-gray-500 italic">
+                              By: {aiCache.document.copyrightAttribution}
+                            </span>
+                          )}
+                        </>
+                      )}
                     </p>
                   )}
                 </div>
@@ -1456,6 +1509,11 @@ function DashboardPage() {
             </div>
           </div>
         )}
+
+        <TeacherVerificationModal
+          isOpen={showVerificationModal}
+          onClose={() => setShowVerificationModal(false)}
+        />
       </div>
     </div>
   );

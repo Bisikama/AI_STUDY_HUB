@@ -6,6 +6,7 @@ import {
   MinLength,
   MaxLength,
   IsPositive,
+  IsUUID,
 } from 'class-validator';
 
 /**
@@ -30,4 +31,8 @@ export class UploadDocumentDto {
   @IsString()
   @IsOptional()
   tags?: string; // JSON string of tag names
+
+  @IsOptional()
+  @IsUUID('4', { message: 'Personal Folder ID must be a valid UUID' })
+  personalFolderId?: string;
 }

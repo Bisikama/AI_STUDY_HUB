@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
+import { toast } from 'sonner';
 
 type Subject = {
   id: number;
@@ -20,6 +21,11 @@ type ExploreDocument = {
   quizCount: number;
   hasSummary: boolean;
   createdAt: string;
+  copyrightSourceType?: string | null;
+  copyrightAuthorName?: string | null;
+  copyrightSourceUrl?: string | null;
+  copyrightLicense?: string | null;
+  copyrightAttribution?: string | null;
 };
 
 type DocumentSummary = {
@@ -121,7 +127,9 @@ export default function DoTestPage() {
 
   // Tự động nộp bài khi hết giờ
   function handleAutoSubmit() {
-    alert('Hết thời gian làm bài! Hệ thống đang tự động nộp bài làm của bạn.');
+    toast.warning('Hết thời gian làm bài! Hệ thống đang tự động nộp bài làm của bạn.', {
+      duration: 5000,
+    });
     handleSubmitQuiz();
   }
 
@@ -381,7 +389,7 @@ export default function DoTestPage() {
                 Thông tin bài thi
               </h3>
               <p className="text-on-surface-variant text-xs font-medium">
-                Tài liệu học tập ScholarHub
+                Tài liệu học tập AI STUDY HUB
               </p>
             </div>
             <button

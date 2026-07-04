@@ -4,6 +4,7 @@ import useSWR from 'swr';
 import { useEffect, useMemo, useState, Suspense, type MouseEvent } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import axiosClient from '@/utils/axios';
+import { toast } from 'sonner';
 
 type Subject = {
   id: number;
@@ -22,7 +23,18 @@ type ExploreDocument = {
   viewCount: number;
   quizCount: number;
   hasSummary: boolean;
+  uploader: {
+    id: string;
+    fullName: string;
+    role: string;
+    isTeacher: boolean;
+  };
   createdAt: string;
+  copyrightSourceType?: string | null;
+  copyrightAuthorName?: string | null;
+  copyrightSourceUrl?: string | null;
+  copyrightLicense?: string | null;
+  copyrightAttribution?: string | null;
 };
 
 type ApiResponse<T> =
@@ -88,8 +100,10 @@ const FOLLOWED_DOCUMENTS_STORAGE_KEY = 'studyhub_followed_documents';
 
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
   const response = await fetch(url, { credentials: 'include' });
-
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      if (typeof window !== 'undefined') window.location.href = '/login';
+    }
     throw new Error('Failed to fetch explore documents');
   }
 
@@ -104,8 +118,10 @@ const fetcher = async (url: string): Promise<ExploreDocument[]> => {
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
   const response = await fetch(url, { credentials: 'include' });
-
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      if (typeof window !== 'undefined') window.location.href = '/login';
+    }
     throw new Error('Failed to fetch AI cache');
   }
 
@@ -383,7 +399,7 @@ function SearchExplore() {
 
   const handleViewFull = (documentId?: string | null) => {
     if (!documentId || documentId.startsWith('mock-')) {
-      alert('Document file is not available yet.');
+      toast.warning('Document file is not available yet.');
       return;
     }
 
@@ -392,7 +408,7 @@ function SearchExplore() {
 
   const handleCardClick = async (doc: ExploreDocument) => {
     if (doc.id.startsWith('mock-')) {
-      alert('This is a simulated document view.');
+      toast.info('This is a simulated document view.');
       return;
     }
 
@@ -465,7 +481,7 @@ function SearchExplore() {
     const unansweredCount = questions.filter((question) => !selectedOptionIds[question.id]).length;
 
     if (unansweredCount > 0) {
-      alert(`Please answer all questions before submitting. Missing: ${unansweredCount}`);
+      toast.warning(`Please answer all questions before submitting. Missing: ${unansweredCount}`);
       return;
     }
 
@@ -538,7 +554,7 @@ function SearchExplore() {
                 router.push('/');
               }}
             >
-              ScholarHub
+              AI STUDY HUB
             </a>
 
             <div className="relative w-full max-w-xl">
@@ -599,13 +615,13 @@ function SearchExplore() {
 
             <div className="border-outline-variant flex items-center gap-4 border-l pl-6">
               <button
-                onClick={() => alert('Notifications clicked (Simulated)')}
+                onClick={() => toast.info('Notifications clicked (Simulated)')}
                 className="material-symbols-outlined text-secondary hover:bg-surface-container-low cursor-pointer rounded-full p-2 transition-colors active:scale-95"
               >
                 notifications
               </button>
               <button
-                onClick={() => alert('Settings clicked (Simulated)')}
+                onClick={() => toast.info('Settings clicked (Simulated)')}
                 className="material-symbols-outlined text-secondary hover:bg-surface-container-low cursor-pointer rounded-full p-2 transition-colors active:scale-95"
               >
                 settings
@@ -622,7 +638,7 @@ function SearchExplore() {
                   }
                 }}
                 className="material-symbols-outlined text-error cursor-pointer rounded-full p-2 transition-colors hover:bg-red-50 active:scale-95"
-                title="Đăng xuất"
+                title="Log out"
               >
                 logout
               </button>
@@ -826,7 +842,7 @@ function SearchExplore() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => alert('Grid view clicked (Simulated)')}
+                    onClick={() => toast.info('Grid view clicked (Simulated)')}
                     className="bg-surface-container-low text-label-md text-primary hover:bg-surface-container-high flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 transition-colors"
                   >
                     <span className="material-symbols-outlined text-[20px]">grid_view</span>
@@ -872,6 +888,21 @@ function SearchExplore() {
                             <h3 className="font-headline-md text-primary group-hover:text-primary-container leading-tight">
                               {doc.title}
                             </h3>
+                            {doc.uploader && (
+                              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-medium text-gray-700">
+                                  {doc.uploader.fullName}
+                                </span>
+                                {doc.uploader.isTeacher && (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                    <span className="material-symbols-outlined text-[14px]">
+                                      verified
+                                    </span>
+                                    Giảng viên đã xác minh
+                                  </span>
+                                )}
+                              </div>
+                            )}
                             <button
                               type="button"
                               onClick={(e) => toggleFollow(doc, e)}
@@ -986,14 +1017,14 @@ function SearchExplore() {
 
               <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <button
-                  onClick={() => alert('Upload Document dialog initiated (Simulated)')}
+                  onClick={() => toast.info('Upload Document dialog initiated (Simulated)')}
                   className="bg-primary-container font-label-md text-label-md flex h-12 cursor-pointer items-center gap-2 rounded-lg px-8 text-white transition-all hover:shadow-lg active:scale-98"
                 >
                   <span className="material-symbols-outlined text-[20px]">upload_file</span>
                   Upload Your Own Document
                 </button>
                 <button
-                  onClick={() => alert('Opening AI Support chatbot (Simulated)')}
+                  onClick={() => toast.info('Opening AI Support chatbot (Simulated)')}
                   className="border-outline-variant text-primary font-label-md text-label-md hover:bg-surface-container-low flex h-12 cursor-pointer items-center gap-2 rounded-lg border bg-white px-8 transition-all active:scale-98"
                 >
                   <span className="material-symbols-outlined text-[20px]">smart_toy</span>
@@ -1378,7 +1409,7 @@ function SearchExplore() {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              alert('Privacy Policy clicked (Simulated)');
+              toast.info('Privacy Policy clicked (Simulated)');
             }}
           >
             Privacy Policy
@@ -1388,7 +1419,7 @@ function SearchExplore() {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              alert('Terms of Service clicked (Simulated)');
+              toast.info('Terms of Service clicked (Simulated)');
             }}
           >
             Terms of Service

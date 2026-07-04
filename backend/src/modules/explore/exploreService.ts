@@ -21,6 +21,7 @@ export class ExploreService {
         deletedAt: null,
         subject: {
           isSystem: true,
+          isActive: true,
         },
         ...(search
           ? {
@@ -65,6 +66,13 @@ export class ExploreService {
             quizzes: true,
           },
         },
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            role: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -87,7 +95,18 @@ export class ExploreService {
         viewCount: document.viewCount,
         quizCount: document._count.quizzes,
         hasSummary: document.summary !== null,
+        uploader: {
+          id: document.user.id,
+          fullName: document.user.fullName,
+          role: document.user.role,
+          isTeacher: document.user.role === 'TEACHER',
+        },
         createdAt: document.createdAt,
+        copyrightSourceType: document.copyrightSourceType,
+        copyrightAuthorName: document.copyrightAuthorName,
+        copyrightSourceUrl: document.copyrightSourceUrl,
+        copyrightLicense: document.copyrightLicense,
+        copyrightAttribution: document.copyrightAttribution,
       };
     });
   }
@@ -104,6 +123,7 @@ export class ExploreService {
         deletedAt: null,
         subject: {
           isSystem: true,
+          isActive: true,
         },
       },
       include: {
@@ -116,6 +136,13 @@ export class ExploreService {
                 options: true,
               },
             },
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            role: true,
           },
         },
       },
@@ -139,7 +166,18 @@ export class ExploreService {
         fileSize: document.fileSize.toString(),
         downloadCount: document.downloadCount,
         viewCount: document.viewCount,
+        uploader: {
+          id: document.user.id,
+          fullName: document.user.fullName,
+          role: document.user.role,
+          isTeacher: document.user.role === 'TEACHER',
+        },
         createdAt: document.createdAt,
+        copyrightSourceType: document.copyrightSourceType,
+        copyrightAuthorName: document.copyrightAuthorName,
+        copyrightSourceUrl: document.copyrightSourceUrl,
+        copyrightLicense: document.copyrightLicense,
+        copyrightAttribution: document.copyrightAttribution,
       },
 
       summaries: document.summary ? [document.summary] : [],
@@ -183,6 +221,7 @@ export class ExploreService {
               deletedAt: null,
               subject: {
                 isSystem: true,
+                isActive: true,
               },
             },
           },

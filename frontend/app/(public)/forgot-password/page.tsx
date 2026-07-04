@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { authApi } from '@/services/authApi';
+import { toast } from 'sonner';
 
 const forgotPasswordSchema = z.object({
   email: z.string().min(1, 'Email không được để trống').email('Email không đúng định dạng'),
@@ -33,12 +34,12 @@ export default function ForgotPasswordPage() {
       const res = await authApi.forgotPassword(data.email);
       const devOtp = res?.data?.devOtp;
       if (devOtp) {
-        alert(`Yêu cầu thành công! (DEV MODE: Mã OTP của bạn là ${devOtp})`);
+        toast.success(`Yêu cầu thành công! (DEV MODE: Mã OTP của bạn là ${devOtp})`);
         router.push(
           `/reset-password?email=${encodeURIComponent(data.email)}&otp=${encodeURIComponent(devOtp)}`,
         );
       } else {
-        alert('Yêu cầu thành công! Vui lòng kiểm tra mã OTP.');
+        toast.success('Yêu cầu thành công! Vui lòng kiểm tra mã OTP.');
         router.push(`/reset-password?email=${encodeURIComponent(data.email)}`);
       }
     } catch (err: unknown) {
@@ -69,7 +70,7 @@ export default function ForgotPasswordPage() {
                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
               </svg>
             </div>
-            <span className="text-lg font-bold tracking-tight text-gray-950">ScholarHub</span>
+            <span className="text-lg font-bold tracking-tight text-gray-950">AI STUDY HUB</span>
           </div>
 
           {/* Tiêu đề */}
@@ -182,7 +183,7 @@ export default function ForgotPasswordPage() {
             </svg>
           </div>
           <p className="text-[9px] font-bold tracking-[0.2em] text-gray-400 uppercase">
-            Recover Access to ScholarHub
+            Recover Access to AI STUDY HUB
           </p>
         </div>
       </div>

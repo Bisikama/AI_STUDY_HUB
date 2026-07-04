@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Script from 'next/script';
+import { toast } from 'sonner';
 
 interface CustomWindow extends Window {
   google?: {
@@ -96,7 +97,7 @@ export default function RegisterPage() {
         email: data.email,
         password: data.password,
       });
-      alert('Đăng ký thành công! Hãy đăng nhập.');
+      toast.success('Đăng ký thành công! Hãy đăng nhập.');
       router.push('/login');
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -122,12 +123,12 @@ export default function RegisterPage() {
                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
               </svg>
             </div>
-            <span className="text-lg font-bold tracking-tight text-gray-950">ScholarHub</span>
+            <span className="text-lg font-bold tracking-tight text-gray-950">AI STUDY HUB</span>
           </div>
 
           <div className="mb-8">
             <h1 className="mb-1.5 text-2xl font-bold tracking-tight text-gray-950">
-              Join ScholarHub
+              Join AI STUDY HUB
             </h1>
             <p className="text-[13px] leading-relaxed text-gray-500">
               Start your academic journey and manage research like a pro.

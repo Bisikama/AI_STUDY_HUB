@@ -13,8 +13,11 @@ export async function clearAllData(prisma: PrismaClient): Promise<void> {
     prisma.documentSummary.deleteMany(),
     prisma.uploadStatus.deleteMany(),
     prisma.document.deleteMany(),
+    prisma.personalFolder.deleteMany(),
     prisma.passwordResetToken.deleteMany(),
+    prisma.majorSubject.deleteMany(),
     prisma.subject.deleteMany(),
+    prisma.major.deleteMany(),
     prisma.user.deleteMany(),
   ]);
 

@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { authApi } from '@/services/authApi';
+import { toast } from 'sonner';
 
 const resetPasswordSchema = z
   .object({
@@ -54,7 +55,7 @@ function ResetPasswordForm() {
         otp: data.otp,
         password: data.password,
       });
-      alert('Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.');
+      toast.success('Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.');
       router.push('/login');
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { message?: string } } };
@@ -84,7 +85,7 @@ function ResetPasswordForm() {
                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
               </svg>
             </div>
-            <span className="text-lg font-bold tracking-tight text-gray-950">ScholarHub</span>
+            <span className="text-lg font-bold tracking-tight text-gray-950">AI STUDY HUB</span>
           </div>
 
           {/* Tiêu đề */}
@@ -310,7 +311,7 @@ function ResetPasswordForm() {
             </svg>
           </div>
           <p className="text-[9px] font-bold tracking-[0.2em] text-gray-400 uppercase">
-            Recover Access to ScholarHub
+            Recover Access to AI STUDY HUB
           </p>
         </div>
       </div>

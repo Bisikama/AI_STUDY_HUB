@@ -1,5 +1,15 @@
-import { Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { DocumentStatus, VisibilityStatus, ReportStatus, ReportReason } from '../../../generated/prisma/client';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import {
+  DocumentStatus,
+  VisibilityStatus,
+  ReportStatus,
+  ReportReason,
+} from '../../../generated/prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { GetAdminQuizzesQueryDto, UpdateQuestionDto } from './dto/admin-quiz.dto';
@@ -106,7 +116,7 @@ export class AdminService {
           fileType: true,
           status: true,
           visibilityStatus: true,
-          fullText: true,        // nội dung text đầy đủ để admin review
+          fullText: true, // nội dung text đầy đủ để admin review
           createdAt: true,
           subject: {
             select: { id: true, name: true, code: true },
@@ -187,8 +197,24 @@ export class AdminService {
     // 3. Chỉ sau khi Cloud xóa thành công mới xóa record trong DB
     // Prisma Cascade tự động xóa DocumentSummary, Quiz, QuizQuestion, QuizOption liên quan
     try {
-      await this.prisma.document.delete({
-        where: { id: docId },
+      await this.prisma.$transaction(async (tx: any) => {
+        await tx.document.delete({
+          where: { id: docId },
+        });
+
+        if (document.fileSize != null) {
+          if (document.deletionStatus === 'ACTIVE') {
+            await tx.userStorageUsage.updateMany({
+              where: { userId: document.uploadedBy },
+              data: { usedBytes: { decrement: document.fileSize } },
+            });
+          } else {
+            await tx.userStorageUsage.updateMany({
+              where: { userId: document.uploadedBy },
+              data: { trashBytes: { decrement: document.fileSize } },
+            });
+          }
+        }
       });
     } catch (error) {
       console.error('Lỗi khi xóa document trong DB:', error);
@@ -434,7 +460,13 @@ export class AdminService {
     }
   }
 
-  async getReports(query: { status?: any; reason?: any; documentId?: string; page?: number; limit?: number }) {
+  async getReports(query: {
+    status?: any;
+    reason?: any;
+    documentId?: string;
+    page?: number;
+    limit?: number;
+  }) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -639,7 +671,8 @@ export class AdminService {
                 status: 'RESOLVED',
                 reviewedBy: adminId,
                 reviewedAt: new Date(),
-                adminNote: 'Báo cáo được giải quyết tự động vì tài liệu đã bị ẩn hoặc gỡ bỏ bởi quản trị viên.',
+                adminNote:
+                  'Báo cáo được giải quyết tự động vì tài liệu đã bị ẩn hoặc gỡ bỏ bởi quản trị viên.',
               },
             });
           }

@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 type Subject = {
   id: number;
@@ -21,6 +22,11 @@ type ExploreDocument = {
   quizCount: number;
   hasSummary: boolean;
   createdAt: string;
+  copyrightSourceType?: string | null;
+  copyrightAuthorName?: string | null;
+  copyrightSourceUrl?: string | null;
+  copyrightLicense?: string | null;
+  copyrightAttribution?: string | null;
 };
 
 type DocumentSummary = {
@@ -207,7 +213,7 @@ export default function PracticePage() {
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   // Fetch danh sách tài liệu
-  const { data: documents = [], error: docsError } = useSWR(`${API_BASE_URL}/api/explore`, fetcher);
+  const { data: documents = [], error: docsError, isLoading: isLoadingDocs } = useSWR(`${API_BASE_URL}/api/explore`, fetcher);
 
   // Fetch AI Cache (Summary + Quizzes) khi chọn tài liệu
   const {
@@ -302,9 +308,6 @@ export default function PracticePage() {
     return documents.find((doc) => doc.id === selectedDocId);
   }, [documents, selectedDocId]);
 
-  // Loading state cho danh sách tài liệu
-  const isLoadingDocs = documents.length === 0 && !docsError;
-
   if (isLoadingDocs && !selectedDocId) {
     return <PracticeSkeleton />;
   }
@@ -322,7 +325,7 @@ export default function PracticePage() {
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
               <h1 className="font-headline-md text-headline-md text-primary font-bold">
-                ScholarHub
+                AI STUDY HUB
               </h1>
               <p className="font-label-sm text-label-sm text-secondary text-[10px] tracking-wider uppercase">
                 Academic Excellence
@@ -371,14 +374,13 @@ export default function PracticePage() {
               <span className="material-symbols-outlined">lightbulb</span> Practice Mode
             </Link>
           </li>
-          
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
           <li>
             <button
               className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-              onClick={() => alert('Settings clicked (Simulated)')}
+              onClick={() => toast.info('Settings clicked (Simulated)')}
             >
               <span className="material-symbols-outlined">settings</span> Settings
             </button>
@@ -386,7 +388,7 @@ export default function PracticePage() {
           <li>
             <button
               className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-              onClick={() => alert('Help clicked (Simulated)')}
+              onClick={() => toast.info('Help clicked (Simulated)')}
             >
               <span className="material-symbols-outlined">help</span> Help
             </button>
@@ -397,7 +399,7 @@ export default function PracticePage() {
               href="#"
               onClick={handleLogout}
             >
-              <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
+              <span className="material-symbols-outlined text-error">logout</span> Log out
             </a>
           </li>
         </ul>
@@ -415,7 +417,7 @@ export default function PracticePage() {
               >
                 <span className="material-symbols-outlined">menu</span>
               </button>
-              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
+              <span className="font-headline-md text-headline-md text-primary">AI STUDY HUB</span>
             </div>
 
             {/* Search Form */}
@@ -430,7 +432,7 @@ export default function PracticePage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="bg-surface-container-low text-on-surface focus:ring-primary focus:bg-surface-container-lowest font-body-md text-body-md w-full rounded-full border-none py-2.5 pr-4 pl-12 transition-all outline-none focus:ring-2"
-                placeholder="Tìm kiếm tài liệu học tập..."
+                placeholder="Search for courses, documents or keywords ..."
                 type="text"
               />
             </form>
@@ -507,7 +509,7 @@ export default function PracticePage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="bg-surface-container-low text-on-surface focus:ring-primary focus:bg-surface-container-lowest font-body-md text-body-md w-full rounded-full border-none py-2.5 pr-4 pl-12 transition-all outline-none focus:ring-2"
-              placeholder="Tìm kiếm tài liệu học tập..."
+              placeholder="Search for courses, documents or keywords..."
               type="text"
             />
           </form>
@@ -517,13 +519,15 @@ export default function PracticePage() {
                ======================================================= */
             <>
               <section className="mb-10">
-                <h3 className="text-primary mb-4 text-lg font-bold">Tài liệu của bạn</h3>
+                <h3 className="text-primary mb-4 text-lg font-bold">QUIZ</h3>
                 {filteredDocuments.length === 0 ? (
                   <div className="bg-surface-container-lowest border-outline-variant rounded-xl border p-8 text-center">
                     <span className="material-symbols-outlined text-secondary mb-2 text-4xl">
                       library_books
                     </span>
-                    <p className="text-secondary font-body-md">Không tìm thấy tài liệu phù hợp.</p>
+                    <p className="text-secondary font-body-md">
+                      {search ? 'No suitable documents found.' : 'There is no quiz here.'}
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -563,32 +567,7 @@ export default function PracticePage() {
               </section>
 
               {/* Bento Row giống giao diện mẫu */}
-              <section className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
-                <div className="bg-primary text-on-primary col-span-1 flex items-center justify-between rounded-xl p-6 md:col-span-2">
-                  <div>
-                    <h5 className="font-headline-md mb-1 text-lg font-bold">
-                      Chuỗi ôn tập: 12 ngày
-                    </h5>
-                    <p className="font-body-md text-sm opacity-80">
-                      Bạn đang nằm trong top 5% học viên tích cực tuần này. Hãy tiếp tục nhé!
-                    </p>
-                  </div>
-                  <div className="border-on-primary/20 bg-on-primary/10 hidden h-16 w-16 items-center justify-center rounded-full border-4 sm:flex">
-                    <span className="material-symbols-outlined filled text-on-primary text-3xl">
-                      local_fire_department
-                    </span>
-                  </div>
-                </div>
-                <div className="bg-surface-container-highest border-outline-variant flex flex-col justify-between rounded-xl border p-6">
-                  <h5 className="text-on-surface-variant text-xs font-semibold tracking-wider uppercase">
-                    Thời gian học hôm nay
-                  </h5>
-                  <span className="text-primary text-3xl font-bold">42 phút</span>
-                  <p className="text-on-surface-variant text-xs">
-                    Còn 18 phút nữa để đạt mục tiêu ngày
-                  </p>
-                </div>
-              </section>
+             
             </>
           ) : (
             /* =======================================================

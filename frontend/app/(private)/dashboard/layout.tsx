@@ -4,12 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import axiosClient from '@/utils/axios';
+import TeacherVerificationModal from '@/components/TeacherVerificationModal';
+import { toast } from 'sonner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [search, setSearch] = useState('');
   const [userFullName, setUserFullName] = useState('User');
 
@@ -58,7 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span className="material-symbols-outlined text-primary text-3xl">school</span>
             <div>
               <h1 className="font-headline-md text-headline-md text-primary font-bold">
-                ScholarHub
+                AI STUDY HUB
               </h1>
               <p className="font-label-sm text-label-sm text-secondary text-[10px] tracking-wider uppercase">
                 Academic Excellence
@@ -124,7 +127,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
           <li>
             <button
-              onClick={() => alert('Settings clicked (Simulated)')}
+              onClick={() => toast.info('Settings clicked (Simulated)')}
               className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
             >
               <span className="material-symbols-outlined">settings</span> Settings
@@ -132,7 +135,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </li>
           <li>
             <button
-              onClick={() => alert('Help clicked (Simulated)')}
+              onClick={() => toast.info('Help clicked (Simulated)')}
               className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
             >
               <span className="material-symbols-outlined">help</span> Help
@@ -144,7 +147,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               href="#"
               onClick={handleLogout}
             >
-              <span className="material-symbols-outlined text-error">logout</span> Đăng xuất
+              <span className="material-symbols-outlined text-error">logout</span> Log out
             </a>
           </li>
         </ul>
@@ -162,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <span className="material-symbols-outlined">menu</span>
               </button>
-              <span className="font-headline-md text-headline-md text-primary">ScholarHub</span>
+              <span className="font-headline-md text-headline-md text-primary">AI STUDY HUB</span>
             </div>
 
             {/* Search Form */}
@@ -216,10 +219,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
                         onClick={() => {
                           setShowAvatarDropdown(false);
+                          setShowVerificationModal(true);
                         }}
                       >
-                        <span className="material-symbols-outlined text-[18px]">person</span>{' '}
-                        Profile
+                        <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
+                        Xác thực Giảng viên
                       </button>
                       <hr className="border-outline-variant my-1" />
                       <button
@@ -235,6 +239,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
+
+        <TeacherVerificationModal
+          isOpen={showVerificationModal}
+          onClose={() => setShowVerificationModal(false)}
+        />
 
         {/* Page Content */}
         <main className="flex-1 bg-[#F8F9FA]">{children}</main>

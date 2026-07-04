@@ -1,7 +1,7 @@
 import UploadZone from '@/components/documents/UploadZone';
 
 export const metadata = {
-  title: 'Upload Materials — ScholarHub',
+  title: 'Upload Materials — AI STUDY HUB',
   description: 'Upload study documents, research papers, and lecture notes.',
 };
 

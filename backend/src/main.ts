@@ -34,22 +34,13 @@ async function bootstrap() {
       if (!origin) {
         return callback(null, true);
       }
-      
-      const isAllowed =
-        allowedOrigins === '*' ||
-        originArray.includes('*') ||
-        originArray.includes(origin) ||
-        origin.endsWith('.vercel.app') ||
-        origin.endsWith('.onrender.com') ||
-        origin.endsWith('.github.dev') ||
-        origin.endsWith('.gitpod.io');
 
+      const isAllowed = originArray.includes(origin) || origin.endsWith('.vercel.app');
       if (isAllowed) {
         return callback(null, true);
       }
-      
-      console.warn(`[CORS Blocked] Origin "${origin}" is not allowed. Configured ALLOWED_ORIGINS: "${allowedOrigins}"`);
-      return callback(null, false);
+
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
   });

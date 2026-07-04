@@ -6,6 +6,7 @@ export interface UploadDocumentPayload {
   description?: string;
   subjectId: number;
   tags?: string; // JSON string
+  personalFolderId?: string;
 }
 
 export type SignedDocumentUrlResponse = {
@@ -15,12 +16,22 @@ export type SignedDocumentUrlResponse = {
   disposition: 'inline' | 'attachment';
 };
 
+export interface StorageSummary {
+  quotaBytes: string;
+  usedBytes: string;
+  reservedBytes: string;
+  trashBytes: string;
+  availableBytes: string;
+  usedPercent: number;
+}
+
 export interface Document {
   id: string;
   title: string;
   description: string | null;
   subjectId: number;
-  subject?: { id: number; name: string; code: string; isSystem: boolean } | null;
+  personalFolderId?: string | null;
+  subject?: { id: number; name: string; code: string; isSystem: boolean; majors?: { major: { id: string; name: string; code: string } }[] } | null;
   fileSize: number;
   fileType: string;
   downloadCount: number;
@@ -32,7 +43,7 @@ export interface Document {
   status?: 'ACTIVE' | 'UNDER_REVIEW' | 'HIDDEN' | 'REMOVED';
   visibilityStatus: 'PUBLIC' | 'PENDING_REVIEW' | 'PRIVATE';
   deletionStatus?: 'ACTIVE' | 'SOFT_DELETED' | 'DELETING' | 'DELETE_FAILED' | 'REMOVED';
-  extractionStatus?: 'PENDING' | 'READY' | 'FAILED';
+  extractionStatus?: 'PENDING' | 'READY' | 'FAILED' | 'UNSUPPORTED';
   aiStatus?: 'NOT_REQUESTED' | 'PROCESSING' | 'READY' | 'FAILED';
   pageCount?: number | null;
   isAIGenerated: boolean;
@@ -44,6 +55,16 @@ export interface Document {
   updatedAt: string;
   requestedAt?: string | null;
   tags?: any[];
+  canRequestPublic?: boolean;
+  publicationEligibilityReason?: string | null;
+  copyrightSourceType?: 'OWN_ORIGINAL' | 'OPEN_LICENSE' | 'AUTHORIZED' | 'FPT_OFFICIAL' | 'THIRD_PARTY' | 'UNKNOWN';
+  copyrightAuthorName?: string | null;
+  copyrightSourceUrl?: string | null;
+  copyrightLicense?: string | null;
+  copyrightAttribution?: string | null;
+  copyrightPermissionReference?: string | null;
+  copyrightDeclaredAt?: string | null;
+  copyrightDeclaredBy?: string | null;
 }
 
 export interface UploadDocumentResponse {
@@ -73,6 +94,7 @@ export const documentsApi = {
     if (payload.description) formData.append("description", payload.description);
     formData.append("subjectId", String(payload.subjectId));
     if (payload.tags) formData.append("tags", payload.tags);
+    if (payload.personalFolderId) formData.append("personalFolderId", payload.personalFolderId);
 
     const response = await axiosClient.post<UploadDocumentResponse>(
       "/documents/upload",
@@ -94,6 +116,15 @@ export const documentsApi = {
     q?: string;
     subjectId?: number;
     visibilityStatus?: string;
+    folderId?: string;
+    unfiled?: boolean;
+    majorCode?: string;
+    aiStatus?: string;
+    extractionStatus?: string;
+    fileType?: string;
+    deletionStatus?: string;
+    sortBy?: string;
+    sortOrder?: string;
   }): Promise<{ data: Document[]; meta: { total: number; page: number; limit: number; totalPages: number } }> => {
     // Clean up undefined/empty params
     const cleanParams: any = {};
@@ -127,8 +158,23 @@ export const documentsApi = {
   /**
    * Update document metadata (title, description, subjectId).
    */
-  updateDocument: async (id: string, payload: { title?: string; description?: string; subjectId?: number; tags?: string }): Promise<Document> => {
+  updateDocument: async (id: string, payload: { title?: string; description?: string; subjectId?: number; tags?: string[]; personalFolderId?: string | null }): Promise<Document> => {
     const response = await axiosClient.patch(`/documents/${id}`, payload);
+    return response.data;
+  },
+
+  /**
+   * Update document copyright.
+   */
+  updateCopyright: async (id: string, payload: {
+    sourceType: string;
+    authorName?: string;
+    sourceUrl?: string;
+    license?: string;
+    attribution?: string;
+    permissionReference?: string;
+  }): Promise<any> => {
+    const response = await axiosClient.patch(`/documents/${id}/copyright`, payload);
     return response.data;
   },
 
@@ -217,6 +263,14 @@ export const documentsApi = {
    */
   reportDocument: async (documentId: string, payload: { reason: string; description?: string }): Promise<any> => {
     const response = await axiosClient.post(`/documents/${documentId}/reports`, payload);
+    return response.data;
+  },
+
+  /**
+   * Get storage summary for the current user.
+   */
+  getStorageSummary: async (): Promise<StorageSummary> => {
+    const response = await axiosClient.get(`/documents/me/storage-summary`);
     return response.data;
   },
 };

@@ -49,6 +49,11 @@ enum ReportStatus {
   REJECTED
 }
 
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
 
 /// Trạng thái tiến trình upload file lên Cloud Storage
 enum UploadProgressStatus {
@@ -82,6 +87,7 @@ enum ExtractionStatus {
   PENDING
   READY
   FAILED
+  UNSUPPORTED
 }
 
 enum AIStatus {
@@ -89,6 +95,21 @@ enum AIStatus {
   PROCESSING
   READY
   FAILED
+}
+
+enum ReservationStatus {
+  PENDING
+  FINALIZED
+  RELEASED
+}
+
+enum CopyrightSourceType {
+  OWN_ORIGINAL
+  OPEN_LICENSE
+  AUTHORIZED
+  FPT_OFFICIAL
+  THIRD_PARTY
+  UNKNOWN
 }
 
 /// Quản lý thông tin tài khoản người dùng
@@ -114,8 +135,13 @@ model User {
   documentViews           UserDocumentView[]
   followedDocuments       UserFollowedDocument[]
   documentRatings         DocumentRating[]
-  documentReportsMade     DocumentReport[] @relation("DocumentReporter")
-  documentReportsReviewed DocumentReport[] @relation("DocumentReviewer")
+  documentReportsMade     DocumentReport[]       @relation("DocumentReporter")
+  documentReportsReviewed DocumentReport[]       @relation("DocumentReviewer")
+  teacherVerification     TeacherVerification?
+  storageUsage            UserStorageUsage?
+  storageReservations     StorageReservation[]
+  personalFolders         PersonalFolder[]
+  copyrightDeclarations   Document[]             @relation("DocumentCopyrightDeclarer")
 
   @@map("users")
 }
@@ -133,6 +159,22 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+/// Quản lý Yêu cầu xác thực Giảng viên
+model TeacherVerification {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @unique @map("user_id") @db.Uuid
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teacherCode String             @map("teacher_code")
+  department  String
+  proofUrl    String             @map("proof_url")
+  status      VerificationStatus @default(PENDING)
+  adminNote   String?            @map("admin_note") @db.Text
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  @@map("teacher_verifications")
+}
+
 /// Danh mục Môn học/Mã học phần
 model Subject {
   id          Int      @id @default(autoincrement())
@@ -140,14 +182,60 @@ model Subject {
   code        String   @unique
   description String?  @db.Text
   isSystem    Boolean  @default(false) @map("is_system")
+  isActive    Boolean  @default(true) @map("is_active")
   createdBy   String?  @map("created_by") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Quan hệ
   documents Document[]
+  majors    MajorSubject[]
 
   @@map("subjects")
+}
+
+/// Chuyên ngành/Ngành học (Major)
+model Major {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  subjects MajorSubject[]
+
+  @@map("majors")
+}
+
+/// Bảng trung gian Course Catalog: Ngành học ↔ Học phần
+model MajorSubject {
+  majorId   String @map("major_id") @db.Uuid
+  subjectId Int    @map("subject_id")
+
+  major   Major   @relation(fields: [majorId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([majorId, subjectId])
+  @@map("major_subjects")
+}
+
+/// Thư mục cá nhân của người dùng
+model PersonalFolder {
+  id        String   @id @default(uuid()) @db.Uuid
+  ownerId   String   @map("owner_id") @db.Uuid
+  name      String
+  parentId  String?  @map("parent_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  parent    PersonalFolder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Restrict)
+  children  PersonalFolder[] @relation("FolderToFolder")
+  documents Document[]
+
+  @@map("personal_folders")
 }
 
 /// Tag quản lý nhãn dán cho Document
@@ -179,29 +267,31 @@ model DocumentTag {
 
 /// Thông tin siêu dữ liệu tài liệu học thuật
 model Document {
-  id            String         @id @default(uuid()) @db.Uuid
-  title         String
-  description   String?        @db.Text
-  subjectId     Int            @map("subject_id")
-  subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  uploadedBy    String         @map("uploaded_by") @db.Uuid
-  user          User           @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
-  fileUrl       String         @map("file_url") @db.VarChar(512)
-  previewUrl    String?        @map("preview_url") @db.VarChar(512)
-  fileSize      BigInt         @map("file_size")
-  fileType      String         @map("file_type")
-  downloadCount Int            @default(0) @map("download_count")
-  viewCount     Int            @default(0) @map("view_count")
-  status        DocumentStatus @default(ACTIVE)
-  fullText      String?        @map("full_text") @db.Text
-  pageCount     Int?           @map("page_count")
-  isAIGenerated Boolean        @default(false) @map("is_ai_generated")
-  averageRating Float          @default(0.0) @map("average_rating")
-  ratingCount   Int            @default(0) @map("rating_count")
-  reportCount   Int            @default(0) @map("report_count")
-  deletedAt     DateTime?      @map("deleted_at")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+  id               String          @id @default(uuid()) @db.Uuid
+  title            String
+  description      String?         @db.Text
+  subjectId        Int             @map("subject_id")
+  subject          Subject         @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  personalFolderId String?         @map("personal_folder_id") @db.Uuid
+  personalFolder   PersonalFolder? @relation(fields: [personalFolderId], references: [id], onDelete: Restrict)
+  uploadedBy       String          @map("uploaded_by") @db.Uuid
+  user             User            @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  fileUrl          String          @map("file_url") @db.VarChar(512)
+  previewUrl       String?         @map("preview_url") @db.VarChar(512)
+  fileSize         BigInt          @map("file_size")
+  fileType         String          @map("file_type")
+  downloadCount    Int             @default(0) @map("download_count")
+  viewCount        Int             @default(0) @map("view_count")
+  status           DocumentStatus  @default(ACTIVE)
+  fullText         String?         @map("full_text") @db.Text
+  pageCount        Int?            @map("page_count")
+  isAIGenerated    Boolean         @default(false) @map("is_ai_generated")
+  averageRating    Float           @default(0.0) @map("average_rating")
+  ratingCount      Int             @default(0) @map("rating_count")
+  reportCount      Int             @default(0) @map("report_count")
+  deletedAt        DateTime?       @map("deleted_at")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
 
   // Document Lifecycle
   visibilityStatus VisibilityStatus @default(PRIVATE) @map("visibility_status")
@@ -218,16 +308,28 @@ model Document {
   aiAttemptCount        Int       @default(0) @map("ai_attempt_count")
   aiFailureReason       String?   @map("ai_failure_reason") @db.Text
 
+  // Copyright Fields
+  copyrightSourceType          CopyrightSourceType @default(UNKNOWN) @map("copyright_source_type")
+  copyrightAuthorName          String?             @map("copyright_author_name") @db.VarChar(255)
+  copyrightSourceUrl           String?             @map("copyright_source_url") @db.VarChar(512)
+  copyrightLicense             String?             @map("copyright_license") @db.VarChar(100)
+  copyrightAttribution         String?             @map("copyright_attribution") @db.Text
+  copyrightPermissionReference String?             @map("copyright_permission_reference") @db.Text
+  copyrightDeclaredAt          DateTime?           @map("copyright_declared_at")
+  copyrightDeclaredBy          String?             @map("copyright_declared_by") @db.Uuid
+  copyrightDeclarer            User?               @relation("DocumentCopyrightDeclarer", fields: [copyrightDeclaredBy], references: [id], onDelete: SetNull)
+
   // Quan hệ
-  summary        DocumentSummary?
-  uploadStatuses UploadStatus[]
-  quizzes        Quiz[]
-  documentViews  UserDocumentView[]
-  tags           DocumentTag[]
-  followers      UserFollowedDocument[]
-  chunks         DocumentChunk[]
-  ratings        DocumentRating[]
-  reports        DocumentReport[]
+  summary             DocumentSummary?
+  uploadStatuses      UploadStatus[]
+  quizzes             Quiz[]
+  documentViews       UserDocumentView[]
+  tags                DocumentTag[]
+  followers           UserFollowedDocument[]
+  chunks              DocumentChunk[]
+  ratings             DocumentRating[]
+  reports             DocumentReport[]
+  storageReservations StorageReservation[]
 
   @@index([subjectId, status])
   @@map("documents")
@@ -375,45 +477,76 @@ model DocumentChunk {
 }
 
 model DocumentRating {
-  id         String   @id @default(uuid()) @db.Uuid
-  documentId String   @map("document_id") @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
+  id         String @id @default(uuid()) @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  userId     String @map("user_id") @db.Uuid
 
-  rating     Int
-  comment    String?  @db.Text
+  rating  Int
+  comment String? @db.Text
 
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([documentId, userId])
   @@map("document_ratings")
 }
 
 model DocumentReport {
-  id          String       @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  documentId  String       @map("document_id") @db.Uuid
-  reporterId  String       @map("reporter_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  reporterId String @map("reporter_id") @db.Uuid
 
   reason      ReportReason
   description String?      @db.Text
 
-  status      ReportStatus @default(PENDING)
+  status ReportStatus @default(PENDING)
 
-  reviewedBy  String?      @map("reviewed_by") @db.Uuid
-  reviewedAt  DateTime?    @map("reviewed_at")
-  adminNote   String?      @map("admin_note") @db.Text
+  reviewedBy String?   @map("reviewed_by") @db.Uuid
+  reviewedAt DateTime? @map("reviewed_at")
+  adminNote  String?   @map("admin_note") @db.Text
 
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  document    Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  reporter    User         @relation("DocumentReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  reviewer    User?        @relation("DocumentReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  reporter User     @relation("DocumentReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reviewer User?    @relation("DocumentReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@map("document_reports")
 }
 
+model UserStorageUsage {
+  userId        String   @id @map("user_id") @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotaBytes    BigInt   @map("quota_bytes")
+  usedBytes     BigInt   @map("used_bytes")
+  reservedBytes BigInt   @map("reserved_bytes")
+  trashBytes    BigInt   @map("trash_bytes")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("user_storage_usages")
+}
+
+model StorageReservation {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @map("user_id") @db.Uuid
+  documentId  String?           @map("document_id") @db.Uuid
+  bytes       BigInt
+  status      ReservationStatus @default(PENDING)
+  expiresAt   DateTime          @map("expires_at")
+  finalizedAt DateTime?         @map("finalized_at")
+  releasedAt  DateTime?         @map("released_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, expiresAt])
+  @@map("storage_reservations")
+}

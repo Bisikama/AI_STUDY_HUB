@@ -42,6 +42,9 @@ export class AuthService {
         passwordHash: hashedPassword,
         fullName: dto.name,
         role: 'STUDENT',
+        storageUsage: {
+          create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
+        },
       },
     });
 
@@ -124,6 +127,9 @@ export class AuthService {
             fullName: name,
             avatarUrl,
             role: 'STUDENT',
+            storageUsage: {
+              create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
+            },
           },
         });
       }
@@ -187,8 +193,7 @@ export class AuthService {
     const mailSent = await this.mailService.sendOtp(email, otp);
 
     return {
-      message: 'Mã OTP khôi phục mật khẩu đã được gửi.',
-      ...(!mailSent ? { devOtp: otp } : {}),
+      message: 'Email khôi phục mật khẩu đã được gửi qua dịch vụ Supabase.',
     };
   }
 
