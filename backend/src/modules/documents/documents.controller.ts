@@ -46,6 +46,7 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Post('/analyze/:id')
+  @UseGuards(JwtAuthGuard)
   // @UseGuards(JwtAuthGuard)
   async analyze(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
