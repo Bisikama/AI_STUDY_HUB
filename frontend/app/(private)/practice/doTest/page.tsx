@@ -192,15 +192,15 @@ export default function DoTestPage() {
       <div className="bg-background flex min-h-screen items-center justify-center p-6">
         <div className="bg-surface-container-lowest border-outline-variant max-w-md rounded-xl border p-8 text-center shadow">
           <span className="material-symbols-outlined text-error mb-3 text-4xl">error</span>
-          <h2 className="text-primary mb-2 text-lg font-bold">Đã xảy ra lỗi</h2>
+          <h2 className="text-primary mb-2 text-lg font-bold">An error occurred</h2>
           <p className="text-secondary mb-4 text-sm">
-            Không thể tải nội dung câu hỏi ôn tập cho tài liệu này.
+           Unable to load the review questions for this document.
           </p>
           <button
             onClick={() => router.push('/practice')}
             className="bg-primary text-on-primary w-full rounded-lg px-4 py-2 font-semibold"
           >
-            Quay lại mục ôn tập
+            Return to the review section
           </button>
         </div>
       </div>
@@ -215,7 +215,7 @@ export default function DoTestPage() {
             sync
           </span>
           <p className="text-secondary text-sm font-semibold">
-            Đang chuẩn bị đề thi trắc nghiệm...
+           Preparing the multiple-choice test...
           </p>
         </div>
       </div>
@@ -243,7 +243,7 @@ export default function DoTestPage() {
                 ></div>
               </div>
               <span className="font-label-md text-secondary text-xs font-semibold">
-                Tiến độ: {progressPercent}%
+                Progress: {progressPercent}%
               </span>
             </div>
 
@@ -251,7 +251,7 @@ export default function DoTestPage() {
               onClick={handleExitQuiz}
               className="font-label-lg text-secondary hover:text-primary border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low cursor-pointer rounded-lg border px-4 py-1.5 text-sm font-semibold transition-colors"
             >
-              Thoát kiểm tra
+              Exit Test
             </button>
 
             <button
@@ -278,7 +278,7 @@ export default function DoTestPage() {
                       psychology
                     </span>
                     <span className="font-label-md text-on-surface-variant text-xs font-bold tracking-wider uppercase">
-                      Câu hỏi {currentIdx + 1} / {questions.length}
+                      Question {currentIdx + 1} / {questions.length}
                     </span>
                   </div>
                   <h1 className="text-on-surface text-lg leading-relaxed font-bold md:text-xl">
@@ -346,14 +346,14 @@ export default function DoTestPage() {
                     className="border-outline-variant text-primary hover:bg-surface-container-low flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border py-3 font-bold transition-colors disabled:opacity-30"
                   >
                     <span className="material-symbols-outlined text-lg">arrow_back</span>
-                    Quay lại
+                    BACK
                   </button>
                   {currentIdx < questions.length - 1 ? (
                     <button
                       onClick={() => setCurrentIdx((prev) => prev + 1)}
                       className="bg-primary text-on-primary flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg py-3 font-bold transition-opacity hover:opacity-90"
                     >
-                      Tiếp theo
+                      NEXT
                       <span className="material-symbols-outlined text-lg">arrow_forward</span>
                     </button>
                   ) : (
@@ -363,7 +363,7 @@ export default function DoTestPage() {
                         disabled={Object.keys(selectedAnswers).length === 0}
                         className="text-on-primary flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-3 font-bold transition-opacity hover:opacity-90 disabled:opacity-40"
                       >
-                        Nộp bài thi
+                        SUBMIT TEST
                         <span className="material-symbols-outlined text-lg">check_circle</span>
                       </button>
                     )
@@ -371,7 +371,7 @@ export default function DoTestPage() {
                 </div>
               </div>
             ) : (
-              <div className="text-center">Tài liệu không có câu hỏi nào.</div>
+              <div className="text-center">The document has no questions available.</div>
             )}
           </div>
         </main>
@@ -386,10 +386,10 @@ export default function DoTestPage() {
           <div className="border-outline-variant/60 mt-16 flex items-center justify-between border-b p-5">
             <div>
               <h3 className="font-headline-sm text-primary text-base font-bold">
-                Thông tin bài thi
+                Information
               </h3>
               <p className="text-on-surface-variant text-xs font-medium">
-                Tài liệu học tập AI STUDY HUB
+                Study materials AI STUDY HUB
               </p>
             </div>
             <button
@@ -403,7 +403,7 @@ export default function DoTestPage() {
           {/* Hàng đợi các câu hỏi (Review Queue Grid) */}
           <div className="flex-grow overflow-y-auto p-5">
             <span className="text-on-surface-variant mb-4 block text-xs font-bold tracking-wider uppercase">
-              Danh sách câu hỏi
+              Question List
             </span>
             <div className="grid grid-cols-5 gap-2.5">
               {questions.map((q, index) => {
@@ -438,10 +438,10 @@ export default function DoTestPage() {
             {isSubmitted && (
               <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
                 <span className="mb-1 block text-sm font-bold text-emerald-800">
-                  Kết quả bài thi
+                  Test Results
                 </span>
                 <span className="block text-2xl font-black text-emerald-600">
-                  {score}/{questions.length} đúng
+                  {score}/{questions.length} correct
                 </span>
                 <span className="text-xs font-semibold text-emerald-800">
                   Tỷ lệ: {Math.round((score / questions.length) * 100)}%
@@ -459,11 +459,11 @@ export default function DoTestPage() {
                   disabled={Object.keys(selectedAnswers).length === 0}
                   className="bg-primary text-on-primary w-full cursor-pointer rounded-lg py-3 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
-                  Nộp bài & kết thúc
+                  Submit Test
                 </button>
                 <div className="text-secondary mt-3 flex items-center justify-center gap-1.5 text-sm font-semibold">
                   <span className="material-symbols-outlined text-lg">schedule</span>
-                  <span>Thời gian: {formatTime(timeLeft)}</span>
+                  <span>Time Remaining: {formatTime(timeLeft)}</span>
                 </div>
               </>
             ) : (
@@ -471,7 +471,7 @@ export default function DoTestPage() {
                 onClick={handleResetQuiz}
                 className="bg-primary-container text-on-primary w-full cursor-pointer rounded-lg py-3 text-sm font-bold transition-opacity hover:opacity-90"
               >
-                Làm lại bài thi
+                Retry Test
               </button>
             )}
           </div>

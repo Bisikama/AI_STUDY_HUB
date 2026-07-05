@@ -898,7 +898,7 @@ function SearchExplore() {
                                     <span className="material-symbols-outlined text-[14px]">
                                       verified
                                     </span>
-                                    Giảng viên đã xác minh
+                                    Verified teacher
                                   </span>
                                 )}
                               </div>
