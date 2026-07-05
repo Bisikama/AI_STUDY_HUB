@@ -566,30 +566,8 @@ function DashboardPage() {
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
-          <li>
-            <a
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                toast.info('Settings clicked (Simulated)');
-              }}
-            >
-              <span className="material-symbols-outlined">settings</span> Settings
-            </a>
-          </li>
-          <li>
-            <a
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                toast.info('Help clicked (Simulated)');
-              }}
-            >
-              <span className="material-symbols-outlined">help</span> Help
-            </a>
-          </li>
+         
+          
           <li>
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
@@ -640,11 +618,6 @@ function DashboardPage() {
                 className="font-label-md text-label-md hidden h-10 cursor-pointer items-center gap-2 rounded-full bg-[#212529] px-4 py-2 text-white transition-opacity hover:opacity-90 md:flex"
               >
                 <span className="material-symbols-outlined text-[20px]">upload</span> Upload
-              </button>
-
-              <button className="text-secondary hover:text-primary relative cursor-pointer p-2 transition-colors">
-                <span className="material-symbols-outlined">notifications</span>
-                <span className="bg-error absolute top-2 right-2 h-2 w-2 rounded-full"></span>
               </button>
 
               <div className="relative">
@@ -1436,7 +1409,7 @@ function DashboardPage() {
                     htmlFor="fullName"
                     className="font-label-md text-label-md text-on-surface font-semibold"
                   >
-                    Full Name (Họ và Tên)
+                    Full Name 
                   </label>
                   <input
                     id="fullName"
@@ -1454,7 +1427,7 @@ function DashboardPage() {
                     htmlFor="username"
                     className="font-label-md text-label-md text-on-surface font-semibold"
                   >
-                    Username (Tên Đăng Nhập)
+                    Username 
                   </label>
                   <input
                     id="username"
@@ -1471,7 +1444,7 @@ function DashboardPage() {
                     htmlFor="phoneNumber"
                     className="font-label-md text-label-md text-on-surface font-semibold"
                   >
-                    Phone Number (Số Điện Thoại)
+                    Phone Number 
                   </label>
                   <input
                     id="phoneNumber"

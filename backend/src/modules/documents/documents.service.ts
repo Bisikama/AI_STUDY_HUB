@@ -49,7 +49,7 @@ export class DocumentsService {
     private readonly subjectsService: SubjectsService,
     private readonly tagsService: TagsService,
     private readonly documentAccessService: DocumentAccessService,
-  ) { }
+  ) {}
 
   /**
    * Helper function to convert BigInt to Number/String in objects to prevent serialization crashes.
@@ -85,12 +85,12 @@ export class DocumentsService {
       personalFolderId: isOwner ? document.personalFolderId : null,
       subject: document.subject
         ? {
-          id: document.subject.id,
-          name: document.subject.name,
-          code: document.subject.code,
-          isSystem: document.subject.isSystem,
-          ...(document.subject.majors && { majors: document.subject.majors }),
-        }
+            id: document.subject.id,
+            name: document.subject.name,
+            code: document.subject.code,
+            isSystem: document.subject.isSystem,
+            ...(document.subject.majors && { majors: document.subject.majors }),
+          }
         : null,
       fileType: document.fileType,
       fileSize:
@@ -128,10 +128,10 @@ export class DocumentsService {
       isFollowed,
       tags: document.tags
         ? document.tags.map((t: any) => ({
-          id: t.tag.id,
-          name: t.tag.name,
-          slug: t.tag.slug,
-        }))
+            id: t.tag.id,
+            name: t.tag.name,
+            slug: t.tag.slug,
+          }))
         : [],
       isAIGenerated: document.isAIGenerated,
       summary: document.summary || null,
@@ -144,18 +144,23 @@ export class DocumentsService {
       // Admin and owner logic: only owner or admin can see these private copyright fields.
       // Assuming for now mapSafeDocumentResponse has isOwner=true when it's the owner's document.
       copyrightPermissionReference: isOwner ? document.copyrightPermissionReference : null,
-      copyrightDeclaredAt: isOwner && document.copyrightDeclaredAt ? new Date(document.copyrightDeclaredAt).toISOString() : null,
+      copyrightDeclaredAt:
+        isOwner && document.copyrightDeclaredAt
+          ? new Date(document.copyrightDeclaredAt).toISOString()
+          : null,
       copyrightDeclaredBy: isOwner ? document.copyrightDeclaredBy : null,
-      canRequestPublic: document.visibilityStatus === 'PRIVATE'
-        && this.checkPublicationEligibility(document).isEligible
-        && this.checkCopyrightEligibility(document).isEligible,
-      publicationEligibilityReason: document.visibilityStatus === 'PRIVATE'
-        ? (!this.checkPublicationEligibility(document).isEligible
-          ? this.checkPublicationEligibility(document).reason || 'AI_NOT_READY_FOR_PUBLICATION'
-          : (!this.checkCopyrightEligibility(document).isEligible
-            ? this.checkCopyrightEligibility(document).reason
-            : null))
-        : null,
+      canRequestPublic:
+        document.visibilityStatus === 'PRIVATE' &&
+        this.checkPublicationEligibility(document).isEligible &&
+        this.checkCopyrightEligibility(document).isEligible,
+      publicationEligibilityReason:
+        document.visibilityStatus === 'PRIVATE'
+          ? !this.checkPublicationEligibility(document).isEligible
+            ? this.checkPublicationEligibility(document).reason || 'AI_NOT_READY_FOR_PUBLICATION'
+            : !this.checkCopyrightEligibility(document).isEligible
+              ? this.checkCopyrightEligibility(document).reason
+              : null
+          : null,
     };
   }
 
@@ -463,7 +468,9 @@ export class DocumentsService {
     await this.subjectsService.validateSubjectAccess(subjectId, finalUserId);
 
     if (personalFolderId) {
-      const folder = await this.prisma.personalFolder.findUnique({ where: { id: personalFolderId } });
+      const folder = await this.prisma.personalFolder.findUnique({
+        where: { id: personalFolderId },
+      });
       if (!folder || folder.ownerId !== finalUserId) {
         throw new NotFoundException('Personal folder not found or access denied');
       }
@@ -969,7 +976,8 @@ Quy định chặt chẽ:
         });
       } catch (dbUpdateError) {
         this.logger.error(
-          `Failed to update FAILED status in DB for document ${documentId}: ${dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
+          `Failed to update FAILED status in DB for document ${documentId}: ${
+            dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
           }`,
         );
       }
@@ -1325,7 +1333,13 @@ Quy định chặt chẽ:
   async updateDocument(
     documentId: string,
     userId: string,
-    dto: { title?: string; description?: string; subjectId?: number; tags?: string[]; personalFolderId?: string },
+    dto: {
+      title?: string;
+      description?: string;
+      subjectId?: number;
+      tags?: string[];
+      personalFolderId?: string;
+    },
   ): Promise<SanitizedDocument> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
@@ -1368,7 +1382,9 @@ Quy định chặt chẽ:
     }
 
     if (dto.personalFolderId !== undefined && dto.personalFolderId !== null) {
-      const folder = await this.prisma.personalFolder.findUnique({ where: { id: dto.personalFolderId } });
+      const folder = await this.prisma.personalFolder.findUnique({
+        where: { id: dto.personalFolderId },
+      });
       if (!folder || folder.ownerId !== userId) {
         throw new NotFoundException('Personal folder not found or access denied');
       }
@@ -1642,7 +1658,7 @@ Quy định chặt chẽ:
           where: { id: input.documentId },
           data: { extractionStatus: 'FAILED' },
         })
-        .catch(() => { });
+        .catch(() => {});
       return { extractionStatus: 'FAILED', chunkCount: 0 };
     }
 
@@ -1758,7 +1774,11 @@ Quy định chặt chẽ:
         }
         return { isEligible: true };
       case 'OPEN_LICENSE':
-        if (!document.copyrightSourceUrl || !document.copyrightLicense || !document.copyrightAttribution) {
+        if (
+          !document.copyrightSourceUrl ||
+          !document.copyrightLicense ||
+          !document.copyrightAttribution
+        ) {
           return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
         }
         return { isEligible: true };
@@ -1810,7 +1830,7 @@ Quy định chặt chẽ:
         tags: { include: { tag: true } },
         summary: true,
         quizzes: { include: { questions: { include: { options: true } } } },
-      }
+      },
     });
 
     return this.mapSafeDocumentResponse(updatedDocument, true, false);

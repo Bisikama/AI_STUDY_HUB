@@ -7,6 +7,7 @@ import { seedSubjects } from './seeders/02-seed-courses';
 import { seedDocuments } from './seeders/03-seed-documents';
 import { seedSummaries } from './seeders/04-seed-summaries';
 import { seedQuizzes } from './seeders/05-seed-quizzes';
+import { seedInteractions } from './seeders/06-seed-interactions';
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL || process.env.DIRECT_URL,
@@ -36,25 +37,8 @@ async function main() {
     // Bước 6: Seed Quizzes (phụ thuộc Documents)
     await seedQuizzes(prisma, documents);
 
-    // Bước 7: Seed User Document Views (Lịch sử xem)
-    console.log('👀 Seeding document views history...');
-    const approvedDocs = documents.filter((doc) => doc.visibilityStatus === 'PUBLIC');
-    if (approvedDocs.length > 0) {
-      const student = users.find((u) => u.email.startsWith('student.phạm'));
-      if (student) {
-        // Cho student xem 3 tài liệu gần nhất
-        const docsToView = approvedDocs.slice(0, 3);
-        for (let j = 0; j < docsToView.length; j++) {
-          await prisma.userDocumentView.create({
-            data: {
-              userId: student.id,
-              documentId: docsToView[j].id,
-              viewedAt: new Date(Date.now() - j * 60 * 60 * 1000), // Xem cách nhau 1 giờ
-            },
-          });
-        }
-      }
-    }
+    // Bước 7: Seed Interactions & Activities (phụ thuộc Users, Documents)
+    await seedInteractions(prisma, users, documents);
 
     console.log('🎉 Database seeding completed successfully!\n');
   } catch (error) {
