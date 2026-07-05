@@ -198,6 +198,7 @@ export class ExploreService {
             questionId: option.questionId,
             optionText: option.optionText,
             createdAt: option.createdAt,
+            isCorrect: option.isCorrect,
           })),
         })),
       })),

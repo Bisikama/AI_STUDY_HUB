@@ -614,18 +614,8 @@ function SearchExplore() {
             </nav>
 
             <div className="border-outline-variant flex items-center gap-4 border-l pl-6">
-              <button
-                onClick={() => toast.info('Notifications clicked (Simulated)')}
-                className="material-symbols-outlined text-secondary hover:bg-surface-container-low cursor-pointer rounded-full p-2 transition-colors active:scale-95"
-              >
-                notifications
-              </button>
-              <button
-                onClick={() => toast.info('Settings clicked (Simulated)')}
-                className="material-symbols-outlined text-secondary hover:bg-surface-container-low cursor-pointer rounded-full p-2 transition-colors active:scale-95"
-              >
-                settings
-              </button>
+              
+              
               <button
                 onClick={async () => {
                   try {

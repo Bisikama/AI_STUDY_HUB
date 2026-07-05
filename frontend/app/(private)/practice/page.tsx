@@ -377,22 +377,7 @@ export default function PracticePage() {
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
-          <li>
-            <button
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-              onClick={() => toast.info('Settings clicked (Simulated)')}
-            >
-              <span className="material-symbols-outlined">settings</span> Settings
-            </button>
-          </li>
-          <li>
-            <button
-              className="text-secondary hover:bg-surface-container-low font-label-md text-label-md flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left transition-transform active:scale-95"
-              onClick={() => toast.info('Help clicked (Simulated)')}
-            >
-              <span className="material-symbols-outlined">help</span> Help
-            </button>
-          </li>
+          
           <li>
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
@@ -445,10 +430,7 @@ export default function PracticePage() {
                 <span className="material-symbols-outlined text-[20px]">upload</span> Upload
               </button>
 
-              <button className="text-secondary hover:text-primary relative cursor-pointer p-2 transition-colors">
-                <span className="material-symbols-outlined">notifications</span>
-                <span className="bg-error absolute top-2 right-2 h-2 w-2 rounded-full"></span>
-              </button>
+              {/*  */}
 
               <div className="relative">
                 <button
@@ -710,9 +692,7 @@ export default function PracticePage() {
                             );
                           })()}
 
-                          <div className="mt-6 inline-block rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800">
-                            CORRECT ANSWER FROM SYSTEM
-                          </div>
+                       
                         </div>
 
                         <div className="text-on-surface-variant absolute bottom-6 flex items-center gap-1.5 text-xs">
