@@ -36,16 +36,16 @@ export class TeacherVerificationService {
       where: { userId },
       update: {
         teacherCode: dto.teacherCode.trim(),
-        department: dto.department?.trim() || null,
-        proofUrl: dto.proofUrl || null,
+        department: dto.department.trim(),
+        proofUrl: dto.proofUrl,
         status: 'PENDING',
         adminNote: null,
       },
       create: {
         userId,
         teacherCode: dto.teacherCode.trim(),
-        department: dto.department?.trim() || null,
-        proofUrl: dto.proofUrl || null,
+        department: dto.department.trim(),
+        proofUrl: dto.proofUrl,
         status: 'PENDING',
       },
     });
