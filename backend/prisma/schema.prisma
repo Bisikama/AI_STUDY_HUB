@@ -156,7 +156,7 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
-/// Quản lý Yêu cầu xác thực Giảng viên
+/// Quản lý Yêu cầu Xác Thực Giảng Viên
 model TeacherVerification {
   id          String             @id @default(uuid()) @db.Uuid
   userId      String             @unique @map("user_id") @db.Uuid

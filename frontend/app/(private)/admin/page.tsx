@@ -206,7 +206,7 @@ export default function AdminOverviewPage() {
         const list = Array.isArray(res) ? res : Array.isArray(resObj?.data) ? resObj.data : [];
         setVerifications(list as TeacherVerificationData[]);
       })
-      .catch(() => setError('Không thể tải danh sách xác thực Giảng viên'))
+      .catch(() => setError('Không thể tải danh sách Xác Thực Giảng Viên'))
       .finally(() => setVerificationsLoading(false));
   };
 
@@ -269,7 +269,7 @@ export default function AdminOverviewPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Admin Control Center</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Quản lý người dùng, tài khoản và phê duyệt xác thực Giảng viên.
+              Quản lý người dùng, tài khoản và phê duyệt Xác Thực Giảng Viên.
             </p>
           </div>
 
@@ -277,21 +277,19 @@ export default function AdminOverviewPage() {
           <div className="flex items-center gap-2 self-start rounded-xl bg-slate-200/60 p-1.5">
             <button
               onClick={() => setActiveTab('USERS')}
-              className={`rounded-lg px-4 py-2 text-xs font-bold transition-all ${
-                activeTab === 'USERS'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`rounded-lg px-4 py-2 text-xs font-bold transition-all ${activeTab === 'USERS'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               Quản lý Người dùng ({users.length})
             </button>
             <button
               onClick={() => setActiveTab('VERIFICATIONS')}
-              className={`relative rounded-lg px-4 py-2 text-xs font-bold transition-all ${
-                activeTab === 'VERIFICATIONS'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`relative rounded-lg px-4 py-2 text-xs font-bold transition-all ${activeTab === 'VERIFICATIONS'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               Phê duyệt Giảng viên
               {pendingVerificationsCount > 0 && (
@@ -376,11 +374,10 @@ export default function AdminOverviewPage() {
                     <button
                       key={r}
                       onClick={() => handleFilterChange(r)}
-                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        roleFilter === r
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'text-slate-500 hover:bg-slate-100'
-                      }`}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${roleFilter === r
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-slate-500 hover:bg-slate-100'
+                        }`}
                     >
                       {r === 'ALL'
                         ? 'Tất cả'
@@ -485,11 +482,10 @@ export default function AdminOverviewPage() {
                     <button
                       key={p}
                       onClick={() => setCurrentPage(p)}
-                      className={`flex h-7 w-7 items-center justify-center rounded border text-xs font-semibold transition ${
-                        currentPage === p
-                          ? 'border-blue-600 bg-blue-600 text-white'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
+                      className={`flex h-7 w-7 items-center justify-center rounded border text-xs font-semibold transition ${currentPage === p
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
                     >
                       {p}
                     </button>
@@ -511,7 +507,7 @@ export default function AdminOverviewPage() {
         {activeTab === 'VERIFICATIONS' && (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-6 py-4">
-              <h2 className="text-sm font-semibold text-slate-800">Yêu cầu xác thực Giảng viên</h2>
+              <h2 className="text-sm font-semibold text-slate-800">Yêu cầu Xác Thực Giảng Viên</h2>
               <p className="mt-0.5 text-xs text-slate-400">
                 Duyệt minh chứng để nâng quyền tài khoản người dùng lên Giảng viên (`TEACHER`).
               </p>
@@ -555,7 +551,7 @@ export default function AdminOverviewPage() {
                   ) : verifications.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
-                        Chưa có yêu cầu xác thực Giảng viên nào.
+                        Chưa có yêu cầu Xác Thực Giảng Viên nào.
                       </td>
                     </tr>
                   ) : (

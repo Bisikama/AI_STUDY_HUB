@@ -52,9 +52,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${
-          mobileMenuOpen ? 'flex' : 'hidden'
-        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
+        className={`${mobileMenuOpen ? 'flex' : 'hidden'
+          } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
         <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
@@ -89,11 +88,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/dashboard"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
-                pathname === '/dashboard'
-                  ? 'bg-surface-container-low text-primary font-semibold'
-                  : 'text-secondary hover:bg-surface-container-low'
-              }`}
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname === '/dashboard'
+                ? 'bg-surface-container-low text-primary font-semibold'
+                : 'text-secondary hover:bg-surface-container-low'
+                }`}
             >
               <span className="material-symbols-outlined">search</span> Discover
             </Link>
@@ -101,11 +99,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/dashboard/documents"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
-                pathname.includes('/dashboard/documents')
-                  ? 'bg-surface-container-low text-primary font-semibold'
-                  : 'text-secondary hover:bg-surface-container-low'
-              }`}
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname.includes('/dashboard/documents')
+                ? 'bg-surface-container-low text-primary font-semibold'
+                : 'text-secondary hover:bg-surface-container-low'
+                }`}
             >
               <span className="material-symbols-outlined">description</span> My Documents
             </Link>
@@ -113,11 +110,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/practice"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
-                pathname.includes('/practice')
-                  ? 'bg-surface-container-low text-primary font-semibold'
-                  : 'text-secondary hover:bg-surface-container-low'
-              }`}
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname.includes('/practice')
+                ? 'bg-surface-container-low text-primary font-semibold'
+                : 'text-secondary hover:bg-surface-container-low'
+                }`}
             >
               <span className="material-symbols-outlined">lightbulb</span> Practice Mode
             </Link>
@@ -125,7 +121,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
-          
+
           <li>
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
@@ -171,7 +167,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </form>
 
             <div className="flex items-center gap-4">
-             
+
 
               <div className="relative">
                 <button
@@ -205,7 +201,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         }}
                       >
                         <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
-                        Xác thực Giảng viên
+                        Instructor Verification
                       </button>
                       <hr className="border-outline-variant my-1" />
                       <button
