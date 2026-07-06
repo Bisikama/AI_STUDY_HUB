@@ -891,20 +891,20 @@ export default function DocumentDetailPage() {
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
               <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[18px]">copyright</span>
-                Bản quyền & nguồn tài liệu
+                Copyright & Source Material
               </h3>
 
               {!document.copyrightSourceType ? (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm text-gray-600">
-                    Bạn cần khai báo nguồn trước khi chia sẻ tài liệu.
+                    You need to cite the source before sharing the document.
                   </p>
                   <button
                     onClick={handleOpenCopyrightModal}
                     className="flex items-center justify-center gap-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 text-sm font-semibold hover:bg-blue-100 transition-colors"
                   >
                     <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                    Khai báo nguồn
+                    Declare source
                   </button>
                 </div>
               ) : (document.copyrightSourceType === 'THIRD_PARTY' || document.copyrightSourceType === 'UNKNOWN') ? (
@@ -912,7 +912,7 @@ export default function DocumentDetailPage() {
                   <div className="flex items-start gap-2 text-red-700 bg-red-50 p-3 rounded-xl border border-red-200">
                     <span className="material-symbols-outlined text-[18px] shrink-0">warning</span>
                     <p className="text-sm font-medium">
-                      Tài liệu này chỉ có thể lưu riêng tư và chưa thể chia sẻ.
+                      This document can only be saved privately and cannot be shared yet.
                     </p>
                   </div>
                   <button
@@ -920,7 +920,7 @@ export default function DocumentDetailPage() {
                     className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <span className="material-symbols-outlined text-[18px]">update</span>
-                    Cập nhật nguồn
+                    Update source
                   </button>
                 </div>
               ) : (
@@ -928,7 +928,7 @@ export default function DocumentDetailPage() {
                   <div className="flex items-start gap-2 text-emerald-700 bg-emerald-50 p-3 rounded-xl border border-emerald-200">
                     <span className="material-symbols-outlined text-[18px] shrink-0">check_circle</span>
                     <div className="text-sm">
-                      <p className="font-bold">Thông tin nguồn tài liệu đã hợp lệ.</p>
+                      <p className="font-bold">Copyright information is valid.</p>
                       <p className="text-emerald-600 mt-0.5">
                         Loại nguồn:{' '}
                         {document.copyrightSourceType === 'OWN_ORIGINAL' ? 'Tự biên soạn' : document.copyrightSourceType === 'OPEN_LICENSE' ? 'Nguồn mở' : document.copyrightSourceType === 'AUTHORIZED' ? 'Có quyền sử dụng' : 'Tài liệu chính thức FPT'}

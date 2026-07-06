@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { documentsApi } from '@/services/documentsApi';
 import { getVisibilityPresentation } from '@/utils/visibility-status';
+import { toast } from 'sonner';
 
 export default function DocumentPreviewPage() {
   const { id } = useParams() as { id: string };
@@ -62,7 +63,7 @@ export default function DocumentPreviewPage() {
       window.open(data.url, '_blank', 'noopener,noreferrer');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      alert(`Could not open original file: ${err.response?.data?.message || err.message}`);
+      toast.error(`Could not open original file: ${err.response?.data?.message || err.message}`);
     }
   };
 
@@ -78,8 +79,9 @@ export default function DocumentPreviewPage() {
       window.document.body.appendChild(a);
       a.click();
       window.document.body.removeChild(a);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      alert(`Could not download file: ${err.response?.data?.message || err.message}`);
+      toast.error(`Could not download file: ${err.response?.data?.message || err.message}`);
     } finally {
       setIsDownloading(false);
     }

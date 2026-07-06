@@ -4,6 +4,7 @@ import useSWR from 'swr';
 import { useEffect, useMemo, useState, Suspense, type MouseEvent } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import axiosClient from '@/utils/axios';
+import { toast } from 'sonner';
 
 type Subject = {
   id: number;
@@ -39,10 +40,10 @@ type ExploreDocument = {
 type ApiResponse<T> =
   | T
   | {
-    statusCode: number;
-    message: string;
-    data: T;
-  };
+      statusCode: number;
+      message: string;
+      data: T;
+    };
 
 type DocumentSummary = {
   id: string;
@@ -398,7 +399,7 @@ function SearchExplore() {
 
   const handleViewFull = (documentId?: string | null) => {
     if (!documentId || documentId.startsWith('mock-')) {
-      alert('Document file is not available yet.');
+      toast.warning('Document file is not available yet.');
       return;
     }
 
@@ -407,7 +408,7 @@ function SearchExplore() {
 
   const handleCardClick = async (doc: ExploreDocument) => {
     if (doc.id.startsWith('mock-')) {
-      alert('This is a simulated document view.');
+      toast.info('This is a simulated document view.');
       return;
     }
 
@@ -480,7 +481,7 @@ function SearchExplore() {
     const unansweredCount = questions.filter((question) => !selectedOptionIds[question.id]).length;
 
     if (unansweredCount > 0) {
-      alert(`Please answer all questions before submitting. Missing: ${unansweredCount}`);
+      toast.warning(`Please answer all questions before submitting. Missing: ${unansweredCount}`);
       return;
     }
 
@@ -613,18 +614,8 @@ function SearchExplore() {
             </nav>
 
             <div className="border-outline-variant flex items-center gap-4 border-l pl-6">
-              <button
-                onClick={() => alert('Notifications clicked (Simulated)')}
-                className="material-symbols-outlined text-secondary hover:bg-surface-container-low cursor-pointer rounded-full p-2 transition-colors active:scale-95"
-              >
-                notifications
-              </button>
-              <button
-                onClick={() => alert('Settings clicked (Simulated)')}
-                className="material-symbols-outlined text-secondary hover:bg-surface-container-low cursor-pointer rounded-full p-2 transition-colors active:scale-95"
-              >
-                settings
-              </button>
+              
+              
               <button
                 onClick={async () => {
                   try {
@@ -637,7 +628,7 @@ function SearchExplore() {
                   }
                 }}
                 className="material-symbols-outlined text-error cursor-pointer rounded-full p-2 transition-colors hover:bg-red-50 active:scale-95"
-                title="Đăng xuất"
+                title="Log out"
               >
                 logout
               </button>
@@ -675,8 +666,9 @@ function SearchExplore() {
               >
                 <h3 className="font-label-md text-primary">Sort By</h3>
                 <span
-                  className={`material-symbols-outlined text-secondary transition-transform ${collapsedSections.sort ? 'rotate-[-90deg]' : ''
-                    }`}
+                  className={`material-symbols-outlined text-secondary transition-transform ${
+                    collapsedSections.sort ? 'rotate-[-90deg]' : ''
+                  }`}
                 >
                   expand_more
                 </span>
@@ -720,8 +712,9 @@ function SearchExplore() {
               >
                 <h3 className="font-label-md text-primary">University</h3>
                 <span
-                  className={`material-symbols-outlined text-secondary transition-transform ${collapsedSections.uni ? 'rotate-[-90deg]' : ''
-                    }`}
+                  className={`material-symbols-outlined text-secondary transition-transform ${
+                    collapsedSections.uni ? 'rotate-[-90deg]' : ''
+                  }`}
                 >
                   expand_more
                 </span>
@@ -760,8 +753,9 @@ function SearchExplore() {
               >
                 <h3 className="font-label-md text-primary">Document Type</h3>
                 <span
-                  className={`material-symbols-outlined text-secondary transition-transform ${collapsedSections.type ? 'rotate-[-90deg]' : ''
-                    }`}
+                  className={`material-symbols-outlined text-secondary transition-transform ${
+                    collapsedSections.type ? 'rotate-[-90deg]' : ''
+                  }`}
                 >
                   expand_more
                 </span>
@@ -794,8 +788,9 @@ function SearchExplore() {
               >
                 <h3 className="font-label-md text-primary">Academic Year</h3>
                 <span
-                  className={`material-symbols-outlined text-secondary transition-transform ${collapsedSections.year ? 'rotate-[-90deg]' : ''
-                    }`}
+                  className={`material-symbols-outlined text-secondary transition-transform ${
+                    collapsedSections.year ? 'rotate-[-90deg]' : ''
+                  }`}
                 >
                   expand_more
                 </span>
@@ -837,7 +832,7 @@ function SearchExplore() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => alert('Grid view clicked (Simulated)')}
+                    onClick={() => toast.info('Grid view clicked (Simulated)')}
                     className="bg-surface-container-low text-label-md text-primary hover:bg-surface-container-high flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 transition-colors"
                   >
                     <span className="material-symbols-outlined text-[20px]">grid_view</span>
@@ -889,9 +884,11 @@ function SearchExplore() {
                                   {doc.uploader.fullName}
                                 </span>
                                 {doc.uploader.isTeacher && (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
-                                    <span className="material-symbols-outlined text-[14px]">verified</span>
-                                    Giảng viên đã xác minh
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                    <span className="material-symbols-outlined text-[14px]">
+                                      verified
+                                    </span>
+                                    Verified teacher
                                   </span>
                                 )}
                               </div>
@@ -899,10 +896,11 @@ function SearchExplore() {
                             <button
                               type="button"
                               onClick={(e) => toggleFollow(doc, e)}
-                              className={`font-label-sm text-label-sm flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 transition-colors ${followedDocumentIds.includes(doc.id)
+                              className={`font-label-sm text-label-sm flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 transition-colors ${
+                                followedDocumentIds.includes(doc.id)
                                   ? 'border-primary bg-primary-container/20 text-primary'
                                   : 'border-outline-variant text-secondary hover:border-primary hover:text-primary'
-                                }`}
+                              }`}
                               title={
                                 followedDocumentIds.includes(doc.id)
                                   ? 'Unfollow this document'
@@ -910,8 +908,9 @@ function SearchExplore() {
                               }
                             >
                               <span
-                                className={`material-symbols-outlined text-[18px] ${followedDocumentIds.includes(doc.id) ? 'filled' : ''
-                                  }`}
+                                className={`material-symbols-outlined text-[18px] ${
+                                  followedDocumentIds.includes(doc.id) ? 'filled' : ''
+                                }`}
                               >
                                 bookmark_add
                               </span>
@@ -1008,14 +1007,14 @@ function SearchExplore() {
 
               <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <button
-                  onClick={() => alert('Upload Document dialog initiated (Simulated)')}
+                  onClick={() => toast.info('Upload Document dialog initiated (Simulated)')}
                   className="bg-primary-container font-label-md text-label-md flex h-12 cursor-pointer items-center gap-2 rounded-lg px-8 text-white transition-all hover:shadow-lg active:scale-98"
                 >
                   <span className="material-symbols-outlined text-[20px]">upload_file</span>
                   Upload Your Own Document
                 </button>
                 <button
-                  onClick={() => alert('Opening AI Support chatbot (Simulated)')}
+                  onClick={() => toast.info('Opening AI Support chatbot (Simulated)')}
                   className="border-outline-variant text-primary font-label-md text-label-md hover:bg-surface-container-low flex h-12 cursor-pointer items-center gap-2 rounded-lg border bg-white px-8 transition-all active:scale-98"
                 >
                   <span className="material-symbols-outlined text-[20px]">smart_toy</span>
@@ -1115,10 +1114,11 @@ function SearchExplore() {
                   <button
                     type="button"
                     onClick={() => setActiveAiCacheTab('summary')}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${activeAiCacheTab === 'summary'
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                      activeAiCacheTab === 'summary'
                         ? 'bg-surface text-primary shadow-sm'
                         : 'text-secondary hover:text-primary'
-                      }`}
+                    }`}
                   >
                     <span className="material-symbols-outlined text-[18px]">summarize</span>
                     Summary
@@ -1130,10 +1130,11 @@ function SearchExplore() {
                   <button
                     type="button"
                     onClick={() => setActiveAiCacheTab('quiz')}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${activeAiCacheTab === 'quiz'
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                      activeAiCacheTab === 'quiz'
                         ? 'bg-surface text-primary shadow-sm'
                         : 'text-secondary hover:text-primary'
-                      }`}
+                    }`}
                   >
                     <span className="material-symbols-outlined text-[18px]">quiz</span>
                     Quiz
@@ -1278,14 +1279,16 @@ function SearchExplore() {
                                             onClick={() =>
                                               handleSelectOption(question.id, option.id)
                                             }
-                                            className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${isQuizSubmitted ? 'cursor-default' : 'cursor-pointer'
-                                              }`}
+                                            className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
+                                              isQuizSubmitted ? 'cursor-default' : 'cursor-pointer'
+                                            }`}
                                           >
                                             <span
-                                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${isSelected
+                                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                isSelected
                                                   ? 'border-primary bg-primary text-on-primary'
                                                   : 'border-outline-variant bg-surface'
-                                                }`}
+                                              }`}
                                             >
                                               {isSelected && (
                                                 <span className="material-symbols-outlined text-[14px]">
@@ -1337,10 +1340,11 @@ function SearchExplore() {
                                       type="button"
                                       onClick={() => void handleSubmitQuiz(quizQuestions)}
                                       disabled={!hasAllAnswers || isQuizSubmitting}
-                                      className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${hasAllAnswers && !isQuizSubmitting
+                                      className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                                        hasAllAnswers && !isQuizSubmitting
                                           ? 'bg-primary text-on-primary hover:shadow-md'
                                           : 'bg-surface-container-high text-secondary cursor-not-allowed'
-                                        }`}
+                                      }`}
                                     >
                                       <span className="material-symbols-outlined text-[18px]">
                                         task_alt
@@ -1395,7 +1399,7 @@ function SearchExplore() {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              alert('Privacy Policy clicked (Simulated)');
+              toast.info('Privacy Policy clicked (Simulated)');
             }}
           >
             Privacy Policy
@@ -1405,7 +1409,7 @@ function SearchExplore() {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              alert('Terms of Service clicked (Simulated)');
+              toast.info('Terms of Service clicked (Simulated)');
             }}
           >
             Terms of Service
