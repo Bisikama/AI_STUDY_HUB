@@ -98,12 +98,25 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3
 const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
 const FOLLOWED_DOCUMENTS_STORAGE_KEY = 'studyhub_followed_documents';
 
+const DOCUMENT_TYPES = ['Lecture notes', 'Summaries', 'Past Exams', 'Essays'];
+
+const POPULAR_FPT_SEARCHES = [
+  'SDN302',
+  'SWR302',
+  'PRN212',
+  'EXE101',
+  'Software Engineering',
+  'Artificial Intelligence',
+];
+
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
   const response = await fetch(url, { credentials: 'include' });
+
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       if (typeof window !== 'undefined') window.location.href = '/login';
     }
+
     throw new Error('Failed to fetch explore documents');
   }
 
@@ -118,10 +131,12 @@ const fetcher = async (url: string): Promise<ExploreDocument[]> => {
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
   const response = await fetch(url, { credentials: 'include' });
+
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       if (typeof window !== 'undefined') window.location.href = '/login';
     }
+
     throw new Error('Failed to fetch AI cache');
   }
 
@@ -166,15 +181,26 @@ function getDocumentCategory(doc: ExploreDocument): string {
   return 'Essays';
 }
 
-function getUniversityName(doc: ExploreDocument): string {
+function getSubjectDisplayName(doc: ExploreDocument): string {
+  if (doc.subject?.code && doc.subject?.name) {
+    return `${doc.subject.code} - ${doc.subject.name}`;
+  }
+
   if (doc.subject?.name) {
     return doc.subject.name;
   }
 
-  const idNum = doc.title.charCodeAt(0) + doc.title.charCodeAt(doc.title.length - 1);
-  const unis = ['Stanford University', 'MIT', 'Harvard University'];
+  if (doc.subject?.code) {
+    return doc.subject.code;
+  }
 
-  return unis[idNum % unis.length];
+  return 'Unmapped subject';
+}
+
+function getSubjectFilterOptions(documents: ExploreDocument[]): string[] {
+  return Array.from(new Set(documents.map(getSubjectDisplayName))).sort((a, b) =>
+    a.localeCompare(b),
+  );
 }
 
 function getCategoryIcon(category: string): string {
@@ -206,15 +232,15 @@ function SearchExplore() {
   }
 
   const [sortBy, setSortBy] = useState<'recent' | 'viewed'>('recent');
-  const [selectedUnis, setSelectedUnis] = useState<string[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [selectedYear, setSelectedYear] = useState('2023 / 2024');
+  const [selectedSemester, setSelectedSemester] = useState('All semesters');
 
   const [collapsedSections, setCollapsedSections] = useState<{ [key: string]: boolean }>({
     sort: false,
-    uni: false,
+    subject: false,
     type: false,
-    year: false,
+    semester: false,
   });
 
   const [followedDocumentIds, setFollowedDocumentIds] = useState<string[]>(() => {
@@ -302,11 +328,15 @@ function SearchExplore() {
     return [];
   }, [documents]);
 
+  const subjectFilterOptions = useMemo(() => {
+    return getSubjectFilterOptions(displayDocs);
+  }, [displayDocs]);
+
   const filteredDocuments = useMemo(() => {
     let list = [...displayDocs];
 
-    if (selectedUnis.length > 0) {
-      list = list.filter((doc) => selectedUnis.includes(getUniversityName(doc)));
+    if (selectedSubjects.length > 0) {
+      list = list.filter((doc) => selectedSubjects.includes(getSubjectDisplayName(doc)));
     }
 
     if (selectedTypes.length > 0) {
@@ -320,15 +350,15 @@ function SearchExplore() {
     }
 
     return list;
-  }, [displayDocs, selectedUnis, selectedTypes, sortBy]);
+  }, [displayDocs, selectedSubjects, selectedTypes, sortBy]);
 
   const toggleSection = (section: string) => {
     setCollapsedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const handleUniversityChange = (uni: string) => {
-    setSelectedUnis((prev) =>
-      prev.includes(uni) ? prev.filter((u) => u !== uni) : [...prev, uni],
+  const handleSubjectChange = (subject: string) => {
+    setSelectedSubjects((prev) =>
+      prev.includes(subject) ? prev.filter((item) => item !== subject) : [...prev, subject],
     );
   };
 
@@ -339,8 +369,9 @@ function SearchExplore() {
   };
 
   const handleClearAll = () => {
-    setSelectedUnis([]);
+    setSelectedSubjects([]);
     setSelectedTypes([]);
+    setSelectedSemester('All semesters');
     setSortBy('recent');
   };
 
@@ -574,7 +605,7 @@ function SearchExplore() {
                     handleSearchSubmit();
                   }
                 }}
-                placeholder="Search for courses, documents, or keywords..."
+                placeholder="Search by subject code, course name, document, or keyword..."
               />
             </div>
           </div>
@@ -614,8 +645,6 @@ function SearchExplore() {
             </nav>
 
             <div className="border-outline-variant flex items-center gap-4 border-l pl-6">
-              
-              
               <button
                 onClick={async () => {
                   try {
@@ -707,39 +736,37 @@ function SearchExplore() {
 
             <section>
               <div
-                onClick={() => toggleSection('uni')}
+                onClick={() => toggleSection('subject')}
                 className="group mb-4 flex cursor-pointer items-center justify-between"
               >
-                <h3 className="font-label-md text-primary">University</h3>
+                <h3 className="font-label-md text-primary">FPT Subject</h3>
                 <span
                   className={`material-symbols-outlined text-secondary transition-transform ${
-                    collapsedSections.uni ? 'rotate-[-90deg]' : ''
+                    collapsedSections.subject ? 'rotate-[-90deg]' : ''
                   }`}
                 >
                   expand_more
                 </span>
               </div>
-              {!collapsedSections.uni && (
+              {!collapsedSections.subject && (
                 <div className="space-y-3">
-                  {[
-                    'Stanford University',
-                    'London School of Economics',
-                    'MIT',
-                    'Harvard University',
-                    'UC Berkeley',
-                  ].map((uni) => (
-                    <label key={uni} className="group flex cursor-pointer items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedUnis.includes(uni)}
-                        onChange={() => handleUniversityChange(uni)}
-                        className="filter-checkbox border-outline-variant text-primary focus:ring-primary h-4 w-4 rounded"
-                      />
-                      <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
-                        {uni}
-                      </span>
-                    </label>
-                  ))}
+                  {subjectFilterOptions.length > 0 ? (
+                    subjectFilterOptions.map((subject) => (
+                      <label key={subject} className="group flex cursor-pointer items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedSubjects.includes(subject)}
+                          onChange={() => handleSubjectChange(subject)}
+                          className="filter-checkbox border-outline-variant text-primary focus:ring-primary h-4 w-4 rounded"
+                        />
+                        <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
+                          {subject}
+                        </span>
+                      </label>
+                    ))
+                  ) : (
+                    <p className="text-secondary text-sm">No subjects available yet.</p>
+                  )}
                 </div>
               )}
             </section>
@@ -762,7 +789,7 @@ function SearchExplore() {
               </div>
               {!collapsedSections.type && (
                 <div className="space-y-3">
-                  {['Lecture notes', 'Summaries', 'Past Exams', 'Essays'].map((type) => (
+                  {DOCUMENT_TYPES.map((type) => (
                     <label key={type} className="group flex cursor-pointer items-center gap-3">
                       <input
                         type="checkbox"
@@ -783,27 +810,34 @@ function SearchExplore() {
 
             <section>
               <div
-                onClick={() => toggleSection('year')}
+                onClick={() => toggleSection('semester')}
                 className="group mb-4 flex cursor-pointer items-center justify-between"
               >
-                <h3 className="font-label-md text-primary">Academic Year</h3>
+                <h3 className="font-label-md text-primary">Semester</h3>
                 <span
                   className={`material-symbols-outlined text-secondary transition-transform ${
-                    collapsedSections.year ? 'rotate-[-90deg]' : ''
+                    collapsedSections.semester ? 'rotate-[-90deg]' : ''
                   }`}
                 >
                   expand_more
                 </span>
               </div>
-              {!collapsedSections.year && (
+              {!collapsedSections.semester && (
                 <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
+                  value={selectedSemester}
+                  onChange={(e) => setSelectedSemester(e.target.value)}
                   className="bg-surface-container-low font-label-md text-on-surface-variant focus:ring-primary w-full rounded-lg border-none px-4 py-2.5 outline-none focus:ring-2"
                 >
-                  <option>2023 / 2024</option>
-                  <option>2022 / 2023</option>
-                  <option>2021 / 2022</option>
+                  <option>All semesters</option>
+                  <option>Semester 1</option>
+                  <option>Semester 2</option>
+                  <option>Semester 3</option>
+                  <option>Semester 4</option>
+                  <option>Semester 5</option>
+                  <option>Semester 6</option>
+                  <option>Semester 7</option>
+                  <option>Semester 8</option>
+                  <option>Semester 9</option>
                 </select>
               )}
             </section>
@@ -917,13 +951,14 @@ function SearchExplore() {
                               {followedDocumentIds.includes(doc.id) ? 'Following' : 'Follow'}
                             </button>
                           </div>
+
                           <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
                             <div className="flex items-center gap-2">
                               <span className="material-symbols-outlined text-on-tertiary-container text-[18px]">
-                                account_balance
+                                school
                               </span>
                               <span className="font-label-md text-on-surface-variant">
-                                {getUniversityName(doc)}
+                                {getSubjectDisplayName(doc)}
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
@@ -938,6 +973,7 @@ function SearchExplore() {
                               {category}
                             </div>
                           </div>
+
                           <div className="text-label-sm text-secondary border-outline-variant flex items-center gap-6 border-t pt-4">
                             <span className="flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-[16px]">
@@ -1024,15 +1060,10 @@ function SearchExplore() {
 
               <div className="border-outline-variant mt-16 w-full max-w-xl border-t pt-8">
                 <p className="font-label-sm text-label-sm text-outline mb-6 tracking-widest uppercase">
-                  Popular Disciplines
+                  Popular FPT Searches
                 </p>
                 <div className="flex flex-wrap justify-center gap-3">
-                  {[
-                    'Computer Science',
-                    'Molecular Biology',
-                    'Microeconomics',
-                    'Applied Ethics',
-                  ].map((discipline) => (
+                  {POPULAR_FPT_SEARCHES.map((discipline) => (
                     <button
                       key={discipline}
                       onClick={() => handleSuggestionClick(discipline)}
@@ -1067,7 +1098,7 @@ function SearchExplore() {
                 </h2>
                 {aiCache?.document.subject && (
                   <p className="text-secondary mt-1">
-                    {aiCache.document.subject.name} • {aiCache.document.subject.code}
+                    {aiCache.document.subject.code} • {aiCache.document.subject.name}
                   </p>
                 )}
               </div>
