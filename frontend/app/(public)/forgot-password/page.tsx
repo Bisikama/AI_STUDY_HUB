@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { authApi } from '@/services/authApi';
+import { toast } from 'sonner';
 
 const forgotPasswordSchema = z.object({
   email: z.string().min(1, 'Email không được để trống').email('Email không đúng định dạng'),
@@ -33,12 +34,12 @@ export default function ForgotPasswordPage() {
       const res = await authApi.forgotPassword(data.email);
       const devOtp = res?.data?.devOtp;
       if (devOtp) {
-        alert(`Yêu cầu thành công! (DEV MODE: Mã OTP của bạn là ${devOtp})`);
+        toast.success(`Yêu cầu thành công! (DEV MODE: Mã OTP của bạn là ${devOtp})`);
         router.push(
           `/reset-password?email=${encodeURIComponent(data.email)}&otp=${encodeURIComponent(devOtp)}`,
         );
       } else {
-        alert('Yêu cầu thành công! Vui lòng kiểm tra mã OTP.');
+        toast.success('Yêu cầu thành công! Vui lòng kiểm tra mã OTP.');
         router.push(`/reset-password?email=${encodeURIComponent(data.email)}`);
       }
     } catch (err: unknown) {

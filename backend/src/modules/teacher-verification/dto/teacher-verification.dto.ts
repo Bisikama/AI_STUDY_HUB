@@ -1,17 +1,20 @@
-import { IsNotEmpty, IsString, IsOptional, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsEnum, IsDefined } from 'class-validator';
 
 export class CreateTeacherVerificationDto {
   @IsNotEmpty({ message: 'Mã giảng viên không được để trống' })
+  @IsDefined({ message: 'Mã giảng viên là bắt buộc' })
   @IsString()
   teacherCode: string;
 
-  @IsOptional()
+  @IsDefined({ message: 'Khoa là bắt buộc' })
+  @IsNotEmpty()
   @IsString()
-  department?: string;
+  department: string;
 
-  @IsOptional()
+  @IsDefined({ message: 'Khoa là bắt buộc' })
+  @IsNotEmpty()
   @IsString()
-  proofUrl?: string;
+  proofUrl: string;
 }
 
 export class ReviewTeacherVerificationDto {

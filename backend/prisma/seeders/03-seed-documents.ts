@@ -115,6 +115,52 @@ export async function seedDocuments(
     },
   ];
 
+  // Tạo các tags mặc định cho hệ thống
+  console.log('🏷️ Creating system tags...');
+  const tagsData = [
+    { name: 'NestJS', slug: 'nestjs', isSystem: true },
+    { name: 'SQL Query', slug: 'sql-query', isSystem: true },
+    { name: 'CI/CD Pipeline', slug: 'cicd-pipeline', isSystem: true },
+    { name: 'Machine Learning', slug: 'machine-learning', isSystem: true },
+    { name: 'Web Responsive', slug: 'web-responsive', isSystem: true },
+    { name: 'Cryptography', slug: 'cryptography', isSystem: true },
+    { name: 'Microservices', slug: 'microservices', isSystem: true },
+    { name: 'Docker Containers', slug: 'docker-containers', isSystem: true },
+    { name: 'NLP & Transformers', slug: 'nlp-transformers', isSystem: true },
+    { name: 'GraphQL', slug: 'graphql', isSystem: true },
+  ];
+  const tags = await Promise.all(
+    tagsData.map((t) =>
+      prisma.tag.create({
+        data: t,
+      }),
+    ),
+  );
+  console.log(`✅ Created ${tags.length} system tags`);
+
+  // Tạo thư mục cá nhân (PersonalFolder) cho các users
+  console.log('📁 Creating personal folders for users...');
+  const personalFolders: { ownerId: string; folderId: string }[] = [];
+  for (const user of users) {
+    const rootFolder = await prisma.personalFolder.create({
+      data: {
+        ownerId: user.id,
+        name: 'Tài Liệu Của Tôi',
+      },
+    });
+
+    const subFolder = await prisma.personalFolder.create({
+      data: {
+        ownerId: user.id,
+        name: 'Kỳ 5 - Tài Liệu Chuyên Ngành',
+        parentId: rootFolder.id,
+      },
+    });
+
+    personalFolders.push({ ownerId: user.id, folderId: subFolder.id });
+  }
+  console.log(`✅ Created personal folders for ${users.length} users`);
+
   const documents: any[] = [];
   const fileSize = BigInt(faker.number.int({ min: 1000000, max: 50000000 })); // 1MB - 50MB
 
@@ -123,36 +169,50 @@ export async function seedDocuments(
     const user = users[i % users.length];
     const subject = subjects.find((s) => s.code === template.subjectCode)!;
 
-    // 1. Random trạng thái cho thực tế (để UI có nhiều màu sắc khác nhau)
-    const randomVisibility = faker.helpers.arrayElement(['PRIVATE', 'PENDING_REVIEW', 'PUBLIC']);
-    const randomStatus = faker.helpers.arrayElement(['ACTIVE', 'ACTIVE', 'ACTIVE', 'UNDER_REVIEW']);
+    // Lấy personalFolderId cho 1/3 số tài liệu ngẫu nhiên của user
+    const userFolder = personalFolders.find((f) => f.ownerId === user.id);
+    const personalFolderId = userFolder && i % 3 === 0 ? userFolder.folderId : null;
+
+    // Phân bổ trạng thái hiển thị của tài liệu để phục vụ việc kiểm thử các luồng hoạt động:
+    // - 12 tài liệu mặc định hiển thị PUBLIC (để xem trên explore, dashboard)
+    // - 3 tài liệu ở trạng thái PENDING_REVIEW (để admin kiểm thử luồng Approve/Reject)
+    // - 3 tài liệu ở trạng thái PRIVATE (để user kiểm thử luồng gửi yêu cầu public)
+    let visibility: 'PUBLIC' | 'PENDING_REVIEW' | 'PRIVATE' = 'PUBLIC';
+    if (i >= 12 && i <= 14) {
+      visibility = 'PENDING_REVIEW';
+    } else if (i >= 15 && i <= 17) {
+      visibility = 'PRIVATE';
+    }
+
+    const docStatus = 'ACTIVE';
 
     // 2. Format lại chuẩn URL của Supabase
-    const fakeSupabaseUrl = `https://${process.env.SUPABASE_PROJECT_REF}.supabase.co/storage/v1/object/public/documents/seed-${faker.string.uuid()}.pdf`;
+    const uuid = faker.string.uuid();
+    const fakeSupabaseUrl = `https://${process.env.SUPABASE_PROJECT_REF}.supabase.co/storage/v1/object/public/documents/seed-${uuid}.pdf`;
+    const storagePath = `documents/seed-${uuid}.pdf`;
 
     const document = await prisma.document.create({
       data: {
         title: template.title,
         description: template.description,
         subjectId: subject.id,
+        personalFolderId: personalFolderId,
         uploadedBy: user.id,
         fileUrl: fakeSupabaseUrl,
+        storagePath: storagePath, // QUAN TRỌNG: Phải có storagePath để API getDetails không báo lỗi 404
         fileSize: fileSize,
         fileType: 'application/pdf',
-        status: randomStatus as any, // Đã fix đúng chuẩn Schema mới
-        visibilityStatus: randomVisibility as any,
-        copyrightSourceType: faker.helpers.arrayElement([
-          'OWN_ORIGINAL',
-          'OPEN_LICENSE',
-          'FPT_OFFICIAL',
-          'UNKNOWN',
-        ]) as any,
-        copyrightAuthorName: faker.person.fullName(),
-        copyrightSourceUrl: faker.internet.url(),
-        copyrightLicense: faker.helpers.arrayElement(['CC BY 4.0', 'CC BY-NC 4.0', 'MIT', null]),
-        copyrightAttribution: faker.lorem.sentence(),
-        copyrightDeclaredAt: new Date(),
-        copyrightDeclaredBy: user.id,
+        status: docStatus as any,
+        visibilityStatus: visibility as any,
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+        copyrightSourceType: 'OWN_ORIGINAL', // QUAN TRỌNG: Thiết lập nguồn tự biên soạn
+        copyrightAuthorName: user.fullName,  // Tác giả tự biên soạn
+        copyrightSourceUrl: null,
+        copyrightLicense: null,
+        copyrightAttribution: 'Tài liệu tự biên soạn bởi giảng viên/sinh viên hệ thống',
+        copyrightDeclaredAt: new Date(),     // QUAN TRỌNG: Cần thiết để xác thực bản quyền hợp lệ
+        copyrightDeclaredBy: user.id,        // QUAN TRỌNG: Phải trùng với uploadedBy để đủ điều kiện yêu cầu public
         averageRating: parseFloat(faker.number.float({ min: 3.5, max: 5.0 }).toFixed(1)),
         ratingCount: faker.number.int({ min: 1, max: 20 }),
         viewCount: faker.number.int({ min: 50, max: 2000 }),
@@ -163,10 +223,21 @@ export async function seedDocuments(
       },
     });
 
+    // Tạo liên kết DocumentTag
+    const selectedTags = faker.helpers.arrayElements(tags, { min: 1, max: 3 });
+    for (const tag of selectedTags) {
+      await prisma.documentTag.create({
+        data: {
+          documentId: document.id,
+          tagId: tag.id,
+        },
+      });
+    }
+
     documents.push(document);
 
     console.log(
-      `   ✓ Document: "${document.title}" (by ${user.fullName}, status: ${randomStatus})`,
+      `   ✓ Document: "${document.title}" (by ${user.fullName}, status: ${docStatus}, tags: ${selectedTags.map(t => t.name).join(', ')})`,
     );
   }
 
