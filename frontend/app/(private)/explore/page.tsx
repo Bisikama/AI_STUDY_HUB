@@ -94,6 +94,20 @@ type QuizAnswerCheckResult = {
   correctOptionId: string;
 };
 
+type AiCacheTab = 'summary' | 'quiz' | 'feedback';
+
+type ReportReason =
+  | 'INCORRECT_CONTENT'
+  | 'WRONG_SUBJECT'
+  | 'OUTDATED_SYLLABUS'
+  | 'DUPLICATED_DOCUMENT'
+  | 'FILE_ERROR'
+  | 'LOW_QUALITY'
+  | 'SPAM'
+  | 'COPYRIGHT_VIOLATION'
+  | 'INAPPROPRIATE_CONTENT'
+  | 'OTHER';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
 const FOLLOWED_DOCUMENTS_STORAGE_KEY = 'studyhub_followed_documents';
@@ -107,6 +121,19 @@ const POPULAR_FPT_SEARCHES = [
   'EXE101',
   'Software Engineering',
   'Artificial Intelligence',
+];
+
+const REPORT_REASONS: { value: ReportReason; label: string }[] = [
+  { value: 'INCORRECT_CONTENT', label: 'Incorrect content' },
+  { value: 'WRONG_SUBJECT', label: 'Wrong subject' },
+  { value: 'OUTDATED_SYLLABUS', label: 'Outdated syllabus' },
+  { value: 'DUPLICATED_DOCUMENT', label: 'Duplicated document' },
+  { value: 'FILE_ERROR', label: 'File error' },
+  { value: 'LOW_QUALITY', label: 'Low quality' },
+  { value: 'SPAM', label: 'Spam' },
+  { value: 'COPYRIGHT_VIOLATION', label: 'Copyright violation' },
+  { value: 'INAPPROPRIATE_CONTENT', label: 'Inappropriate content' },
+  { value: 'OTHER', label: 'Other' },
 ];
 
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
@@ -258,8 +285,10 @@ function SearchExplore() {
     }
   });
 
+  const [followLoadingId, setFollowLoadingId] = useState<string | null>(null);
+
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
-  const [activeAiCacheTab, setActiveAiCacheTab] = useState<'summary' | 'quiz'>('summary');
+  const [activeAiCacheTab, setActiveAiCacheTab] = useState<AiCacheTab>('summary');
   const [isQuizSubmitted, setIsQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState<number | null>(null);
   const [quizAuthWarning, setQuizAuthWarning] = useState<string | null>(null);
@@ -268,6 +297,14 @@ function SearchExplore() {
   );
   const [isQuizSubmitting, setIsQuizSubmitting] = useState(false);
   const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
+
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [isRatingSubmitting, setIsRatingSubmitting] = useState(false);
+
+  const [reportReason, setReportReason] = useState<ReportReason>('INCORRECT_CONTENT');
+  const [reportDescription, setReportDescription] = useState('');
+  const [isReportSubmitting, setIsReportSubmitting] = useState(false);
 
   const aiCacheUrl = selectedDocumentId
     ? `${API_BASE_URL}/api/explore/${selectedDocumentId}/ai-cache`
@@ -403,18 +440,48 @@ function SearchExplore() {
     }
   };
 
-  const toggleFollow = (doc: ExploreDocument, e: MouseEvent) => {
+  const toggleFollow = async (doc: ExploreDocument, e: MouseEvent) => {
     e.stopPropagation();
 
-    setFollowedDocumentIds((prev) => {
-      const nextIds = prev.includes(doc.id)
-        ? prev.filter((followedId) => followedId !== doc.id)
-        : [...prev, doc.id];
+    if (followLoadingId === doc.id) {
+      return;
+    }
 
-      saveFollowedDocuments(nextIds, doc);
+    const isCurrentlyFollowed = followedDocumentIds.includes(doc.id);
+    const endpoint = isCurrentlyFollowed
+      ? `/documents/${doc.id}/unfollow`
+      : `/documents/${doc.id}/follow`;
 
-      return nextIds;
-    });
+    setFollowLoadingId(doc.id);
+
+    try {
+      await axiosClient.post(endpoint);
+
+      setFollowedDocumentIds((prev) => {
+        const nextIds = isCurrentlyFollowed
+          ? prev.filter((followedId) => followedId !== doc.id)
+          : Array.from(new Set([...prev, doc.id]));
+
+        saveFollowedDocuments(nextIds, doc);
+        return nextIds;
+      });
+
+      toast.success(isCurrentlyFollowed ? 'Document unfollowed.' : 'Document followed.');
+    } catch (err) {
+      console.error('Failed to update follow status:', err);
+      toast.error('Could not update follow status. Please try again.');
+    } finally {
+      setFollowLoadingId(null);
+    }
+  };
+
+  const resetFeedbackForm = () => {
+    setSelectedRating(0);
+    setRatingComment('');
+    setReportReason('INCORRECT_CONTENT');
+    setReportDescription('');
+    setIsRatingSubmitting(false);
+    setIsReportSubmitting(false);
   };
 
   const closeSelectedDocument = () => {
@@ -426,6 +493,7 @@ function SearchExplore() {
     setQuizAuthWarning(null);
     setQuizAnswerResults({});
     setIsQuizSubmitting(false);
+    resetFeedbackForm();
   };
 
   const handleViewFull = (documentId?: string | null) => {
@@ -450,6 +518,7 @@ function SearchExplore() {
     setQuizAuthWarning(null);
     setQuizAnswerResults({});
     setIsQuizSubmitting(false);
+    resetFeedbackForm();
     setSelectedDocumentId(doc.id);
 
     try {
@@ -565,6 +634,58 @@ function SearchExplore() {
     setQuizAuthWarning(null);
     setQuizAnswerResults({});
     setIsQuizSubmitting(false);
+  };
+
+  const handleSubmitRating = async () => {
+    if (!selectedDocumentId) {
+      return;
+    }
+
+    if (selectedRating < 1 || selectedRating > 5) {
+      toast.warning('Please choose a rating from 1 to 5 stars.');
+      return;
+    }
+
+    setIsRatingSubmitting(true);
+
+    try {
+      await axiosClient.post(`/documents/${selectedDocumentId}/ratings`, {
+        rating: selectedRating,
+        comment: ratingComment.trim() || undefined,
+      });
+
+      toast.success('Rating submitted successfully.');
+      setRatingComment('');
+    } catch (err) {
+      console.error('Failed to submit rating:', err);
+      toast.error('Could not submit rating. You may not be allowed to rate your own document.');
+    } finally {
+      setIsRatingSubmitting(false);
+    }
+  };
+
+  const handleSubmitReport = async () => {
+    if (!selectedDocumentId) {
+      return;
+    }
+
+    setIsReportSubmitting(true);
+
+    try {
+      await axiosClient.post(`/documents/${selectedDocumentId}/reports`, {
+        reason: reportReason,
+        description: reportDescription.trim() || undefined,
+      });
+
+      toast.success('Report submitted successfully. Admin will review this document.');
+      setReportReason('INCORRECT_CONTENT');
+      setReportDescription('');
+    } catch (err) {
+      console.error('Failed to submit report:', err);
+      toast.error('Could not submit report. You may have already reported this document.');
+    } finally {
+      setIsReportSubmitting(false);
+    }
   };
 
   const handleSuggestionClick = (discipline: string) => {
@@ -894,6 +1015,8 @@ function SearchExplore() {
               <div className="space-y-4">
                 {filteredDocuments.map((doc) => {
                   const category = getDocumentCategory(doc);
+                  const isFollowed = followedDocumentIds.includes(doc.id);
+                  const isFollowLoading = followLoadingId === doc.id;
 
                   return (
                     <article
@@ -929,26 +1052,23 @@ function SearchExplore() {
                             )}
                             <button
                               type="button"
-                              onClick={(e) => toggleFollow(doc, e)}
-                              className={`font-label-sm text-label-sm flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 transition-colors ${
-                                followedDocumentIds.includes(doc.id)
+                              disabled={isFollowLoading}
+                              onClick={(e) => void toggleFollow(doc, e)}
+                              className={`font-label-sm text-label-sm flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                                isFollowed
                                   ? 'border-primary bg-primary-container/20 text-primary'
                                   : 'border-outline-variant text-secondary hover:border-primary hover:text-primary'
                               }`}
-                              title={
-                                followedDocumentIds.includes(doc.id)
-                                  ? 'Unfollow this document'
-                                  : 'Follow this document'
-                              }
+                              title={isFollowed ? 'Unfollow this document' : 'Follow this document'}
                             >
                               <span
                                 className={`material-symbols-outlined text-[18px] ${
-                                  followedDocumentIds.includes(doc.id) ? 'filled' : ''
+                                  isFollowed ? 'filled' : ''
                                 }`}
                               >
-                                bookmark_add
+                                {isFollowLoading ? 'sync' : 'bookmark_add'}
                               </span>
-                              {followedDocumentIds.includes(doc.id) ? 'Following' : 'Follow'}
+                              {isFollowLoading ? 'Saving...' : isFollowed ? 'Following' : 'Follow'}
                             </button>
                           </div>
 
@@ -1141,11 +1261,11 @@ function SearchExplore() {
 
             {aiCache && (
               <div className="space-y-6">
-                <div className="bg-surface-container-low border-outline-variant flex rounded-xl border p-1">
+                <div className="bg-surface-container-low border-outline-variant grid rounded-xl border p-1 md:grid-cols-3">
                   <button
                     type="button"
                     onClick={() => setActiveAiCacheTab('summary')}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    className={`flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
                       activeAiCacheTab === 'summary'
                         ? 'bg-surface text-primary shadow-sm'
                         : 'text-secondary hover:text-primary'
@@ -1161,7 +1281,7 @@ function SearchExplore() {
                   <button
                     type="button"
                     onClick={() => setActiveAiCacheTab('quiz')}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    className={`flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
                       activeAiCacheTab === 'quiz'
                         ? 'bg-surface text-primary shadow-sm'
                         : 'text-secondary hover:text-primary'
@@ -1172,6 +1292,19 @@ function SearchExplore() {
                     <span className="bg-surface-container-high text-secondary rounded-full px-2 py-0.5 text-[11px]">
                       {aiCache.quizzes[0]?.questions.length ?? 0}
                     </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveAiCacheTab('feedback')}
+                    className={`flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                      activeAiCacheTab === 'feedback'
+                        ? 'bg-surface text-primary shadow-sm'
+                        : 'text-secondary hover:text-primary'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">reviews</span>
+                    Feedback
                   </button>
                 </div>
 
@@ -1392,6 +1525,108 @@ function SearchExplore() {
                         </div>
                       );
                     })()}
+                  </section>
+                )}
+
+                {activeAiCacheTab === 'feedback' && (
+                  <section className="grid gap-4 md:grid-cols-2">
+                    <div className="bg-surface-container-lowest border-outline-variant rounded-xl border p-5">
+                      <div className="mb-4">
+                        <h3 className="text-primary text-lg font-bold">Rate this document</h3>
+                        <p className="text-secondary mt-1 text-sm">
+                          Give feedback to help other students find useful materials.
+                        </p>
+                      </div>
+
+                      <div className="mb-4 flex gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setSelectedRating(star)}
+                            className={`material-symbols-outlined cursor-pointer rounded-full p-1 text-3xl transition-colors ${
+                              selectedRating >= star
+                                ? 'text-primary'
+                                : 'text-outline hover:text-primary'
+                            }`}
+                            title={`${star} star${star > 1 ? 's' : ''}`}
+                          >
+                            star
+                          </button>
+                        ))}
+                      </div>
+
+                      <textarea
+                        value={ratingComment}
+                        onChange={(e) => setRatingComment(e.target.value)}
+                        maxLength={500}
+                        rows={5}
+                        className="border-outline-variant bg-surface text-on-surface focus:border-primary focus:ring-primary/30 w-full resize-none rounded-lg border px-3 py-2 text-sm transition-colors outline-none focus:ring-2"
+                        placeholder="Optional comment, max 500 characters..."
+                      />
+
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <p className="text-secondary text-xs">{ratingComment.length}/500</p>
+                        <button
+                          type="button"
+                          onClick={() => void handleSubmitRating()}
+                          disabled={isRatingSubmitting}
+                          className="bg-primary text-on-primary flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">star</span>
+                          {isRatingSubmitting ? 'Submitting...' : 'Submit Rating'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="bg-surface-container-lowest border-outline-variant rounded-xl border p-5">
+                      <div className="mb-4">
+                        <h3 className="text-primary text-lg font-bold">Report this document</h3>
+                        <p className="text-secondary mt-1 text-sm">
+                          Report issues so admins can review this public material.
+                        </p>
+                      </div>
+
+                      <label className="text-primary mb-2 block text-sm font-semibold">
+                        Reason
+                      </label>
+                      <select
+                        value={reportReason}
+                        onChange={(e) => setReportReason(e.target.value as ReportReason)}
+                        className="border-outline-variant bg-surface text-on-surface focus:border-primary focus:ring-primary/30 mb-4 w-full rounded-lg border px-3 py-2 text-sm transition-colors outline-none focus:ring-2"
+                      >
+                        {REPORT_REASONS.map((reason) => (
+                          <option key={reason.value} value={reason.value}>
+                            {reason.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <label className="text-primary mb-2 block text-sm font-semibold">
+                        Description
+                      </label>
+                      <textarea
+                        value={reportDescription}
+                        onChange={(e) => setReportDescription(e.target.value)}
+                        maxLength={500}
+                        rows={5}
+                        className="border-outline-variant bg-surface text-on-surface focus:border-primary focus:ring-primary/30 w-full resize-none rounded-lg border px-3 py-2 text-sm transition-colors outline-none focus:ring-2"
+                        placeholder="Optional details for admin review, max 500 characters..."
+                      />
+
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <p className="text-secondary text-xs">{reportDescription.length}/500</p>
+                        <button
+                          type="button"
+                          onClick={() => void handleSubmitReport()}
+                          disabled={isReportSubmitting}
+                          className="bg-error text-on-error flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">flag</span>
+                          {isReportSubmitting ? 'Submitting...' : 'Submit Report'}
+                        </button>
+                      </div>
+                    </div>
                   </section>
                 )}
 
