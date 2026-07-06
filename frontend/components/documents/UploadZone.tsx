@@ -271,7 +271,7 @@ export default function UploadZone() {
   // Subject (Major -> Course) state
   const [selectedMajorCode, setSelectedMajorCode] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
-  
+
   // Study Folder state
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const [showCreateFolder, setShowCreateFolder] = useState(false);
@@ -356,11 +356,11 @@ export default function UploadZone() {
       if (rejectedFiles.length > 0) {
         const err = rejectedFiles[0]?.errors[0];
         if (err?.code === 'file-too-large') {
-          addToast('File quá lớn! Kích thước tối đa là 10MB.', 'error');
+          addToast('File too large! Maximum size is 10MB.', 'error');
         } else if (err?.code === 'file-invalid-type') {
-          addToast(`Loại file không được hỗ trợ. Các loại hợp lệ: ${ACCEPTED_EXTENSIONS.join(', ')}`, 'error');
+          addToast(`Unsupported file type. Allowed types: ${ACCEPTED_EXTENSIONS.join(', ')}`, 'error');
         } else {
-          addToast('File không hợp lệ. Vui lòng thử lại.', 'error');
+          addToast('Invalid file. Please try again.', 'error');
         }
         return;
       }
@@ -465,15 +465,15 @@ export default function UploadZone() {
   //  Submit
   const handleSubmit = async () => {
     if (!selectedFile) {
-      addToast('Vui lòng chọn một file để upload.', 'error');
+      addToast('Please select a file to upload.', 'error');
       return;
     }
     if (!title.trim() || title.trim().length > 150) {
-      addToast('Tiêu đề tài liệu là bắt buộc và tối đa 150 ký tự.', 'error');
+      addToast('Document title is required and must be max 150 characters.', 'error');
       return;
     }
     if (!selectedMajorCode || !selectedSubjectId) {
-      addToast('Vui lòng chọn Major và Course trước khi upload.', 'error');
+      addToast('Please select a Major and Course before uploading.', 'error');
       return;
     }
 
@@ -493,11 +493,11 @@ export default function UploadZone() {
       stopProgress(true);
 
       if (result.extractionStatus === 'READY') {
-        addToast('Tài liệu đã được upload thành công! PDF đã được trích xuất thành công.', 'success');
+        addToast('Document uploaded successfully! PDF text extracted successfully.', 'success');
       } else if (result.extractionStatus === 'FAILED') {
-        addToast('Upload thành công! Không thể trích xuất text nhưng file PDF vẫn được lưu riêng tư và có thể preview.', 'success');
+        addToast('Upload successful! Could not extract text, but the file is saved and previewable.', 'success');
       } else {
-        addToast('Tài liệu đã được upload thành công!', 'success');
+        addToast('Document uploaded successfully!', 'success');
       }
 
       // Revalidate documents list (wildcard)
@@ -548,12 +548,12 @@ export default function UploadZone() {
             // Reuse the same onDrop validation path
             const f = files[0];
             if (!ACCEPTED_TYPES[f.type as keyof typeof ACCEPTED_TYPES] && !ACCEPTED_EXTENSIONS.some(ext => f.name.toLowerCase().endsWith(ext))) {
-              addToast(`Loại file không được hỗ trợ. Các loại hợp lệ: ${ACCEPTED_EXTENSIONS.join(', ')}`, 'error');
+              addToast(`Unsupported file type. Allowed types: ${ACCEPTED_EXTENSIONS.join(', ')}`, 'error');
               e.target.value = '';
               return;
             }
             if (f.size > MAX_FILE_SIZE) {
-              addToast('File quá lớn! Kích thước tối đa là 10MB.', 'error');
+              addToast('File too large! Maximum size is 10MB.', 'error');
               e.target.value = '';
               return;
             }
@@ -592,7 +592,7 @@ export default function UploadZone() {
           </div>
 
           <p className="text-lg font-semibold text-gray-800">
-            {isDragActive ? 'Thả file vào đây...' : 'Drag and Drop your study materials here'}
+            {isDragActive ? 'Drop file here...' : 'Drag and Drop your study materials here'}
           </p>
           <p className="mt-1.5 text-sm text-gray-400">
             Supports {ACCEPTED_EXTENSIONS.join(', ')} up to 10MB per file.
@@ -761,7 +761,7 @@ export default function UploadZone() {
                 New Folder
               </button>
             </div>
-            
+
             {showCreateFolder && (
               <div className="mt-2 flex gap-2">
                 <input

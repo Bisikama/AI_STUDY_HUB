@@ -68,7 +68,7 @@ function ConfirmModal({ open, title, description, confirmLabel, confirmClass, on
         <div className="flex justify-end gap-3">
           <button onClick={onCancel} disabled={loading}
             className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-            Hủy
+            Cancel
           </button>
           <button onClick={onConfirm} disabled={loading}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50 ${confirmClass}`}>
@@ -92,9 +92,9 @@ export default function AdminQuizManager() {
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  
+
   const [deletingLoading, setDeletingLoading] = useState(false);
-  
+
   // Toast notifications state
   const [toasts, setToasts] = useState<Array<{ id: number; text: string; type: 'success' | 'error' }>>([]);
   const addToast = (text: string, type: 'success' | 'error') => {
@@ -120,7 +120,7 @@ export default function AdminQuizManager() {
 
   const handleRefresh = () => {
     void mutate();
-    addToast('Đang làm mới dữ liệu...', 'success');
+    addToast('Refreshing data...', 'success');
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,13 +139,13 @@ export default function AdminQuizManager() {
     try {
       setDeletingLoading(true);
       await adminApi.deleteQuiz(activeQuiz.id);
-      addToast(`🗑️ Đã xóa bộ câu hỏi "${activeQuiz.title}" thành công.`, 'success');
+      addToast(`🗑️ Successfully deleted quiz "${activeQuiz.title}".`, 'success');
       void mutate();
       setIsDeleteOpen(false);
       setActiveQuiz(null);
     } catch (err: any) {
       console.error('Delete failed:', err);
-      addToast(err.response?.data?.message || 'Xóa bộ câu hỏi thất bại', 'error');
+      addToast(err.response?.data?.message || 'Failed to delete quiz', 'error');
     } finally {
       setDeletingLoading(false);
     }
@@ -165,15 +165,15 @@ export default function AdminQuizManager() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Quản lý Quiz trắc nghiệm</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Quiz Management</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Kiểm duyệt, xem số liệu thống kê lượt làm bài hoặc trực tiếp chỉnh sửa nội dung câu hỏi/đáp án.
+              Moderate, view statistics of attempts, or directly edit questions and answers.
             </p>
           </div>
           <div className="flex items-center gap-3">
             {quizData && (
               <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-600">
-                {quizData.totalItems} bộ quiz
+                {quizData.totalItems} quizzes
               </span>
             )}
             <button
@@ -184,7 +184,7 @@ export default function AdminQuizManager() {
               <span className={quizzesLoading ? 'animate-spin' : ''}>
                 <RefreshIcon />
               </span>
-              Làm mới
+              Refresh
             </button>
           </div>
         </div>
@@ -199,7 +199,7 @@ export default function AdminQuizManager() {
               type="text"
               value={search}
               onChange={handleSearchChange}
-              placeholder="Tìm theo tiêu đề quiz hoặc tài liệu..."
+              placeholder="Search by quiz title or document..."
               className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-600 focus:bg-white"
             />
           </div>
@@ -210,7 +210,7 @@ export default function AdminQuizManager() {
               onChange={handleSubjectChange}
               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-600"
             >
-              <option value="">Tất cả môn học</option>
+              <option value="">All Subjects</option>
               {subjects?.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name} ({s.code})
@@ -223,7 +223,7 @@ export default function AdminQuizManager() {
         {/* Error alert */}
         {quizError && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-            ⚠️ Không thể tải danh sách bộ câu hỏi. Vui lòng thử lại.
+            ⚠️ Failed to load quizzes. Please try again.
           </div>
         )}
 
@@ -234,25 +234,25 @@ export default function AdminQuizManager() {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Bộ Quiz
+                    Quiz
                   </th>
                   <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Tài liệu nguồn
+                    Source Document
                   </th>
                   <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Môn học
+                    Course
                   </th>
                   <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Người tạo
+                    Creator
                   </th>
                   <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Số câu hỏi
+                    Questions
                   </th>
                   <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Ngày tạo
+                    Created At
                   </th>
                   <th className="px-6 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Hành động
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -275,8 +275,8 @@ export default function AdminQuizManager() {
                     <td colSpan={7} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center gap-3 text-slate-400">
                         <AssignmentIcon />
-                        <p className="text-sm font-medium">Không tìm thấy bộ câu hỏi nào</p>
-                        <p className="text-xs">Hãy thử đổi từ khóa tìm kiếm hoặc môn học khác.</p>
+                        <p className="text-sm font-medium">No quizzes found</p>
+                        <p className="text-xs">Try changing the search keyword or selecting a different course.</p>
                       </div>
                     </td>
                   </tr>
@@ -290,7 +290,7 @@ export default function AdminQuizManager() {
 
                       {/* Original Document */}
                       <td className="px-6 py-4 text-slate-600 font-medium">
-                        {quiz.document?.title || <span className="text-slate-400 italic">Đã xóa tài liệu</span>}
+                        {quiz.document?.title || <span className="text-slate-400 italic">Document deleted</span>}
                       </td>
 
                       {/* Subject */}
@@ -321,7 +321,7 @@ export default function AdminQuizManager() {
 
                       {/* Question Count */}
                       <td className="px-6 py-4 text-slate-600 font-semibold">
-                        {quiz._count.questions} câu
+                        {quiz._count.questions} questions
                       </td>
 
                       {/* Created Date */}
@@ -349,7 +349,7 @@ export default function AdminQuizManager() {
                             className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
                           >
                             <EditIcon />
-                            Sửa
+                            Edit
                           </button>
 
                           <button
@@ -360,7 +360,7 @@ export default function AdminQuizManager() {
                             className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-500 shadow-sm transition hover:bg-red-50"
                           >
                             <TrashIcon />
-                            Xóa
+                            Delete
                           </button>
                         </div>
                       </td>
@@ -375,7 +375,7 @@ export default function AdminQuizManager() {
           {quizData && quizData.totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-slate-100 bg-white px-6 py-4">
               <div className="text-xs text-slate-500">
-                Hiển thị trang {page} / {quizData.totalPages} ({quizData.totalItems} kết quả)
+                Showing page {page} / {quizData.totalPages} ({quizData.totalItems} results)
               </div>
               <div className="flex gap-2">
                 <button
@@ -383,14 +383,14 @@ export default function AdminQuizManager() {
                   disabled={page === 1}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
                 >
-                  Trang trước
+                  Previous
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.min(p + 1, quizData.totalPages))}
                   disabled={page === quizData.totalPages}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
                 >
-                  Trang sau
+                  Next
                 </button>
               </div>
             </div>
@@ -429,9 +429,9 @@ export default function AdminQuizManager() {
       {activeQuiz && (
         <ConfirmModal
           open={isDeleteOpen}
-          title="Xóa bộ câu hỏi ôn tập"
-          description={`Hành động này không thể hoàn tác! Bộ câu hỏi "${activeQuiz.title}" sẽ bị xóa hoàn toàn khỏi cơ sở dữ liệu.`}
-          confirmLabel="Xóa vĩnh viễn"
+          title="Delete Quiz"
+          description={`This action cannot be undone! The quiz "${activeQuiz.title}" will be permanently deleted from the database.`}
+          confirmLabel="Permanently Delete"
           confirmClass="bg-red-600 hover:bg-red-700"
           onConfirm={executeDelete}
           onCancel={() => {
@@ -447,9 +447,8 @@ export default function AdminQuizManager() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg ${
-              t.type === 'success' ? 'bg-slate-800' : 'bg-red-600'
-            }`}
+            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg ${t.type === 'success' ? 'bg-slate-800' : 'bg-red-600'
+              }`}
           >
             {t.text}
           </div>

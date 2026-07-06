@@ -238,7 +238,7 @@ export default function DocumentDetailPage() {
     if (!id) return;
     try {
       setIsSubmittingCopyright(true);
-      
+
       const cleanStr = (val: string) => {
         const trimmed = val.trim();
         return trimmed === '' ? undefined : trimmed;
@@ -255,8 +255,8 @@ export default function DocumentDetailPage() {
       }
 
       await documentsApi.updateCopyright(id, payload);
-      addToast('Khai báo bản quyền thành công.', 'success');
-      
+      addToast('Copyright declared successfully.', 'success');
+
       // Update cache optimistically so that document state reflects new data before async load finishes
       mutate((currentData: any) => {
         if (!currentData) return currentData;
@@ -271,7 +271,7 @@ export default function DocumentDetailPage() {
           copyrightDeclaredAt: new Date().toISOString(),
         };
       }, { revalidate: true });
-      
+
       setIsCopyrightModalOpen(false);
     } catch (err: any) {
       const { mapDocumentError } = await import('@/utils/errorMapper');
@@ -410,7 +410,7 @@ export default function DocumentDetailPage() {
   };
 
   const extractionUI = getExtractionStatusUI();
-  const publishCtaText = currentUser?.role === 'STUDENT' ? 'Gửi yêu cầu chia sẻ' : 'Chia sẻ trong AI Study Hub';
+  const publishCtaText = currentUser?.role === 'STUDENT' ? 'Request to publish' : 'Publish in AI Study Hub';
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-6xl bg-[#F8F9FA] p-6 font-sans md:p-8">
@@ -486,8 +486,8 @@ export default function DocumentDetailPage() {
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
               <span className="material-symbols-outlined text-[16px] text-blue-600">copyright</span>
               <span className="font-semibold text-blue-800">
-                {document.copyrightSourceType === 'OWN_ORIGINAL' && 'Tự biên soạn'}
-                {document.copyrightSourceType === 'OPEN_LICENSE' && 'Nguồn mở'}
+                {document.copyrightSourceType === 'OWN_ORIGINAL' && 'Self-authored'}
+                {document.copyrightSourceType === 'OPEN_LICENSE' && 'Open Source'}
               </span>
               {document.copyrightLicense && (
                 <>
@@ -501,7 +501,7 @@ export default function DocumentDetailPage() {
                 <>
                   <span className="text-gray-300">|</span>
                   <a href={document.copyrightSourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5 text-xs font-medium">
-                    Nguồn gốc <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                    Source <span className="material-symbols-outlined text-[14px]">open_in_new</span>
                   </a>
                 </>
               )}
@@ -930,7 +930,7 @@ export default function DocumentDetailPage() {
                     className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <span className="material-symbols-outlined text-[18px]">edit</span>
-                    Chỉnh sửa
+                    Edit
                   </button>
                 </div>
               )}
@@ -1007,18 +1007,18 @@ export default function DocumentDetailPage() {
                           </button>
                           <p className="mt-1.5 text-xs text-red-500 text-center">
                             {document.publicationEligibilityReason === 'AI_ANALYSIS_UNSUPPORTED'
-                              ? 'File này chỉ được lưu trữ riêng tư và không thể chia sẻ.'
+                              ? 'This file is stored privately and cannot be shared.'
                               : document.publicationEligibilityReason === 'AI_ANALYSIS_PROCESSING'
-                                ? 'AI Analyze đang xử lý...'
+                                ? 'AI Analysis is processing...'
                                 : document.publicationEligibilityReason === 'AI_ANALYSIS_FAILED'
-                                  ? 'AI Analyze thất bại. Vui lòng thử lại.'
+                                  ? 'AI analysis failed. Please try again.'
                                   : document.publicationEligibilityReason === 'AI_ANALYSIS_REQUIRED'
-                                    ? 'Hãy chạy AI Analyze trước khi chia sẻ tài liệu.'
+                                    ? 'Run AI Analyze before sharing the document.'
                                     : document.publicationEligibilityReason === 'COPYRIGHT_SHARING_NOT_ALLOWED'
-                                      ? 'Nguồn gốc tài liệu này không được phép chia sẻ.'
+                                      ? 'The source of this document is not permitted to be shared.'
                                       : document.publicationEligibilityReason === 'COPYRIGHT_DECLARATION_REQUIRED' || document.publicationEligibilityReason === 'COPYRIGHT_METADATA_INCOMPLETE'
-                                        ? 'Vui lòng khai báo bản quyền để chia sẻ.'
-                                        : 'Tài liệu cần hoàn tất AI Analyze và Khai báo bản quyền trước khi chia sẻ.'}
+                                        ? 'Please declare the copyright when sharing.'
+                                        : 'The document requires AI analysis and copyright declaration before sharing.'}
                           </p>
                           {(document.publicationEligibilityReason === 'COPYRIGHT_DECLARATION_REQUIRED' || document.publicationEligibilityReason === 'COPYRIGHT_METADATA_INCOMPLETE') && (
                             <button
@@ -1026,7 +1026,7 @@ export default function DocumentDetailPage() {
                               className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
                             >
                               <span className="material-symbols-outlined text-[18px]">copyright</span>
-                              Khai báo nguồn / Bản quyền
+                              Source / Copyright
                             </button>
                           )}
                         </div>
@@ -1304,39 +1304,39 @@ export default function DocumentDetailPage() {
           <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8 animate-in zoom-in-95 duration-200">
             <div className="mb-6 flex items-center gap-3 text-blue-600">
               <span className="material-symbols-outlined text-2xl">copyright</span>
-              <h3 className="text-xl font-bold text-gray-900">Khai báo bản quyền</h3>
+              <h3 className="text-xl font-bold text-gray-900">Copyright Declaration</h3>
             </div>
 
             <p className="mb-4 text-xs text-gray-500">
-              Để chia sẻ tài liệu, bạn cần khai báo nguồn gốc và quyền sử dụng theo chính sách của AI Study Hub.
+              To share this document, you must declare its origin and usage rights according to AI Study Hub's policies.
             </p>
 
             <form onSubmit={handleSubmitCopyright} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Nguồn tài liệu
+                  Document Source
                 </label>
                 <select
                   value={copyrightSourceType}
                   onChange={(e) => setCopyrightSourceType(e.target.value)}
                   className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
                 >
-                  <option value="UNKNOWN">Không rõ nguồn</option>
-                  <option value="OWN_ORIGINAL">Tài liệu do tôi biên soạn</option>
-                  <option value="OPEN_LICENSE">Tài liệu có giấy phép mở</option>
+                  <option value="UNKNOWN">Unknown source</option>
+                  <option value="OWN_ORIGINAL">My original document</option>
+                  <option value="OPEN_LICENSE">Open license document</option>
                 </select>
               </div>
 
               {copyrightSourceType === 'OWN_ORIGINAL' && (
                 <div className="rounded border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
-                  Bạn đã xác nhận tài liệu do mình biên soạn.
+                  You have confirmed that this document was authored by you.
                 </div>
               )}
 
               {copyrightSourceType === 'OPEN_LICENSE' && (
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                    URL Nguồn gốc (Bắt buộc)
+                    Source URL (Required)
                   </label>
                   <input
                     type="url"
@@ -1353,7 +1353,7 @@ export default function DocumentDetailPage() {
                 <>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                      Giấy phép (Bắt buộc)
+                      License (Required)
                     </label>
                     <input
                       type="text"
@@ -1366,14 +1366,14 @@ export default function DocumentDetailPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                      Ghi công tác giả (Bắt buộc)
+                      Author Attribution (Required)
                     </label>
                     <input
                       type="text"
                       value={copyrightAttribution}
                       onChange={(e) => setCopyrightAttribution(e.target.value)}
                       required
-                      placeholder="Tên tác giả gốc..."
+                      placeholder="Original author's name..."
                       className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
                     />
                   </div>
@@ -1382,7 +1382,7 @@ export default function DocumentDetailPage() {
 
               {copyrightSourceType === 'UNKNOWN' && (
                 <div className="rounded border border-red-100 bg-red-50 p-3 text-xs text-red-800">
-                  Nguồn tài liệu chưa rõ nên tài liệu chỉ có thể lưu riêng tư.
+                  As the source is unknown, this document can only be saved privately.
                 </div>
               )}
 
@@ -1393,14 +1393,14 @@ export default function DocumentDetailPage() {
                   disabled={isSubmittingCopyright}
                   className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
                 >
-                  Hủy
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingCopyright}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {isSubmittingCopyright ? 'Đang lưu...' : 'Lưu khai báo'}
+                  {isSubmittingCopyright ? 'Saving...' : 'Save Declaration'}
                 </button>
               </div>
             </form>

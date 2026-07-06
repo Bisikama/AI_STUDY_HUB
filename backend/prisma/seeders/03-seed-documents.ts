@@ -202,8 +202,8 @@ export async function seedDocuments(
         storagePath: storagePath, // QUAN TRỌNG: Phải có storagePath để API getDetails không báo lỗi 404
         fileSize: fileSize,
         fileType: 'application/pdf',
-        status: randomStatus as any, // Đã fix đúng chuẩn Schema mới
-        visibilityStatus: randomVisibility as any,
+        status: docStatus as any, // Đã fix đúng chuẩn Schema mới
+        visibilityStatus: visibility as any,
         copyrightSourceType: faker.helpers.arrayElement([
           'OWN_ORIGINAL', 'OPEN_LICENSE', 'UNKNOWN'
         ]) as any,

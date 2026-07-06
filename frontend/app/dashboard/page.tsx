@@ -9,6 +9,7 @@ import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
 import Link from 'next/link';
 import TeacherVerificationModal from '@/components/TeacherVerificationModal';
+import { toast } from 'sonner';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
@@ -394,7 +395,7 @@ function DashboardPage() {
   useEffect(() => {
     loadDashboardData();
 
-    // Fetch từ API để đồng bộ dữ liệu mới nhất từ database
+    // Fetch from API to sync the latest data from database
     getProfile()
       .then((updatedUser) => {
         if (updatedUser) {
@@ -470,7 +471,7 @@ function DashboardPage() {
       setUser(updatedUser);
       setUserFullName(updatedUser.fullName);
 
-      setEditSuccess('Cập nhật thông tin tài khoản thành công!');
+      setEditSuccess('Account information updated successfully!');
       setTimeout(() => {
         setShowEditAccountModal(false);
         setEditSuccess('');
@@ -478,7 +479,7 @@ function DashboardPage() {
     } catch (err: unknown) {
       console.error('Failed to update profile:', err);
       const axiosError = err as { response?: { data?: { message?: string } } };
-      const errMsg = axiosError.response?.data?.message || 'Cập nhật tài khoản thất bại!';
+      const errMsg = axiosError.response?.data?.message || 'Failed to update account!';
       setEditError(Array.isArray(errMsg) ? errMsg[0] : errMsg);
     } finally {
       setEditLoading(false);
@@ -657,7 +658,7 @@ function DashboardPage() {
                         className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
                       >
                         <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
-                        Xác thực Giảng viên
+                        Verify Teacher
                       </button>
                       <hr className="border-outline-variant my-1" />
                       <button
@@ -727,13 +728,13 @@ function DashboardPage() {
                       find_in_page
                     </span>
                     <p className="font-body-md text-body-md text-secondary">
-                      Chưa xem, hãy khám phá tài liệu mà bạn muốn.
+                      Not viewed yet, let's explore documents you want.
                     </p>
                     <button
                       onClick={() => router.push('/explore')}
                       className="font-label-sm text-label-sm mt-4 cursor-pointer rounded-full bg-[#212529] px-4 py-2 text-white transition-opacity hover:opacity-90"
                     >
-                      Khám phá tài liệu
+                      Explore documents
                     </button>
                   </div>
                 ) : (
@@ -806,7 +807,7 @@ function DashboardPage() {
                 ) : publicDocuments.length === 0 ? (
                   <div className="bg-surface-container-lowest rounded-xl border border-dashed border-[#E9ECEF] p-8 text-center shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
                     <p className="font-body-md text-body-md text-secondary">
-                      Chưa có tài liệu công khai nào khác từ cộng đồng.
+                      No other public documents from the community yet.
                     </p>
                   </div>
                 ) : (
@@ -867,7 +868,7 @@ function DashboardPage() {
                     <div className="text-secondary py-8 text-center">Loading...</div>
                   ) : trendingDocs.length === 0 ? (
                     <div className="text-secondary p-8 text-center">
-                      Chưa có tài liệu thịnh hành.
+                      No trending documents yet.
                     </div>
                   ) : (
                     trendingDocs.map((doc) => {
@@ -933,7 +934,7 @@ function DashboardPage() {
                 <div className="flex flex-col gap-4">
                   {topContributors.length === 0 ? (
                     <p className="font-label-sm text-label-sm text-secondary py-4 text-center">
-                      Chưa có contributor nào.
+                      No contributors yet.
                     </p>
                   ) : (
                     topContributors.slice(0, 3).map((c, idx) => (
@@ -1158,8 +1159,8 @@ function DashboardPage() {
                           <span className="flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-600">
                             <span className="material-symbols-outlined text-[14px]">copyright</span>
                             {aiCache.document.copyrightSourceType === 'OWN_ORIGINAL' &&
-                              'Tự biên soạn'}
-                            {aiCache.document.copyrightSourceType === 'OPEN_LICENSE' && 'Nguồn mở'}
+                              'Self-composed'}
+                            {aiCache.document.copyrightSourceType === 'OPEN_LICENSE' && 'Open source'}
                           </span>
                           {aiCache.document.copyrightLicense && (
                             <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
@@ -1173,7 +1174,7 @@ function DashboardPage() {
                               rel="noopener noreferrer"
                               className="flex items-center gap-0.5 text-xs text-blue-500 hover:underline"
                             >
-                              Nguồn{' '}
+                              Source{' '}
                               <span className="material-symbols-outlined text-[12px]">
                                 open_in_new
                               </span>

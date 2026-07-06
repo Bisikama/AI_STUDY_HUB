@@ -157,6 +157,18 @@ export default function DocumentPreviewPage() {
 
   const iframeSrc = previewData?.url;
 
+  const isNativePreviewSupported = (fileType: string) => {
+    if (!fileType) return false;
+    const type = fileType.toLowerCase();
+    return (
+      type === 'application/pdf' ||
+      type === 'text/plain' ||
+      type.startsWith('image/') ||
+      type.startsWith('audio/') ||
+      type.startsWith('video/')
+    );
+  };
+
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-[#F8F9FA] font-sans lg:flex-row">
       {/* Left Column (Preview Area) */}
@@ -206,7 +218,7 @@ export default function DocumentPreviewPage() {
 
         {/* Iframe Container */}
         <div className="relative flex-1 overflow-hidden bg-gray-100 p-4 lg:p-8">
-          {iframeSrc ? (
+          {iframeSrc && isNativePreviewSupported(document.fileType) ? (
             <div className="h-full w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
               <iframe
                 src={iframeSrc}

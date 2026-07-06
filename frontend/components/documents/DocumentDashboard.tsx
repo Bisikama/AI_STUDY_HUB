@@ -38,7 +38,7 @@ export default function DocumentDashboard() {
       <div className="bg-red-50 text-red-500 p-6 rounded-xl border border-red-200">
         <p className="font-semibold flex items-center gap-2">
           <span className="material-symbols-outlined">error</span>
-          Không thể tải danh sách tài liệu. Vui lòng thử lại sau.
+          Failed to load documents. Please try again later.
         </p>
       </div>
     );
@@ -50,7 +50,7 @@ export default function DocumentDashboard() {
         <div>
           <h2 className="text-lg font-bold text-gray-900">My Documents</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Quản lý các tài liệu bạn đã tải lên.
+            Manage your uploaded documents.
           </p>
         </div>
         <div className="bg-primary-container text-on-primary px-3 py-1 rounded-full text-sm font-semibold">
@@ -62,11 +62,11 @@ export default function DocumentDashboard() {
         <table className="w-full text-left text-sm text-gray-600">
           <thead className="bg-gray-50 text-gray-500 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-4 font-semibold w-1/3">Tên tài liệu</th>
-              <th className="px-6 py-4 font-semibold">Môn học</th>
-              <th className="px-6 py-4 font-semibold">Kích thước</th>
-              <th className="px-6 py-4 font-semibold">Ngày tải lên</th>
-              <th className="px-6 py-4 font-semibold text-center">Trạng thái</th>
+              <th className="px-6 py-4 font-semibold w-1/3">Document Name</th>
+              <th className="px-6 py-4 font-semibold">Course</th>
+              <th className="px-6 py-4 font-semibold">Size</th>
+              <th className="px-6 py-4 font-semibold">Upload Date</th>
+              <th className="px-6 py-4 font-semibold text-center">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
@@ -75,7 +75,7 @@ export default function DocumentDashboard() {
                 <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-2">
                     <span className="material-symbols-outlined text-4xl text-gray-300">folder_open</span>
-                    <p>Bạn chưa có tài liệu nào.</p>
+                    <p>You have no documents.</p>
                   </div>
                 </td>
               </tr>
@@ -91,7 +91,7 @@ export default function DocumentDashboard() {
                       </div>
                       <div>
                         <p className="font-semibold text-gray-900 line-clamp-1">{doc.title}</p>
-                        <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{doc.description || 'Không có mô tả'}</p>
+                        <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{doc.description || 'No description'}</p>
                       </div>
                     </div>
                   </td>
@@ -101,12 +101,12 @@ export default function DocumentDashboard() {
                         {doc.subject.code}
                       </span>
                     ) : (
-                      <span className="text-gray-400 italic">Trống</span>
+                      <span className="text-gray-400 italic">Empty</span>
                     )}
                   </td>
                   <td className="px-6 py-4 font-medium">{formatSize(doc.fileSize)}</td>
                   <td className="px-6 py-4">
-                    {new Date(doc.createdAt).toLocaleDateString('vi-VN')}
+                    {new Date(doc.createdAt).toLocaleDateString('en-US')}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <StatusBadge visibilityStatus={doc.visibilityStatus} />
