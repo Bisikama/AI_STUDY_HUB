@@ -252,14 +252,6 @@ export default function DocumentDetailPage() {
         payload.sourceUrl = cleanStr(copyrightSourceUrl);
         payload.license = cleanStr(copyrightLicense);
         payload.attribution = cleanStr(copyrightAttribution);
-      } else if (copyrightSourceType === 'AUTHORIZED') {
-        payload.permissionReference = cleanStr(copyrightPermissionReference);
-      } else if (copyrightSourceType === 'FPT_OFFICIAL') {
-        payload.sourceUrl = cleanStr(copyrightSourceUrl);
-        payload.permissionReference = cleanStr(copyrightPermissionReference);
-      } else if (copyrightSourceType === 'THIRD_PARTY') {
-        payload.authorName = cleanStr(copyrightAuthorName);
-        payload.sourceUrl = cleanStr(copyrightSourceUrl);
       }
 
       await documentsApi.updateCopyright(id, payload);
@@ -496,8 +488,6 @@ export default function DocumentDetailPage() {
               <span className="font-semibold text-blue-800">
                 {document.copyrightSourceType === 'OWN_ORIGINAL' && 'Tự biên soạn'}
                 {document.copyrightSourceType === 'OPEN_LICENSE' && 'Nguồn mở'}
-                {document.copyrightSourceType === 'AUTHORIZED' && 'Được cấp quyền sử dụng'}
-                {document.copyrightSourceType === 'FPT_OFFICIAL' && 'Tài liệu chính thức FPT'}
               </span>
               {document.copyrightLicense && (
                 <>
@@ -907,7 +897,7 @@ export default function DocumentDetailPage() {
                     Declare source
                   </button>
                 </div>
-              ) : (document.copyrightSourceType === 'THIRD_PARTY' || document.copyrightSourceType === 'UNKNOWN') ? (
+              ) : (document.copyrightSourceType === 'UNKNOWN') ? (
                 <div className="flex flex-col gap-3">
                   <div className="flex items-start gap-2 text-red-700 bg-red-50 p-3 rounded-xl border border-red-200">
                     <span className="material-symbols-outlined text-[18px] shrink-0">warning</span>
@@ -931,7 +921,7 @@ export default function DocumentDetailPage() {
                       <p className="font-bold">Copyright information is valid.</p>
                       <p className="text-emerald-600 mt-0.5">
                         Loại nguồn:{' '}
-                        {document.copyrightSourceType === 'OWN_ORIGINAL' ? 'Tự biên soạn' : document.copyrightSourceType === 'OPEN_LICENSE' ? 'Nguồn mở' : document.copyrightSourceType === 'AUTHORIZED' ? 'Có quyền sử dụng' : 'Tài liệu chính thức FPT'}
+                        {document.copyrightSourceType === 'OWN_ORIGINAL' ? 'Tự biên soạn' : 'Nguồn mở'}
                       </p>
                     </div>
                   </div>
@@ -1331,22 +1321,19 @@ export default function DocumentDetailPage() {
                   onChange={(e) => setCopyrightSourceType(e.target.value)}
                   className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
                 >
-                  <option value="UNKNOWN">Chưa xác định</option>
-                  <option value="OWN_ORIGINAL">Tự biên soạn (Do chính bạn tạo ra)</option>
-                  <option value="OPEN_LICENSE">Nguồn mở (Open License / Creative Commons)</option>
-                  <option value="AUTHORIZED">Có quyền sử dụng (Được cấp quyền)</option>
-                  <option value="FPT_OFFICIAL">Tài liệu chính thức FPT</option>
-                  <option value="THIRD_PARTY">Nội dung bên thứ ba (Không có quyền chia sẻ)</option>
+                  <option value="UNKNOWN">Không rõ nguồn</option>
+                  <option value="OWN_ORIGINAL">Tài liệu do tôi biên soạn</option>
+                  <option value="OPEN_LICENSE">Tài liệu có giấy phép mở</option>
                 </select>
               </div>
 
               {copyrightSourceType === 'OWN_ORIGINAL' && (
                 <div className="rounded border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
-                  Bạn xác nhận mình là tác giả duy nhất của tài liệu này và có toàn quyền chia sẻ nó.
+                  Bạn đã xác nhận tài liệu do mình biên soạn.
                 </div>
               )}
 
-              {(copyrightSourceType === 'OPEN_LICENSE' || copyrightSourceType === 'FPT_OFFICIAL') && (
+              {copyrightSourceType === 'OPEN_LICENSE' && (
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                     URL Nguồn gốc (Bắt buộc)
@@ -1393,25 +1380,9 @@ export default function DocumentDetailPage() {
                 </>
               )}
 
-              {(copyrightSourceType === 'AUTHORIZED' || copyrightSourceType === 'FPT_OFFICIAL') && (
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                    Minh chứng quyền sử dụng {copyrightSourceType === 'AUTHORIZED' ? '(Bắt buộc)' : '(Nếu không có URL)'}
-                  </label>
-                  <input
-                    type="text"
-                    value={copyrightPermissionReference}
-                    onChange={(e) => setCopyrightPermissionReference(e.target.value)}
-                    required={copyrightSourceType === 'AUTHORIZED'}
-                    placeholder="Tham chiếu email, văn bản cấp quyền..."
-                    className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
-                  />
-                </div>
-              )}
-
-              {(copyrightSourceType === 'UNKNOWN' || copyrightSourceType === 'THIRD_PARTY') && (
+              {copyrightSourceType === 'UNKNOWN' && (
                 <div className="rounded border border-red-100 bg-red-50 p-3 text-xs text-red-800">
-                  Tài liệu có nguồn gốc chưa xác định hoặc thuộc bên thứ ba sẽ không được phép chia sẻ công khai trên hệ thống.
+                  Nguồn tài liệu chưa rõ nên tài liệu chỉ có thể lưu riêng tư.
                 </div>
               )}
 
@@ -1426,7 +1397,7 @@ export default function DocumentDetailPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmittingCopyright || copyrightSourceType === 'UNKNOWN' || copyrightSourceType === 'THIRD_PARTY'}
+                  disabled={isSubmittingCopyright}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {isSubmittingCopyright ? 'Đang lưu...' : 'Lưu khai báo'}

@@ -202,17 +202,17 @@ export async function seedDocuments(
         storagePath: storagePath, // QUAN TRỌNG: Phải có storagePath để API getDetails không báo lỗi 404
         fileSize: fileSize,
         fileType: 'application/pdf',
-        status: docStatus as any,
-        visibilityStatus: visibility as any,
-        extractionStatus: 'READY',
-        aiStatus: 'READY',
-        copyrightSourceType: 'OWN_ORIGINAL', // QUAN TRỌNG: Thiết lập nguồn tự biên soạn
-        copyrightAuthorName: user.fullName,  // Tác giả tự biên soạn
-        copyrightSourceUrl: null,
-        copyrightLicense: null,
-        copyrightAttribution: 'Tài liệu tự biên soạn bởi giảng viên/sinh viên hệ thống',
-        copyrightDeclaredAt: new Date(),     // QUAN TRỌNG: Cần thiết để xác thực bản quyền hợp lệ
-        copyrightDeclaredBy: user.id,        // QUAN TRỌNG: Phải trùng với uploadedBy để đủ điều kiện yêu cầu public
+        status: randomStatus as any, // Đã fix đúng chuẩn Schema mới
+        visibilityStatus: randomVisibility as any,
+        copyrightSourceType: faker.helpers.arrayElement([
+          'OWN_ORIGINAL', 'OPEN_LICENSE', 'UNKNOWN'
+        ]) as any,
+        copyrightAuthorName: faker.person.fullName(),
+        copyrightSourceUrl: faker.internet.url(),
+        copyrightLicense: faker.helpers.arrayElement(['CC BY 4.0', 'CC BY-NC 4.0', 'MIT', null]),
+        copyrightAttribution: faker.lorem.sentence(),
+        copyrightDeclaredAt: new Date(),
+        copyrightDeclaredBy: user.id,
         averageRating: parseFloat(faker.number.float({ min: 3.5, max: 5.0 }).toFixed(1)),
         ratingCount: faker.number.int({ min: 1, max: 20 }),
         viewCount: faker.number.int({ min: 50, max: 2000 }),

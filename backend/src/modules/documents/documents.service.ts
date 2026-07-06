@@ -1781,21 +1781,13 @@ Quy định chặt chẽ:
         ) {
           return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
         }
-        return { isEligible: true };
-      case 'AUTHORIZED':
-        if (!document.copyrightPermissionReference) {
-          return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
+        if (!document.copyrightDeclaredAt || document.copyrightDeclaredBy !== document.uploadedBy) {
+          return { isEligible: false, reason: 'COPYRIGHT_DECLARATION_REQUIRED' };
         }
         return { isEligible: true };
-      case 'FPT_OFFICIAL':
-        if (!document.copyrightSourceUrl && !document.copyrightPermissionReference) {
-          return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
-        }
-        return { isEligible: true };
-      case 'THIRD_PARTY':
       case 'UNKNOWN':
       default:
-        return { isEligible: false, reason: 'COPYRIGHT_SHARING_NOT_ALLOWED' };
+        return { isEligible: false, reason: 'COPYRIGHT_SOURCE_UNKNOWN' };
     }
   }
 
@@ -1813,18 +1805,45 @@ Quy định chặt chẽ:
       throw new ConflictException('DOCUMENT_INVALID_STATE');
     }
 
-    const updatedDocument = await this.prisma.document.update({
-      where: { id: documentId },
-      data: {
-        copyrightSourceType: dto.sourceType,
-        copyrightAuthorName: dto.authorName,
-        copyrightSourceUrl: dto.sourceUrl,
-        copyrightLicense: dto.license,
-        copyrightAttribution: dto.attribution,
-        copyrightPermissionReference: dto.permissionReference,
+    let dataToUpdate: any = {
+      copyrightSourceType: dto.sourceType,
+    };
+
+    if (dto.sourceType === 'OWN_ORIGINAL') {
+      dataToUpdate = {
+        ...dataToUpdate,
+        copyrightSourceUrl: null,
+        copyrightLicense: null,
+        copyrightAttribution: null,
+        copyrightPermissionReference: null,
         copyrightDeclaredAt: new Date(),
         copyrightDeclaredBy: userId,
-      },
+      };
+    } else if (dto.sourceType === 'OPEN_LICENSE') {
+      dataToUpdate = {
+        ...dataToUpdate,
+        copyrightSourceUrl: dto.sourceUrl || null,
+        copyrightLicense: dto.license || null,
+        copyrightAttribution: dto.attribution || null,
+        copyrightPermissionReference: null,
+        copyrightDeclaredAt: new Date(),
+        copyrightDeclaredBy: userId,
+      };
+    } else {
+      dataToUpdate = {
+        ...dataToUpdate,
+        copyrightDeclaredAt: null,
+        copyrightDeclaredBy: null,
+      };
+    }
+
+    if (dto.authorName !== undefined) {
+      dataToUpdate.copyrightAuthorName = dto.authorName || null;
+    }
+
+    const updatedDocument = await this.prisma.document.update({
+      where: { id: documentId },
+      data: dataToUpdate,
       include: {
         subject: { select: { isSystem: true, id: true, name: true, code: true } },
         tags: { include: { tag: true } },

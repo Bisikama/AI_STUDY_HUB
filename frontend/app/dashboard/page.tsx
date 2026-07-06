@@ -9,7 +9,6 @@ import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
 import Link from 'next/link';
 import TeacherVerificationModal from '@/components/TeacherVerificationModal';
-import { toast } from 'sonner';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
@@ -60,10 +59,10 @@ type ExploreAiCache = {
 type ApiResponse<T> =
   | T
   | {
-      statusCode: number;
-      message: string;
-      data: T;
-    };
+    statusCode: number;
+    message: string;
+    data: T;
+  };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
   const response = await fetch(url, { credentials: 'include' });
@@ -325,10 +324,10 @@ function DashboardPage() {
         findDocumentById(docId) ||
         (aiCache?.document
           ? ({
-              ...aiCache.document,
-              quizCount: aiCache.quizzes?.length || 0,
-              hasSummary: (aiCache.summaries?.length || 0) > 0,
-            } as ExploreDocument)
+            ...aiCache.document,
+            quizCount: aiCache.quizzes?.length || 0,
+            hasSummary: (aiCache.summaries?.length || 0) > 0,
+          } as ExploreDocument)
           : undefined);
 
       if (documentToSave) {
@@ -490,9 +489,8 @@ function DashboardPage() {
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${
-          mobileMenuOpen ? 'flex' : 'hidden'
-        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
+        className={`${mobileMenuOpen ? 'flex' : 'hidden'
+          } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
         <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
@@ -566,8 +564,8 @@ function DashboardPage() {
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
-         
-          
+
+
           <li>
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
@@ -911,11 +909,10 @@ function DashboardPage() {
                           </div>
                           <button
                             onClick={(e) => toggleSaveDoc(doc.id, e)}
-                            className={`font-label-sm text-label-sm hidden cursor-pointer rounded-full border px-4 py-2 transition-colors sm:block ${
-                              followedDocumentIds.includes(doc.id)
-                                ? 'bg-primary-container border-primary-container text-white'
-                                : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
-                            }`}
+                            className={`font-label-sm text-label-sm hidden cursor-pointer rounded-full border px-4 py-2 transition-colors sm:block ${followedDocumentIds.includes(doc.id)
+                              ? 'bg-primary-container border-primary-container text-white'
+                              : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
+                              }`}
                           >
                             {followedDocumentIds.includes(doc.id) ? 'Saved' : 'Save'}
                           </button>
@@ -960,11 +957,10 @@ function DashboardPage() {
                           </div>
                         </div>
                         <span
-                          className={`rounded px-2 py-1 text-xs font-bold ${
-                            idx === 0
-                              ? 'bg-primary-fixed-dim text-on-primary-fixed'
-                              : 'bg-surface-variant text-on-surface-variant'
-                          }`}
+                          className={`rounded px-2 py-1 text-xs font-bold ${idx === 0
+                            ? 'bg-primary-fixed-dim text-on-primary-fixed'
+                            : 'bg-surface-variant text-on-surface-variant'
+                            }`}
                         >
                           #{idx + 1}
                         </span>
@@ -1092,9 +1088,8 @@ function DashboardPage() {
                   return (
                     <div
                       key={c.id}
-                      className={`flex items-center justify-between rounded-xl border p-3 transition-all ${
-                        rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
-                      }`}
+                      className={`flex items-center justify-between rounded-xl border p-3 transition-all ${rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -1165,10 +1160,6 @@ function DashboardPage() {
                             {aiCache.document.copyrightSourceType === 'OWN_ORIGINAL' &&
                               'Tự biên soạn'}
                             {aiCache.document.copyrightSourceType === 'OPEN_LICENSE' && 'Nguồn mở'}
-                            {aiCache.document.copyrightSourceType === 'AUTHORIZED' &&
-                              'Được cấp quyền sử dụng'}
-                            {aiCache.document.copyrightSourceType === 'FPT_OFFICIAL' &&
-                              'Tài liệu chính thức FPT'}
                           </span>
                           {aiCache.document.copyrightLicense && (
                             <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
@@ -1302,9 +1293,8 @@ function DashboardPage() {
                                     type="button"
                                     disabled={hasAnswered}
                                     onClick={() => handleSelectOption(question.id, option.id)}
-                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
-                                      hasAnswered ? 'cursor-default' : 'cursor-pointer'
-                                    }`}
+                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${hasAnswered ? 'cursor-default' : 'cursor-pointer'
+                                      }`}
                                   >
                                     {option.optionText}
 
@@ -1344,11 +1334,10 @@ function DashboardPage() {
                             handleFollowDocument(aiCache.document.id);
                           }
                         }}
-                        className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-5 py-2 transition-all hover:shadow-md ${
-                          isDocumentFollowed
-                            ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
-                            : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
-                        }`}
+                        className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-5 py-2 transition-all hover:shadow-md ${isDocumentFollowed
+                          ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                          : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                          }`}
                       >
                         <span className="material-symbols-outlined text-[18px]">
                           {isDocumentFollowed ? 'bookmark_remove' : 'bookmark'}
@@ -1409,7 +1398,7 @@ function DashboardPage() {
                     htmlFor="fullName"
                     className="font-label-md text-label-md text-on-surface font-semibold"
                   >
-                    Full Name 
+                    Full Name
                   </label>
                   <input
                     id="fullName"
@@ -1427,7 +1416,7 @@ function DashboardPage() {
                     htmlFor="username"
                     className="font-label-md text-label-md text-on-surface font-semibold"
                   >
-                    Username 
+                    Username
                   </label>
                   <input
                     id="username"
@@ -1444,7 +1433,7 @@ function DashboardPage() {
                     htmlFor="phoneNumber"
                     className="font-label-md text-label-md text-on-surface font-semibold"
                   >
-                    Phone Number 
+                    Phone Number
                   </label>
                   <input
                     id="phoneNumber"

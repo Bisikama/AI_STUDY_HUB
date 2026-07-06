@@ -106,9 +106,6 @@ enum ReservationStatus {
 enum CopyrightSourceType {
   OWN_ORIGINAL
   OPEN_LICENSE
-  AUTHORIZED
-  FPT_OFFICIAL
-  THIRD_PARTY
   UNKNOWN
 }
 
