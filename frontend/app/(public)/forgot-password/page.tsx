@@ -9,7 +9,7 @@ import { authApi } from '@/services/authApi';
 import { toast } from 'sonner';
 
 const forgotPasswordSchema = z.object({
-  email: z.string().min(1, 'Email không được để trống').email('Email không đúng định dạng'),
+  email: z.string().min(1, 'Email cannot be empty').email('Invalid email format'),
 });
 
 type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
@@ -34,17 +34,17 @@ export default function ForgotPasswordPage() {
       const res = await authApi.forgotPassword(data.email);
       const devOtp = res?.data?.devOtp;
       if (devOtp) {
-        toast.success(`Yêu cầu thành công! (DEV MODE: Mã OTP của bạn là ${devOtp})`);
+        toast.success(`Request successful! (DEV MODE: Your OTP is ${devOtp})`);
         router.push(
           `/reset-password?email=${encodeURIComponent(data.email)}&otp=${encodeURIComponent(devOtp)}`,
         );
       } else {
-        toast.success('Yêu cầu thành công! Vui lòng kiểm tra mã OTP.');
+        toast.success('Request successful! Please check your OTP.');
         router.push(`/reset-password?email=${encodeURIComponent(data.email)}`);
       }
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { message?: string } } };
-      const errorMsg = axiosError.response?.data?.message || 'Đã có lỗi xảy ra!';
+      const errorMsg = axiosError.response?.data?.message || 'An error occurred!';
       setApiError(errorMsg);
     } finally {
       setIsLoading(false);

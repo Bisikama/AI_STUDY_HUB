@@ -1,6 +1,11 @@
 import { PDFParse } from 'pdf-parse';
 import * as mammoth from 'mammoth';
 
+export interface ParsedDocument {
+  text: string;
+  pageCount: number;
+}
+
 /**
  * Parses a document file buffer and extracts plain text.
  * Supports PDF, TXT, and DOCX (DOC is supported via best-effort or throws error if binary .doc).
@@ -8,19 +13,22 @@ import * as mammoth from 'mammoth';
  * @param fileBuffer The file buffer to parse
  * @param originalName The original file name to inspect extension
  * @param mimeType The file mime type
- * @returns The extracted plain text
+ * @returns The extracted ParsedDocument
  */
 export async function parseDocument(
   fileBuffer: Buffer,
   originalName: string,
   mimeType: string,
-): Promise<string | { text: string; pageCount: number }> {
+): Promise<ParsedDocument> {
   const extension = originalName.split('.').pop()?.toLowerCase();
   const mime = mimeType.toLowerCase();
 
   // 1. TXT
   if (extension === 'txt' || mime === 'text/plain') {
-    return fileBuffer.toString('utf-8');
+    return {
+      text: fileBuffer.toString('utf-8'),
+      pageCount: 1,
+    };
   }
 
   // 2. PDF
@@ -48,7 +56,10 @@ export async function parseDocument(
   ) {
     try {
       const result = await mammoth.extractRawText({ buffer: fileBuffer });
-      return result.value || '';
+      return {
+        text: result.value || '',
+        pageCount: 1,
+      };
     } catch (error) {
       throw new Error(
         `Failed to parse DOCX file: ${error instanceof Error ? error.message : String(error)}`,
@@ -62,7 +73,10 @@ export async function parseDocument(
     // Try to parse using mammoth in case it is a mislabeled docx, otherwise throw error.
     try {
       const result = await mammoth.extractRawText({ buffer: fileBuffer });
-      return result.value || '';
+      return {
+        text: result.value || '',
+        pageCount: 1,
+      };
     } catch {
       throw new Error(
         'Format .doc (Word 97-2003) is not supported directly. Please convert it to .docx or .pdf before uploading.',

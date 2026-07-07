@@ -57,7 +57,7 @@ export interface Document {
   tags?: any[];
   canRequestPublic?: boolean;
   publicationEligibilityReason?: string | null;
-  copyrightSourceType?: 'OWN_ORIGINAL' | 'OPEN_LICENSE' | 'AUTHORIZED' | 'FPT_OFFICIAL' | 'THIRD_PARTY' | 'UNKNOWN';
+  copyrightSourceType?: 'OWN_ORIGINAL' | 'OPEN_LICENSE' | 'UNKNOWN';
   copyrightAuthorName?: string | null;
   copyrightSourceUrl?: string | null;
   copyrightLicense?: string | null;

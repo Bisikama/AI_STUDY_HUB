@@ -12,7 +12,7 @@ import {
 
 @Injectable()
 export class TeacherVerificationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async submitRequest(userId: string, dto: CreateTeacherVerificationDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -51,7 +51,7 @@ export class TeacherVerificationService {
     });
 
     return {
-      message: 'Gửi yêu cầu xác thực Giảng viên thành công!',
+      message: 'Gửi yêu cầu Xác Thực Giảng Viên thành công!',
       verification,
     };
   }
@@ -107,7 +107,7 @@ export class TeacherVerificationService {
       }
 
       return {
-        message: `Đã ${dto.status === 'APPROVED' ? 'phe duyệt' : 'từ chối'} yêu cầu xác thực Giảng viên.`,
+        message: `Đã ${dto.status === 'APPROVED' ? 'phe duyệt' : 'từ chối'} yêu cầu Xác Thực Giảng Viên.`,
         verification: updated,
       };
     });

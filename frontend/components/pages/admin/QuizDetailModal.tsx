@@ -40,7 +40,7 @@ export default function QuizDetailModal({
       setActiveQuestionIdx(0);
     } catch (err: any) {
       console.error('Failed to load quiz detail:', err);
-      setError(err.response?.data?.message || 'Không thể tải chi tiết bộ câu hỏi');
+      setError(err.response?.data?.message || 'Failed to load quiz details');
     } finally {
       setLoading(false);
     }
@@ -91,18 +91,18 @@ export default function QuizDetailModal({
     if (!activeQuestion) return;
 
     if (!questionText.trim()) {
-      setError('Nội dung câu hỏi không được trống');
+      setError('Question content cannot be empty');
       return;
     }
 
     if (options.some((opt) => !opt.optionText.trim())) {
-      setError('Các phương án lựa chọn không được trống');
+      setError('Options cannot be empty');
       return;
     }
 
     const correctCount = options.filter((opt) => opt.isCorrect).length;
     if (correctCount !== 1) {
-      setError('Phải chọn đúng 1 đáp án chính xác');
+      setError('Exactly 1 correct option must be selected');
       return;
     }
 
@@ -116,8 +116,8 @@ export default function QuizDetailModal({
         options,
       });
 
-      setSuccessMsg('Đã lưu câu hỏi thành công!');
-      
+      setSuccessMsg('Question saved successfully!');
+
       // Update local detail state
       const updatedQuestions = [...quizDetail.questions];
       updatedQuestions[activeQuestionIdx] = {
@@ -140,7 +140,7 @@ export default function QuizDetailModal({
       }
     } catch (err: any) {
       console.error('Failed to update question:', err);
-      setError(err.response?.data?.message || 'Không thể lưu câu hỏi');
+      setError(err.response?.data?.message || 'Failed to save question');
     } finally {
       setSaving(false);
     }
@@ -152,7 +152,7 @@ export default function QuizDetailModal({
         {/* Header */}
         <div className="border-b border-slate-100 p-6 flex justify-between items-center bg-slate-50">
           <div>
-            <h2 className="text-[20px] font-bold text-gray-900">Chỉnh sửa bộ câu hỏi</h2>
+            <h2 className="text-[20px] font-bold text-gray-900">Edit Quiz</h2>
             <p className="text-[13px] text-gray-500 font-medium truncate max-w-md" title={quizTitle}>
               {quizTitle}
             </p>
@@ -179,20 +179,19 @@ export default function QuizDetailModal({
             {/* Left Sidebar (Questions navigation) */}
             <div className="w-1/4 border-r border-slate-100 bg-slate-50 p-4 overflow-y-auto">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 px-2">
-                Danh sách câu hỏi
+                Questions List
               </p>
               <div className="space-y-1">
                 {quizDetail?.questions.map((q, idx) => (
                   <button
                     key={q.id}
                     onClick={() => setActiveQuestionIdx(idx)}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      idx === activeQuestionIdx
+                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${idx === activeQuestionIdx
                         ? 'bg-blue-50 text-blue-700 font-semibold'
                         : 'text-slate-600 hover:bg-slate-200'
-                    }`}
+                      }`}
                   >
-                    Câu hỏi {idx + 1}
+                    Question {idx + 1}
                   </button>
                 ))}
               </div>
@@ -203,20 +202,20 @@ export default function QuizDetailModal({
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">
-                    Nội dung câu hỏi {activeQuestionIdx + 1}
+                    Question {activeQuestionIdx + 1} Content
                   </label>
                   <textarea
                     value={questionText}
                     onChange={(e) => setQuestionText(e.target.value)}
                     rows={3}
                     className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
-                    placeholder="Nhập nội dung câu hỏi..."
+                    placeholder="Enter question content..."
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">
-                    Các phương án trả lời (Chọn 1 phương án đúng)
+                    Options (Select 1 correct option)
                   </label>
                   <div className="space-y-3">
                     {options.map((opt, idx) => (
@@ -233,7 +232,7 @@ export default function QuizDetailModal({
                           value={opt.optionText}
                           onChange={(e) => handleOptionTextChange(idx, e.target.value)}
                           className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-blue-600"
-                          placeholder={`Lựa chọn ${String.fromCharCode(65 + idx)}`}
+                          placeholder={`Option ${String.fromCharCode(65 + idx)}`}
                         />
                       </div>
                     ))}
@@ -258,7 +257,7 @@ export default function QuizDetailModal({
                   onClick={onClose}
                   className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
                 >
-                  Đóng
+                  Close
                 </button>
                 <button
                   onClick={handleSaveQuestion}
@@ -268,12 +267,12 @@ export default function QuizDetailModal({
                   {saving ? (
                     <>
                       <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
-                      Đang lưu...
+                      Saving...
                     </>
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-[18px]">save</span>
-                      Lưu thay đổi
+                      Save Changes
                     </>
                   )}
                 </button>

@@ -60,10 +60,10 @@ type ExploreAiCache = {
 type ApiResponse<T> =
   | T
   | {
-      statusCode: number;
-      message: string;
-      data: T;
-    };
+    statusCode: number;
+    message: string;
+    data: T;
+  };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
   const response = await fetch(url, { credentials: 'include' });
@@ -325,10 +325,10 @@ function DashboardPage() {
         findDocumentById(docId) ||
         (aiCache?.document
           ? ({
-              ...aiCache.document,
-              quizCount: aiCache.quizzes?.length || 0,
-              hasSummary: (aiCache.summaries?.length || 0) > 0,
-            } as ExploreDocument)
+            ...aiCache.document,
+            quizCount: aiCache.quizzes?.length || 0,
+            hasSummary: (aiCache.summaries?.length || 0) > 0,
+          } as ExploreDocument)
           : undefined);
 
       if (documentToSave) {
@@ -395,7 +395,7 @@ function DashboardPage() {
   useEffect(() => {
     loadDashboardData();
 
-    // Fetch từ API để đồng bộ dữ liệu mới nhất từ database
+    // Fetch from API to sync the latest data from database
     getProfile()
       .then((updatedUser) => {
         if (updatedUser) {
@@ -471,7 +471,7 @@ function DashboardPage() {
       setUser(updatedUser);
       setUserFullName(updatedUser.fullName);
 
-      setEditSuccess('Cập nhật thông tin tài khoản thành công!');
+      setEditSuccess('Account information updated successfully!');
       setTimeout(() => {
         setShowEditAccountModal(false);
         setEditSuccess('');
@@ -479,7 +479,7 @@ function DashboardPage() {
     } catch (err: unknown) {
       console.error('Failed to update profile:', err);
       const axiosError = err as { response?: { data?: { message?: string } } };
-      const errMsg = axiosError.response?.data?.message || 'Cập nhật tài khoản thất bại!';
+      const errMsg = axiosError.response?.data?.message || 'Failed to update account!';
       setEditError(Array.isArray(errMsg) ? errMsg[0] : errMsg);
     } finally {
       setEditLoading(false);
@@ -490,9 +490,8 @@ function DashboardPage() {
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${
-          mobileMenuOpen ? 'flex' : 'hidden'
-        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
+        className={`${mobileMenuOpen ? 'flex' : 'hidden'
+          } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
         <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
@@ -566,8 +565,8 @@ function DashboardPage() {
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
-         
-          
+
+
           <li>
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
@@ -659,7 +658,7 @@ function DashboardPage() {
                         className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
                       >
                         <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
-                        Xác thực Giảng viên
+                        Verify Teacher
                       </button>
                       <hr className="border-outline-variant my-1" />
                       <button
@@ -729,13 +728,13 @@ function DashboardPage() {
                       find_in_page
                     </span>
                     <p className="font-body-md text-body-md text-secondary">
-                      Chưa xem, hãy khám phá tài liệu mà bạn muốn.
+                      Not viewed yet, let's explore documents you want.
                     </p>
                     <button
                       onClick={() => router.push('/explore')}
                       className="font-label-sm text-label-sm mt-4 cursor-pointer rounded-full bg-[#212529] px-4 py-2 text-white transition-opacity hover:opacity-90"
                     >
-                      Khám phá tài liệu
+                      Explore documents
                     </button>
                   </div>
                 ) : (
@@ -808,7 +807,7 @@ function DashboardPage() {
                 ) : publicDocuments.length === 0 ? (
                   <div className="bg-surface-container-lowest rounded-xl border border-dashed border-[#E9ECEF] p-8 text-center shadow-[0px_4px_12px_rgba(0,0,0,0.03)]">
                     <p className="font-body-md text-body-md text-secondary">
-                      Chưa có tài liệu công khai nào khác từ cộng đồng.
+                      No other public documents from the community yet.
                     </p>
                   </div>
                 ) : (
@@ -869,7 +868,7 @@ function DashboardPage() {
                     <div className="text-secondary py-8 text-center">Loading...</div>
                   ) : trendingDocs.length === 0 ? (
                     <div className="text-secondary p-8 text-center">
-                      Chưa có tài liệu thịnh hành.
+                      No trending documents yet.
                     </div>
                   ) : (
                     trendingDocs.map((doc) => {
@@ -911,11 +910,10 @@ function DashboardPage() {
                           </div>
                           <button
                             onClick={(e) => toggleSaveDoc(doc.id, e)}
-                            className={`font-label-sm text-label-sm hidden cursor-pointer rounded-full border px-4 py-2 transition-colors sm:block ${
-                              followedDocumentIds.includes(doc.id)
-                                ? 'bg-primary-container border-primary-container text-white'
-                                : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
-                            }`}
+                            className={`font-label-sm text-label-sm hidden cursor-pointer rounded-full border px-4 py-2 transition-colors sm:block ${followedDocumentIds.includes(doc.id)
+                              ? 'bg-primary-container border-primary-container text-white'
+                              : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
+                              }`}
                           >
                             {followedDocumentIds.includes(doc.id) ? 'Saved' : 'Save'}
                           </button>
@@ -936,7 +934,7 @@ function DashboardPage() {
                 <div className="flex flex-col gap-4">
                   {topContributors.length === 0 ? (
                     <p className="font-label-sm text-label-sm text-secondary py-4 text-center">
-                      Chưa có contributor nào.
+                      No contributors yet.
                     </p>
                   ) : (
                     topContributors.slice(0, 3).map((c, idx) => (
@@ -960,11 +958,10 @@ function DashboardPage() {
                           </div>
                         </div>
                         <span
-                          className={`rounded px-2 py-1 text-xs font-bold ${
-                            idx === 0
-                              ? 'bg-primary-fixed-dim text-on-primary-fixed'
-                              : 'bg-surface-variant text-on-surface-variant'
-                          }`}
+                          className={`rounded px-2 py-1 text-xs font-bold ${idx === 0
+                            ? 'bg-primary-fixed-dim text-on-primary-fixed'
+                            : 'bg-surface-variant text-on-surface-variant'
+                            }`}
                         >
                           #{idx + 1}
                         </span>
@@ -1092,9 +1089,8 @@ function DashboardPage() {
                   return (
                     <div
                       key={c.id}
-                      className={`flex items-center justify-between rounded-xl border p-3 transition-all ${
-                        rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
-                      }`}
+                      className={`flex items-center justify-between rounded-xl border p-3 transition-all ${rankColor ? `${rankColor} border-opacity-50` : 'border-outline-variant'
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -1163,12 +1159,8 @@ function DashboardPage() {
                           <span className="flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-600">
                             <span className="material-symbols-outlined text-[14px]">copyright</span>
                             {aiCache.document.copyrightSourceType === 'OWN_ORIGINAL' &&
-                              'Tự biên soạn'}
-                            {aiCache.document.copyrightSourceType === 'OPEN_LICENSE' && 'Nguồn mở'}
-                            {aiCache.document.copyrightSourceType === 'AUTHORIZED' &&
-                              'Được cấp quyền sử dụng'}
-                            {aiCache.document.copyrightSourceType === 'FPT_OFFICIAL' &&
-                              'Tài liệu chính thức FPT'}
+                              'Self-composed'}
+                            {aiCache.document.copyrightSourceType === 'OPEN_LICENSE' && 'Open source'}
                           </span>
                           {aiCache.document.copyrightLicense && (
                             <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
@@ -1182,7 +1174,7 @@ function DashboardPage() {
                               rel="noopener noreferrer"
                               className="flex items-center gap-0.5 text-xs text-blue-500 hover:underline"
                             >
-                              Nguồn{' '}
+                              Source{' '}
                               <span className="material-symbols-outlined text-[12px]">
                                 open_in_new
                               </span>
@@ -1302,9 +1294,8 @@ function DashboardPage() {
                                     type="button"
                                     disabled={hasAnswered}
                                     onClick={() => handleSelectOption(question.id, option.id)}
-                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${
-                                      hasAnswered ? 'cursor-default' : 'cursor-pointer'
-                                    }`}
+                                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${optionClass} ${hasAnswered ? 'cursor-default' : 'cursor-pointer'
+                                      }`}
                                   >
                                     {option.optionText}
 
@@ -1344,11 +1335,10 @@ function DashboardPage() {
                             handleFollowDocument(aiCache.document.id);
                           }
                         }}
-                        className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-5 py-2 transition-all hover:shadow-md ${
-                          isDocumentFollowed
-                            ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
-                            : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
-                        }`}
+                        className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-5 py-2 transition-all hover:shadow-md ${isDocumentFollowed
+                          ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                          : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                          }`}
                       >
                         <span className="material-symbols-outlined text-[18px]">
                           {isDocumentFollowed ? 'bookmark_remove' : 'bookmark'}
@@ -1409,7 +1399,7 @@ function DashboardPage() {
                     htmlFor="fullName"
                     className="font-label-md text-label-md text-on-surface font-semibold"
                   >
-                    Full Name 
+                    Full Name
                   </label>
                   <input
                     id="fullName"
@@ -1427,7 +1417,7 @@ function DashboardPage() {
                     htmlFor="username"
                     className="font-label-md text-label-md text-on-surface font-semibold"
                   >
-                    Username 
+                    Username
                   </label>
                   <input
                     id="username"
@@ -1444,7 +1434,7 @@ function DashboardPage() {
                     htmlFor="phoneNumber"
                     className="font-label-md text-label-md text-on-surface font-semibold"
                   >
-                    Phone Number 
+                    Phone Number
                   </label>
                   <input
                     id="phoneNumber"
