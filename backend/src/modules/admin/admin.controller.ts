@@ -50,14 +50,15 @@ export class AdminController {
   /**
    * Phê duyệt hoặc từ chối tài liệu
    * PATCH /api/admin/documents/:id/approve
-   * Body: { status: 'APPROVED' | 'REJECTED' }
+   * Body: { status: 'APPROVED' | 'REJECTED'; reason?: string }
    */
   @Patch('documents/:id/approve')
   async approveOrRejectDoc(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @Body() body: { status: 'APPROVED' | 'REJECTED' },
+    @Body() body: { status: 'APPROVED' | 'REJECTED'; reason?: string },
+    @CurrentUser('id') adminId: string,
   ) {
-    return this.adminService.approveOrRejectDoc(id, body.status);
+    return this.adminService.approveOrRejectDoc(id, body.status, adminId, body.reason);
   }
 
   /**

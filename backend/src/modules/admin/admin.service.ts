@@ -3,12 +3,14 @@ import {
   InternalServerErrorException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import {
   DocumentStatus,
   VisibilityStatus,
   ReportStatus,
   ReportReason,
+  DeletionStatus,
 } from '../../../generated/prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SupabaseService } from '../../supabase/supabase.service';
@@ -17,6 +19,8 @@ import { ResolveReportDto } from './dto/resolve-report.dto';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabaseService: SupabaseService,
@@ -102,11 +106,16 @@ export class AdminService {
   /**
    * Lấy danh sách tài liệu đang chờ duyệt (status = PENDING)
    * Dùng cho bảng hàng đợi phê duyệt trong Admin Dashboard
+   * Chỉ lấy các tài liệu có visibilityStatus = PENDING_REVIEW, deletionStatus = ACTIVE và status = ACTIVE
    */
   async getPendingDocuments() {
     try {
       const documents = await this.prisma.document.findMany({
-        where: { visibilityStatus: VisibilityStatus.PENDING_REVIEW },
+        where: {
+          visibilityStatus: VisibilityStatus.PENDING_REVIEW,
+          deletionStatus: DeletionStatus.ACTIVE,
+          status: DocumentStatus.ACTIVE,
+        },
         select: {
           id: true,
           title: true,
@@ -118,6 +127,10 @@ export class AdminService {
           visibilityStatus: true,
           fullText: true, // nội dung text đầy đủ để admin review
           createdAt: true,
+          fileHash: true,
+          copyrightSourceType: true,
+          copyrightAuthorName: true,
+          copyrightDeclaredAt: true,
           subject: {
             select: { id: true, name: true, code: true },
           },
@@ -128,39 +141,182 @@ export class AdminService {
         orderBy: { createdAt: 'asc' }, // File nào chờ lâu nhất hiện trước
       });
 
-      return this.sanitizeData(documents);
+      const enrichedDocs = await Promise.all(
+        documents.map(async (doc) => {
+          let duplicateSource: any = null;
+          if (doc.fileHash) {
+            duplicateSource = await this.prisma.document.findFirst({
+              where: {
+                fileHash: doc.fileHash,
+                id: { not: doc.id },
+                visibilityStatus: VisibilityStatus.PUBLIC,
+                status: DocumentStatus.ACTIVE,
+              },
+              select: {
+                id: true,
+                title: true,
+                createdAt: true,
+                user: {
+                  select: { fullName: true, email: true },
+                },
+              },
+            });
+          }
+
+          return {
+            ...doc,
+            isDuplicateDetected: !!duplicateSource,
+            duplicateSourceInfo: duplicateSource
+              ? {
+                  id: duplicateSource.id,
+                  title: duplicateSource.title,
+                  author: duplicateSource.user.fullName,
+                  email: duplicateSource.user.email,
+                  createdAt: duplicateSource.createdAt,
+                }
+              : null,
+          };
+        }),
+      );
+
+      return this.sanitizeData(enrichedDocs);
     } catch (error) {
       console.error('Lỗi khi lấy danh sách tài liệu PENDING:', error);
       throw new InternalServerErrorException('Không thể lấy danh sách tài liệu chờ duyệt');
     }
   }
 
-  async approveOrRejectDoc(docId: string, status: 'APPROVED' | 'REJECTED') {
+  private checkCopyrightEligibility(document: any): { isEligible: boolean; reason?: string } {
+    switch (document.copyrightSourceType) {
+      case 'OWN_ORIGINAL':
+        if (!document.copyrightDeclaredAt || document.copyrightDeclaredBy !== document.uploadedBy) {
+          return { isEligible: false, reason: 'Thiếu thông tin tuyên bố bản quyền của tác giả chính chủ.' };
+        }
+        return { isEligible: true };
+      case 'OPEN_LICENSE':
+        if (!document.copyrightSourceUrl || !document.copyrightLicense || !document.copyrightAttribution) {
+          return { isEligible: false, reason: 'Thông tin bản quyền mở (Open License) không đầy đủ (thiếu URL nguồn, Giấy phép hoặc Tác quyền).' };
+        }
+        return { isEligible: true };
+      case 'AUTHORIZED':
+        if (!document.copyrightPermissionReference) {
+          return { isEligible: false, reason: 'Thiếu thông tin tham chiếu quyền cho phép của bên sở hữu.' };
+        }
+        return { isEligible: true };
+      case 'FPT_OFFICIAL':
+        if (!document.copyrightSourceUrl && !document.copyrightPermissionReference) {
+          return { isEligible: false, reason: 'Thông tin tài liệu FPT Official không đầy đủ (thiếu URL nguồn hoặc Tham chiếu quyền).' };
+        }
+        return { isEligible: true };
+      case 'THIRD_PARTY':
+      case 'UNKNOWN':
+      default:
+        return { isEligible: false, reason: 'Nguồn gốc bản quyền không được phép chia sẻ công khai.' };
+    }
+  }
+
+  async approveOrRejectDoc(
+    docId: string,
+    status: 'APPROVED' | 'REJECTED',
+    adminId?: string,
+    rejectReason?: string,
+  ) {
     try {
       const dbStatus = status === 'APPROVED' ? VisibilityStatus.PUBLIC : VisibilityStatus.PRIVATE;
 
       const document = await this.prisma.document.findUnique({
         where: { id: docId },
+        include: {
+          subject: true,
+          summary: true,
+          quizzes: {
+            include: {
+              questions: true,
+            },
+          },
+        },
       });
 
       if (!document) {
         throw new NotFoundException('Không tìm thấy tài liệu với ID đã cho');
       }
 
-      const updatedDoc = await this.prisma.document.update({
-        where: { id: docId },
-        data: {
-          visibilityStatus: dbStatus,
-        },
-      });
+      if (document.visibilityStatus !== VisibilityStatus.PENDING_REVIEW) {
+        throw new BadRequestException('Tài liệu không ở trạng thái chờ duyệt (PENDING_REVIEW).');
+      }
 
-      return {
-        success: true,
-        message: `Tài liệu đã được cập nhật trạng thái thành ${status}`,
-        document: this.sanitizeData(updatedDoc),
-      };
+      if (status === 'APPROVED') {
+        // 1. AI READY
+        if (document.aiStatus !== 'READY') {
+          throw new BadRequestException('Tài liệu chưa hoàn tất AI Analyze (Trạng thái AI: ' + document.aiStatus + ').');
+        }
+
+        // 2. Summary + Quiz tồn tại và hợp lệ
+        if (!document.summary) {
+          throw new BadRequestException('Tài liệu thiếu thông tin tóm tắt nội dung (Summary) của AI.');
+        }
+        if (!document.quizzes || document.quizzes.length === 0) {
+          throw new BadRequestException('Tài liệu chưa có bộ câu hỏi (Quiz) ôn tập của AI.');
+        }
+        const hasQuestions = document.quizzes.some((q) => q.questions && q.questions.length > 0);
+        if (!hasQuestions) {
+          throw new BadRequestException('Bộ câu hỏi Quiz của tài liệu phải có ít nhất một câu hỏi.');
+        }
+
+        // 3. Copyright hợp lệ
+        const copyright = this.checkCopyrightEligibility(document);
+        if (!copyright.isEligible) {
+          throw new BadRequestException(`Vi phạm điều kiện bản quyền: ${copyright.reason}`);
+        }
+
+        // 4. Course system + active
+        if (!document.subject?.isSystem || !document.subject?.isActive) {
+          throw new BadRequestException('Học phần liên kết không hợp lệ, không thuộc hệ thống hoặc đang bị khóa.');
+        }
+
+        // 5. Document chưa soft delete, hidden hoặc removed
+        if (document.deletionStatus !== DeletionStatus.ACTIVE || document.status !== DocumentStatus.ACTIVE) {
+          throw new BadRequestException('Không thể duyệt tài liệu đã bị xóa tạm, bị ẩn hoặc gỡ bỏ.');
+        }
+
+        // Cập nhật trạng thái
+        const updatedDoc = await this.prisma.document.update({
+          where: { id: docId },
+          data: {
+            visibilityStatus: dbStatus,
+          },
+        });
+
+        // Ghi log vận hành (Audit Log)
+        this.logger.log(`[AUDIT] Admin ${adminId || 'System'} APPROVED document ${docId}`);
+
+        return {
+          success: true,
+          message: `Tài liệu đã được phê duyệt thành công (PUBLIC).`,
+          document: this.sanitizeData(updatedDoc),
+        };
+      } else {
+        // REJECTED flow
+        const updatedDoc = await this.prisma.document.update({
+          where: { id: docId },
+          data: {
+            visibilityStatus: dbStatus,
+          },
+        });
+
+        // Ghi log vận hành (Audit Log) với lý do từ chối
+        this.logger.log(
+          `[AUDIT] Admin ${adminId || 'System'} REJECTED document ${docId}. Lý do: ${rejectReason || 'Không có lý do cụ thể'}`,
+        );
+
+        return {
+          success: true,
+          message: `Tài liệu đã bị từ chối phê duyệt (đưa về trạng thái PRIVATE).`,
+          document: this.sanitizeData(updatedDoc),
+        };
+      }
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
       console.error('Lỗi khi phê duyệt/từ chối document:', error);

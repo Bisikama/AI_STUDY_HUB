@@ -1,5 +1,11 @@
 export const mapDocumentError = (error: any): string => {
-  const code = error?.response?.data?.code || error?.response?.data?.message || error?.message;
+  const responseData = error?.response?.data;
+
+  if (error?.response?.status === 409 && responseData?.message) {
+    return responseData.message;
+  }
+
+  const code = responseData?.code || responseData?.message || error?.message;
 
   switch (code) {
     case 'DOCUMENT_INVALID_FILE':

@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { parseDocument } from './utils/documentParser';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -504,6 +505,26 @@ export class DocumentsService {
       }
     }
 
+    // 2.7 Calculate file hash and check for duplicates
+    const fileHash = crypto.createHash('sha256').update(file.buffer).digest('hex');
+
+    const duplicate = await this.prisma.document.findFirst({
+      where: {
+        fileHash,
+        deletionStatus: 'ACTIVE',
+        deletedAt: null,
+      },
+      include: {
+        user: { select: { fullName: true } },
+      },
+    });
+
+    if (duplicate) {
+      throw new ConflictException(
+        `Tài liệu này đã tồn tại trên hệ thống (đăng bởi ${duplicate.user.fullName})`,
+      );
+    }
+
     // 3. Reserve storage quota
     const reservationId = await this.reserveStorage(finalUserId, file.size);
 
@@ -526,6 +547,7 @@ export class DocumentsService {
         aiStatus: 'NOT_REQUESTED',
         fullText: null,
         pageCount: null,
+        fileHash,
       },
     });
 
@@ -2136,6 +2158,15 @@ Quy định chặt chẽ:
 
     if (document.uploadedBy === userId) {
       throw new BadRequestException('Bạn không thể báo cáo tài liệu của chính mình.');
+    }
+
+    if (
+      document.visibilityStatus !== 'PUBLIC' ||
+      document.deletionStatus !== 'ACTIVE' ||
+      document.status !== 'ACTIVE' ||
+      document.deletedAt !== null
+    ) {
+      throw new BadRequestException('Chỉ được báo cáo tài liệu đang hiển thị công khai và hoạt động bình thường.');
     }
 
     // Check if user already reported this document with a PENDING or REVIEWING status

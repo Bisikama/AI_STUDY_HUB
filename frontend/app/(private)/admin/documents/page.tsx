@@ -177,6 +177,55 @@ function FullTextPanel({ doc, pendingAction, onClose, onApprove, onReject, actio
               <span><span className="font-semibold text-slate-700">Email: </span>{doc.user.email}</span>
             </div>
 
+            {/* ── Copyright & Duplicate Alert strip ── */}
+            <div className="border-b border-slate-100 px-6 py-4 space-y-3">
+              {/* Copyright Info */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Bản quyền</p>
+                <div className="mt-1 flex items-center gap-2 text-xs">
+                  <span className="font-semibold text-slate-700">Nguồn gốc:</span>
+                  <span className={`rounded-lg px-2 py-0.5 font-bold ${
+                    doc.copyrightSourceType === 'OWN_ORIGINAL' 
+                      ? 'bg-blue-50 text-blue-600' 
+                      : doc.copyrightSourceType === 'OPEN_LICENSE' 
+                      ? 'bg-emerald-50 text-emerald-600' 
+                      : doc.copyrightSourceType === 'AUTHORIZED' 
+                      ? 'bg-indigo-50 text-indigo-600'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {doc.copyrightSourceType === 'OWN_ORIGINAL' ? 'Tự biên soạn' : doc.copyrightSourceType}
+                  </span>
+                  {doc.copyrightAuthorName && (
+                    <span className="text-slate-500">· Tác giả: {doc.copyrightAuthorName}</span>
+                  )}
+                  {doc.copyrightDeclaredAt && (
+                    <span className="text-slate-400">· Khai báo: {formatDate(doc.copyrightDeclaredAt)}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Duplicate Alert Card */}
+              {doc.isDuplicateDetected && doc.duplicateSourceInfo && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs">
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 text-red-600 text-base">⚠️</span>
+                    <div className="space-y-1">
+                      <p className="font-bold text-red-800">CẢNH BÁO: TỆP TRÙNG LẶP 100%</p>
+                      <p className="text-red-700 leading-relaxed">
+                        Tệp tin này trùng khớp hoàn toàn với một tài liệu đã được công khai trên hệ thống. 
+                        Người đăng có dấu hiệu sao chép và khai báo sai thông tin bản quyền.
+                      </p>
+                      <div className="mt-2 rounded-lg bg-white/70 p-2.5 text-slate-700 space-y-1 border border-red-100">
+                        <p><span className="font-semibold text-slate-900">Tài liệu gốc:</span> {doc.duplicateSourceInfo.title}</p>
+                        <p><span className="font-semibold text-slate-900">Người đăng:</span> {doc.duplicateSourceInfo.author} ({doc.duplicateSourceInfo.email})</p>
+                        <p><span className="font-semibold text-slate-900">Ngày đăng:</span> {formatDate(doc.duplicateSourceInfo.createdAt)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* ── Full Text Content ── */}
             <div className="flex-1 overflow-y-auto px-6 py-5">
               <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">Full Text Content</p>
@@ -412,7 +461,14 @@ export default function AdminDocumentsPage() {
                             {ext}
                           </span>
                           <div>
-                            <p className="font-semibold text-slate-800 line-clamp-1">{doc.title}</p>
+                            <p className="font-semibold text-slate-800 line-clamp-1">
+                              {doc.title}
+                              {doc.isDuplicateDetected && (
+                                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                                  ⚠️ TRÙNG LẶP
+                                </span>
+                              )}
+                            </p>
                             {doc.description && (
                               <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{doc.description}</p>
                             )}

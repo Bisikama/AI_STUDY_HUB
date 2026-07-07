@@ -102,6 +102,17 @@ export interface PendingDocument {
   createdAt: string;
   subject: { id: number; name: string; code: string };
   user: { id: string; fullName: string; email: string };
+  copyrightSourceType?: string;
+  copyrightAuthorName?: string | null;
+  copyrightDeclaredAt?: string | null;
+  isDuplicateDetected?: boolean;
+  duplicateSourceInfo?: {
+    id: string;
+    title: string;
+    author: string;
+    email: string;
+    createdAt: string;
+  } | null;
 }
 
 export interface AdminQuiz {

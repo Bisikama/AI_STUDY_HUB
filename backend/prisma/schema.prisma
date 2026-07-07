@@ -166,7 +166,7 @@ model TeacherVerification {
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   teacherCode String             @map("teacher_code")
   department  String
-  proofUrl    String             @map("proof_url")
+  proofUrl    String?            @map("proof_url")
   status      VerificationStatus @default(PENDING)
   adminNote   String?            @map("admin_note") @db.Text
   createdAt   DateTime           @default(now()) @map("created_at")
@@ -318,6 +318,7 @@ model Document {
   copyrightDeclaredAt          DateTime?           @map("copyright_declared_at")
   copyrightDeclaredBy          String?             @map("copyright_declared_by") @db.Uuid
   copyrightDeclarer            User?               @relation("DocumentCopyrightDeclarer", fields: [copyrightDeclaredBy], references: [id], onDelete: SetNull)
+  fileHash                     String?             @map("file_hash") @db.VarChar(64)
 
   // Quan hệ
   summary             DocumentSummary?
@@ -332,6 +333,7 @@ model Document {
   storageReservations StorageReservation[]
 
   @@index([subjectId, status])
+  @@index([fileHash])
   @@map("documents")
 }
 
