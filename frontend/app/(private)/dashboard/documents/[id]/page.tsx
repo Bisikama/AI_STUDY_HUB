@@ -1010,6 +1010,23 @@ export default function DocumentDetailPage() {
 
                   {document.visibilityStatus === 'PRIVATE' && (
                     <div className="mt-2 border-t border-gray-100 pt-3">
+                      {document.rejectReason && (
+                        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs">
+                          <div className="flex items-start gap-2.5">
+                            <span className="mt-0.5 text-red-600 text-base">🚫</span>
+                            <div className="space-y-1">
+                              <p className="font-bold text-red-800">YÊU CẦU CHIA SẺ BỊ TỪ CHỐI</p>
+                              <p className="text-red-700 leading-relaxed">
+                                Yêu cầu chia sẻ công khai tài liệu này đã bị Quản trị viên từ chối phê duyệt.
+                              </p>
+                              <div className="mt-2 rounded-lg bg-white/70 p-2.5 text-slate-700 space-y-1 border border-red-100">
+                                <p><span className="font-semibold text-slate-900">Lý do từ chối:</span> {document.rejectReason}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {!document.canRequestPublic ? (
                         <div className="group relative">
                           <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">

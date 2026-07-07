@@ -1056,6 +1056,7 @@ Quy định chặt chẽ:
         copyrightPermissionReference: true,
         copyrightDeclaredAt: true,
         copyrightDeclaredBy: true,
+        rejectReason: true,
 
         tags: {
           include: {
@@ -1936,6 +1937,7 @@ Quy định chặt chẽ:
       data: {
         visibilityStatus: targetVisibility,
         requestedAt: new Date(),
+        rejectReason: null,
       },
     });
 

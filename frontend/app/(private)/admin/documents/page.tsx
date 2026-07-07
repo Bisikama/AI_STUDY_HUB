@@ -119,12 +119,20 @@ interface SlideOverProps {
   pendingAction: 'approve' | 'reject' | null;
   onClose: () => void;
   onApprove: (doc: PendingDocument) => void;
-  onReject: (doc: PendingDocument) => void;
+  onReject: (doc: PendingDocument, reason: string) => void;
   actionLoading: boolean;
 }
 
 function FullTextPanel({ doc, pendingAction, onClose, onApprove, onReject, actionLoading }: SlideOverProps) {
   const isOpen = !!doc;
+  const [rejectReason, setRejectReason] = useState('');
+
+  // Reset rejectReason when slide-over state changes
+  useEffect(() => {
+    if (!isOpen) {
+      setRejectReason('');
+    }
+  }, [isOpen]);
 
   // Trap focus / close on Escape
   useEffect(() => {
@@ -244,6 +252,23 @@ function FullTextPanel({ doc, pendingAction, onClose, onApprove, onReject, actio
               )}
             </div>
 
+            {/* ── Rejection Reason Input ── */}
+            {pendingAction === 'reject' && (
+              <div className="border-t border-slate-100 bg-amber-50/40 px-6 py-4 space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-amber-800">
+                  Lý do từ chối <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Nhập lý do từ chối phê duyệt tài liệu này (lý do này sẽ được gửi tới email của người đăng)..."
+                  className="w-full rounded-lg border border-amber-200 bg-white p-3 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                  rows={3}
+                  disabled={actionLoading}
+                />
+              </div>
+            )}
+
             {/* ── Action Footer ── */}
             <div className="border-t border-slate-100 bg-white px-6 py-4">
               {pendingAction === 'approve' ? (
@@ -266,7 +291,7 @@ function FullTextPanel({ doc, pendingAction, onClose, onApprove, onReject, actio
                     className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
                     Cancel
                   </button>
-                  <button onClick={() => onReject(doc)} disabled={actionLoading}
+                  <button onClick={() => onReject(doc, rejectReason.trim())} disabled={actionLoading || !rejectReason.trim()}
                     className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-amber-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-600 disabled:opacity-50">
                     {actionLoading
                       ? <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
@@ -349,13 +374,13 @@ export default function AdminDocumentsPage() {
   };
 
   // ── Execute reject from panel ──
-  const handleReject = async (doc: PendingDocument) => {
+  const handleReject = async (doc: PendingDocument, reason: string) => {
     setActionLoading((p) => ({ ...p, [doc.id]: true }));
     try {
-      await adminApi.rejectDocument(doc.id);
+      await adminApi.rejectDocument(doc.id, reason);
       setDocs((prev) => prev.filter((d) => d.id !== doc.id));
       setPanel({ doc: null, intent: null });
-      addToast(`🚫 "${doc.title}" đã bị từ chối.`, 'success');
+      addToast(`🚫 "${doc.title}" đã bị từ chối. Lý do: ${reason}`, 'success');
     } catch {
       addToast(`Reject thất bại. Vui lòng thử lại.`, 'error');
     } finally {

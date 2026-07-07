@@ -413,8 +413,11 @@ export default function MyDocumentsPage() {
                       )}
                     </div>
 
-                    <h3 className="mb-1 truncate font-semibold text-gray-900" title={doc.title}>
-                      {doc.title}
+                    <h3 className="mb-1 truncate font-semibold text-gray-900 flex items-center gap-1.5" title={doc.title}>
+                      <span className="truncate">{doc.title}</span>
+                      {doc.visibilityStatus === 'PRIVATE' && doc.rejectReason && (
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-red-500 animate-pulse" title="Yêu cầu chia sẻ công khai bị từ chối" />
+                      )}
                     </h3>
 
                     <p className="mb-2 truncate text-[12px] font-medium text-[#1a1c23]">

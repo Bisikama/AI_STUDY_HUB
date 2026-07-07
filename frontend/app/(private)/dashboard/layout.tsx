@@ -3,8 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
 import TeacherVerificationModal from '@/components/TeacherVerificationModal';
+import { notificationsApi, SystemNotification } from '@/services/notificationsApi';
 import { toast } from 'sonner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -15,6 +17,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [search, setSearch] = useState('');
   const [userFullName, setUserFullName] = useState('User');
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+
+  // Fetch notifications
+  const { data: notifications = [], mutate: mutateNotifications } = useSWR(
+    '/notifications',
+    () => notificationsApi.getNotifications(),
+    { refreshInterval: 10000 }
+  );
+
+  const unreadCount = notifications.filter((n: SystemNotification) => !n.isRead).length;
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await notificationsApi.markAsRead(id);
+      mutateNotifications();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationsApi.markAllAsRead();
+      mutateNotifications();
+      toast.success('Đã đánh dấu tất cả thông báo là đã đọc');
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -171,7 +202,88 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </form>
 
             <div className="flex items-center gap-4">
-             
+              {/* Notification Bell & Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowNotificationsDropdown(!showNotificationsDropdown);
+                    setShowAvatarDropdown(false);
+                  }}
+                  className="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-outline-variant text-secondary hover:border-primary hover:text-primary transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                >
+                  <span className="material-symbols-outlined text-[24px]">notifications</span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotificationsDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setShowNotificationsDropdown(false)}
+                    />
+                    <div className="bg-surface-container-lowest border-outline-variant absolute right-0 z-40 mt-2 w-80 rounded-2xl border py-3 px-4 shadow-xl flex flex-col gap-2 max-h-[400px]">
+                      <div className="flex items-center justify-between border-b border-outline-variant pb-2">
+                        <span className="font-title-md text-[16px] font-bold text-on-surface">Thông báo</span>
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={handleMarkAllAsRead}
+                            className="text-primary hover:underline text-xs font-semibold"
+                          >
+                            Đọc tất cả
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-1 divide-y divide-outline-variant/30 overflow-y-auto max-h-[300px] pr-1">
+                        {notifications.length === 0 ? (
+                          <div className="py-8 text-center text-secondary text-sm flex flex-col items-center justify-center gap-2">
+                            <span className="material-symbols-outlined text-[32px] text-secondary/50">notifications_off</span>
+                            Không có thông báo nào
+                          </div>
+                        ) : (
+                          notifications.map((n: SystemNotification) => (
+                            <div
+                              key={n.id}
+                              onClick={() => {
+                                if (!n.isRead) handleMarkAsRead(n.id);
+                              }}
+                              className={`group flex flex-col gap-1 py-2.5 transition-colors cursor-pointer rounded-lg px-2 hover:bg-surface-container-low ${
+                                !n.isRead ? 'bg-primary-container/10' : ''
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span className={`text-sm font-semibold truncate ${
+                                  !n.isRead ? 'text-primary' : 'text-on-surface'
+                                }`}>
+                                  {n.title}
+                                </span>
+                                {!n.isRead && (
+                                  <span className="h-2 w-2 shrink-0 rounded-full bg-primary mt-1.5" />
+                                )}
+                              </div>
+                              <p className="text-secondary text-xs line-clamp-3 leading-relaxed">
+                                {n.content}
+                              </p>
+                              <span className="text-[10px] text-secondary/60 mt-1">
+                                {new Date(n.createdAt).toLocaleDateString('vi-VN', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
 
               <div className="relative">
                 <button

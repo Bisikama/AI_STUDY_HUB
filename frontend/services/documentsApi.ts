@@ -40,6 +40,7 @@ export interface Document {
   ratingCount?: number;
   reportCount?: number;
   moderationWarning?: string | null;
+  rejectReason?: string | null;
   status?: 'ACTIVE' | 'UNDER_REVIEW' | 'HIDDEN' | 'REMOVED';
   visibilityStatus: 'PUBLIC' | 'PENDING_REVIEW' | 'PRIVATE';
   deletionStatus?: 'ACTIVE' | 'SOFT_DELETED' | 'DELETING' | 'DELETE_FAILED' | 'REMOVED';

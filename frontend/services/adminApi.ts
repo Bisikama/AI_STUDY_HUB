@@ -202,8 +202,8 @@ export const adminApi = {
   },
 
   /** PATCH /api/admin/documents/:id/approve  — reject maps to PRIVATE in BE */
-  rejectDocument: async (id: string): Promise<void> => {
-    await axiosClient.patch(`/admin/documents/${id}/approve`, { status: "REJECTED" });
+  rejectDocument: async (id: string, reason?: string): Promise<void> => {
+    await axiosClient.patch(`/admin/documents/${id}/approve`, { status: "REJECTED", reason });
   },
 
   /** DELETE /api/admin/documents/:id */

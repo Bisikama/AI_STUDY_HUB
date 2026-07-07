@@ -14,6 +14,7 @@ import {
 } from '../../../generated/prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SupabaseService } from '../../supabase/supabase.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { GetAdminQuizzesQueryDto, UpdateQuestionDto } from './dto/admin-quiz.dto';
 import { ResolveReportDto } from './dto/resolve-report.dto';
 
@@ -24,6 +25,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabaseService: SupabaseService,
+    private readonly notificationsService: NotificationsService,
   ) {}
   // Helper function để convert BigInt → Number
   private sanitizeData<T>(data: unknown): T {
@@ -301,8 +303,16 @@ export class AdminService {
           where: { id: docId },
           data: {
             visibilityStatus: dbStatus,
+            rejectReason: rejectReason || null,
           },
         });
+
+        // Tạo thông báo hệ thống trực tiếp trên web
+        await this.notificationsService.create(
+          updatedDoc.uploadedBy,
+          'Yêu cầu chia sẻ tài liệu bị từ chối',
+          `Yêu cầu chia sẻ công khai tài liệu "${updatedDoc.title}" đã bị từ chối. Lý do: ${rejectReason || 'Không có lý do cụ thể'}`,
+        );
 
         // Ghi log vận hành (Audit Log) với lý do từ chối
         this.logger.log(
