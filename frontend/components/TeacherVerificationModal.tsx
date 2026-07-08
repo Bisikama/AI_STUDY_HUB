@@ -16,6 +16,7 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
   const [teacherCode, setTeacherCode] = useState('');
   const [department, setDepartment] = useState('');
   const [proofUrl, setProofUrl] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -49,7 +50,27 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teacherCode.trim()) {
-      setError('Please enter Teacher ID');
+      setError('Vui lòng nhập Mã giảng viên');
+      return;
+    }
+    if (!department.trim()) {
+      setError('Vui lòng nhập Khoa / Bộ môn');
+      return;
+    }
+    if (!proofUrl.trim()) {
+      setError('Vui lòng nhập Link minh chứng');
+      return;
+    }
+
+    try {
+      new URL(proofUrl.trim());
+    } catch {
+      setError('Link minh chứng phải là một URL hợp lệ (ví dụ: https://...)');
+      return;
+    }
+
+    if (!agreed) {
+      setError('Bạn phải đọc và đồng ý với cam kết luật lệ để tiếp tục.');
       return;
     }
 
@@ -60,14 +81,14 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
     try {
       await teacherVerificationApi.submit({
         teacherCode: teacherCode.trim(),
-        department: department.trim() || undefined,
-        proofUrl: proofUrl.trim() || undefined,
+        department: department.trim(),
+        proofUrl: proofUrl.trim(),
       });
-      setSuccessMsg('Teacher verification request submitted successfully! Admins will review it soon.');
+      setSuccessMsg('Gửi yêu cầu Xác Thực Giảng viên thành công! Admin sẽ duyệt sớm.');
       await loadStatus();
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
-      setError(errorObj.response?.data?.message || 'An error occurred while submitting the request.');
+      setError(errorObj.response?.data?.message || 'Có lỗi xảy ra khi gửi yêu cầu.');
     } finally {
       setLoading(false);
     }
@@ -79,7 +100,7 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          className="absolute top-4 right-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
         >
           <span className="material-symbols-outlined">close</span>
         </button>
@@ -90,7 +111,9 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
           </div>
           <div>
             <h3 className="text-lg font-bold text-slate-800">Teacher Verification</h3>
-            <p className="text-xs text-slate-500">Teachers can upload public documents without going through review.</p>
+            <p className="text-xs text-slate-500">
+              Teachers can upload public documents without going through review.
+            </p>
           </div>
         </div>
 
@@ -102,35 +125,39 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
             {myStatus && (
               <div className="mb-5 rounded-xl border p-4 text-xs">
                 {myStatus.status === 'PENDING' && (
-                  <div className="border-amber-200 bg-amber-50 text-amber-800 rounded-lg p-3">
+                  <div className="rounded-lg border-amber-200 bg-amber-50 p-3 text-amber-800">
                     <p className="font-bold">⏳ Verification request is pending review</p>
-                    <p className="mt-1">ID: {myStatus.teacherCode} — Dept: {myStatus.department || 'Not provided'}</p>
+                    <p className="mt-1">
+                      ID: {myStatus.teacherCode} — Dept: {myStatus.department || 'Not provided'}
+                    </p>
                   </div>
                 )}
                 {myStatus.status === 'APPROVED' && (
-                  <div className="border-emerald-200 bg-emerald-50 text-emerald-800 rounded-lg p-3">
+                  <div className="rounded-lg border-emerald-200 bg-emerald-50 p-3 text-emerald-800">
                     <p className="font-bold">✅ Your account has been verified as a Teacher!</p>
                     <p className="mt-1">You now have full teacher privileges on the system.</p>
                   </div>
                 )}
                 {myStatus.status === 'REJECTED' && (
-                  <div className="border-rose-200 bg-rose-50 text-rose-800 rounded-lg p-3">
+                  <div className="rounded-lg border-rose-200 bg-rose-50 p-3 text-rose-800">
                     <p className="font-bold">❌ Previous request was rejected</p>
                     {myStatus.adminNote && <p className="mt-1">Reason: {myStatus.adminNote}</p>}
-                    <p className="mt-1 font-medium">You can update your info and submit again below.</p>
+                    <p className="mt-1 font-medium">
+                      You can update your info and submit again below.
+                    </p>
                   </div>
                 )}
               </div>
             )}
 
             {error && (
-              <div className="mb-4 rounded-lg bg-rose-50 p-3 text-xs text-rose-600 border border-rose-200">
+              <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-600">
                 ⚠️ {error}
               </div>
             )}
 
             {successMsg && (
-              <div className="mb-4 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-700 border border-emerald-200">
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
                 ✅ {successMsg}
               </div>
             )}
@@ -138,13 +165,13 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
             {myStatus?.status !== 'APPROVED' && (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Teacher ID <span className="text-red-500">*</span>
+                  <label className="mb-1 block text-xs font-bold tracking-wider text-slate-700 uppercase">
+                    Mã giảng viên <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g.: T10293"
+                    placeholder="Ví dụ: T10293"
                     value={teacherCode}
                     onChange={(e) => setTeacherCode(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 p-2.5 text-sm text-slate-800 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
@@ -152,12 +179,13 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Department / Faculty
+                  <label className="mb-1 block text-xs font-bold tracking-wider text-slate-700 uppercase">
+                    Khoa / Bộ môn <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g.: Computer Science Department"
+                    required
+                    placeholder="Ví dụ: Khoa Công nghệ thông tin"
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 p-2.5 text-sm text-slate-800 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
@@ -165,11 +193,12 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Link to ID Card / Proof (optional)
+                  <label className="mb-1 block text-xs font-bold tracking-wider text-slate-700 uppercase">
+                    Link minh chứng (Thẻ GV / Quyết định) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="url"
+                    required
                     placeholder="https://example.com/the-giang-vien.jpg"
                     value={proofUrl}
                     onChange={(e) => setProofUrl(e.target.value)}
@@ -177,20 +206,48 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
                   />
                 </div>
 
-                <div className="mt-6 flex justify-end gap-3 pt-2 border-t border-slate-100">
+                {/* Cam kết luật lệ */}
+                <div className="space-y-2 rounded-xl border border-amber-200/60 bg-amber-50/70 p-4 text-xs text-amber-900">
+                  <p className="flex items-center gap-1.5 font-bold text-amber-800">
+                    <span className="material-symbols-outlined text-[16px]">gavel</span>
+                    CAM KẾT LUẬT LỆ GIẢNG VIÊN:
+                  </p>
+                  <ul className="list-disc space-y-1 pl-4 font-medium text-slate-600">
+                    <li>
+                      Không đăng tải tài liệu vi phạm bản quyền hoặc nội dung không lành mạnh.
+                    </li>
+                    <li>Tài liệu chia sẻ phải chính xác, phục vụ tốt cho mục đích học tập.</li>
+                    <li>
+                      Nếu vi phạm quy định hoặc bị báo cáo vi phạm nghiêm trọng, tài khoản của bạn
+                      sẽ bị hạ quyền về <strong>Sinh viên (STUDENT)</strong> và chặn nâng quyền
+                      Giảng viên vĩnh viễn.
+                    </li>
+                  </ul>
+                  <label className="flex cursor-pointer items-start gap-2 pt-1.5 font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={agreed}
+                      onChange={(e) => setAgreed(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                    />
+                    <span>Tôi đồng ý với cam kết luật lệ trên</span>
+                  </label>
+                </div>
+
+                <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-2">
                   <button
                     type="button"
                     onClick={onClose}
                     className="rounded-lg px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
                   >
-                    Cancel
+                    Hủy
                   </button>
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || !agreed}
                     className="rounded-lg bg-violet-600 px-5 py-2 text-xs font-bold text-white shadow-md transition hover:bg-violet-700 disabled:opacity-50"
                   >
-                    {loading ? 'Submitting...' : 'Submit Request'}
+                    {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
                   </button>
                 </div>
               </form>
