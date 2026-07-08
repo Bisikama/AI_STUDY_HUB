@@ -498,6 +498,7 @@ export class AdminService {
                   select: {
                     fullName: true,
                     email: true,
+                    role: true,
                   },
                 },
               },
