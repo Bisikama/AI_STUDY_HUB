@@ -28,21 +28,27 @@ describe('DocumentParser Utility', () => {
   });
 
   describe('TXT Parser', () => {
-    it('should correctly parse plain text from txt file buffer', async () => {
+    it('should correctly parse plain text from txt file buffer and return ParsedDocument', async () => {
       const buffer = Buffer.from('Hello world in text format', 'utf-8');
       const result = await parseDocument(buffer, 'test.txt', 'text/plain');
-      expect(result).toBe('Hello world in text format');
+      expect(result).toEqual({
+        text: 'Hello world in text format',
+        pageCount: 1,
+      });
     });
 
     it('should correctly parse txt when mime type is not text/plain but extension is txt', async () => {
       const buffer = Buffer.from('Extension match', 'utf-8');
       const result = await parseDocument(buffer, 'test.txt', 'application/octet-stream');
-      expect(result).toBe('Extension match');
+      expect(result).toEqual({
+        text: 'Extension match',
+        pageCount: 1,
+      });
     });
   });
 
   describe('PDF Parser', () => {
-    it('should call pdf-parse and return extracted text', async () => {
+    it('should call pdf-parse and return extracted text and page count', async () => {
       const buffer = Buffer.from('pdf data dummy');
       mockGetText.mockResolvedValueOnce({ text: 'Extracted PDF text content', total: 5 });
 
@@ -65,7 +71,7 @@ describe('DocumentParser Utility', () => {
   });
 
   describe('DOCX Parser', () => {
-    it('should call mammoth and return extracted text', async () => {
+    it('should call mammoth and return extracted text with pageCount 1', async () => {
       const buffer = Buffer.from('docx data dummy');
       (mammoth.extractRawText as jest.Mock).mockResolvedValue({
         value: 'Extracted DOCX text content',
@@ -78,7 +84,10 @@ describe('DocumentParser Utility', () => {
       );
 
       expect(mammoth.extractRawText).toHaveBeenCalledWith({ buffer });
-      expect(result).toBe('Extracted DOCX text content');
+      expect(result).toEqual({
+        text: 'Extracted DOCX text content',
+        pageCount: 1,
+      });
     });
 
     it('should throw error when mammoth fails', async () => {
@@ -96,14 +105,17 @@ describe('DocumentParser Utility', () => {
   });
 
   describe('DOC (old format) Parser', () => {
-    it('should try mammoth first and return text if doc is actually a renamed docx', async () => {
+    it('should try mammoth first and return ParsedDocument if doc is actually a renamed docx', async () => {
       const buffer = Buffer.from('doc dummy');
       (mammoth.extractRawText as jest.Mock).mockResolvedValue({
         value: 'Extracted renamed docx content',
       });
 
       const result = await parseDocument(buffer, 'test.doc', 'application/msword');
-      expect(result).toBe('Extracted renamed docx content');
+      expect(result).toEqual({
+        text: 'Extracted renamed docx content',
+        pageCount: 1,
+      });
     });
 
     it('should throw error suggesting format conversion when mammoth fails on doc', async () => {

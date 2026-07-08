@@ -50,7 +50,7 @@ export class DocumentsService {
     private readonly subjectsService: SubjectsService,
     private readonly tagsService: TagsService,
     private readonly documentAccessService: DocumentAccessService,
-  ) {}
+  ) { }
 
   /**
    * Helper function to convert BigInt to Number/String in objects to prevent serialization crashes.
@@ -86,12 +86,12 @@ export class DocumentsService {
       personalFolderId: isOwner ? document.personalFolderId : null,
       subject: document.subject
         ? {
-            id: document.subject.id,
-            name: document.subject.name,
-            code: document.subject.code,
-            isSystem: document.subject.isSystem,
-            ...(document.subject.majors && { majors: document.subject.majors }),
-          }
+          id: document.subject.id,
+          name: document.subject.name,
+          code: document.subject.code,
+          isSystem: document.subject.isSystem,
+          ...(document.subject.majors && { majors: document.subject.majors }),
+        }
         : null,
       fileType: document.fileType,
       fileSize:
@@ -129,10 +129,10 @@ export class DocumentsService {
       isFollowed,
       tags: document.tags
         ? document.tags.map((t: any) => ({
-            id: t.tag.id,
-            name: t.tag.name,
-            slug: t.tag.slug,
-          }))
+          id: t.tag.id,
+          name: t.tag.name,
+          slug: t.tag.slug,
+        }))
         : [],
       isAIGenerated: document.isAIGenerated,
       summary: document.summary || null,
@@ -998,8 +998,7 @@ Quy định chặt chẽ:
         });
       } catch (dbUpdateError) {
         this.logger.error(
-          `Failed to update FAILED status in DB for document ${documentId}: ${
-            dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
+          `Failed to update FAILED status in DB for document ${documentId}: ${dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
           }`,
         );
       }
@@ -1386,6 +1385,10 @@ Quy định chặt chẽ:
       throw new ForbiddenException('You do not have permission to edit this document');
     }
 
+    if (document.visibilityStatus === 'PENDING_REVIEW') {
+      throw new ConflictException('DOCUMENT_PENDING_REVIEW');
+    }
+
     let { title, description } = dto;
 
     if (title !== undefined) {
@@ -1681,7 +1684,7 @@ Quy định chặt chẽ:
           where: { id: input.documentId },
           data: { extractionStatus: 'FAILED' },
         })
-        .catch(() => {});
+        .catch(() => { });
       return { extractionStatus: 'FAILED', chunkCount: 0 };
     }
 
@@ -1804,21 +1807,13 @@ Quy định chặt chẽ:
         ) {
           return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
         }
-        return { isEligible: true };
-      case 'AUTHORIZED':
-        if (!document.copyrightPermissionReference) {
-          return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
+        if (!document.copyrightDeclaredAt || document.copyrightDeclaredBy !== document.uploadedBy) {
+          return { isEligible: false, reason: 'COPYRIGHT_DECLARATION_REQUIRED' };
         }
         return { isEligible: true };
-      case 'FPT_OFFICIAL':
-        if (!document.copyrightSourceUrl && !document.copyrightPermissionReference) {
-          return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
-        }
-        return { isEligible: true };
-      case 'THIRD_PARTY':
       case 'UNKNOWN':
       default:
-        return { isEligible: false, reason: 'COPYRIGHT_SHARING_NOT_ALLOWED' };
+        return { isEligible: false, reason: 'COPYRIGHT_SOURCE_UNKNOWN' };
     }
   }
 
@@ -1835,19 +1830,49 @@ Quy định chặt chẽ:
     if (document.deletionStatus !== 'ACTIVE' || document.deletedAt !== null) {
       throw new ConflictException('DOCUMENT_INVALID_STATE');
     }
+    if (document.visibilityStatus === 'PENDING_REVIEW') {
+      throw new ConflictException('DOCUMENT_PENDING_REVIEW');
+    }
+
+    let dataToUpdate: any = {
+      copyrightSourceType: dto.sourceType,
+    };
+
+    if (dto.sourceType === 'OWN_ORIGINAL') {
+      dataToUpdate = {
+        ...dataToUpdate,
+        copyrightSourceUrl: null,
+        copyrightLicense: null,
+        copyrightAttribution: null,
+        copyrightPermissionReference: null,
+        copyrightDeclaredAt: new Date(),
+        copyrightDeclaredBy: userId,
+      };
+    } else if (dto.sourceType === 'OPEN_LICENSE') {
+      dataToUpdate = {
+        ...dataToUpdate,
+        copyrightSourceUrl: dto.sourceUrl || null,
+        copyrightLicense: dto.license || null,
+        copyrightAttribution: dto.attribution || null,
+        copyrightPermissionReference: null,
+        copyrightDeclaredAt: new Date(),
+        copyrightDeclaredBy: userId,
+      };
+    } else {
+      dataToUpdate = {
+        ...dataToUpdate,
+        copyrightDeclaredAt: null,
+        copyrightDeclaredBy: null,
+      };
+    }
+
+    if (dto.authorName !== undefined) {
+      dataToUpdate.copyrightAuthorName = dto.authorName || null;
+    }
 
     const updatedDocument = await this.prisma.document.update({
       where: { id: documentId },
-      data: {
-        copyrightSourceType: dto.sourceType,
-        copyrightAuthorName: dto.authorName,
-        copyrightSourceUrl: dto.sourceUrl,
-        copyrightLicense: dto.license,
-        copyrightAttribution: dto.attribution,
-        copyrightPermissionReference: dto.permissionReference,
-        copyrightDeclaredAt: new Date(),
-        copyrightDeclaredBy: userId,
-      },
+      data: dataToUpdate,
       include: {
         subject: { select: { isSystem: true, id: true, name: true, code: true } },
         tags: { include: { tag: true } },

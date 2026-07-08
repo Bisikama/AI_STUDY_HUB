@@ -61,7 +61,8 @@ export class SupabaseService implements StorageAdapter {
       nameWithoutExt = 'document';
     }
 
-    return `${nameWithoutExt}${ext === '.pdf' ? '.pdf' : ''}`;
+    // return `${nameWithoutExt}${ext === '.pdf' ? '.pdf' : ''}`;
+    return `${nameWithoutExt}${ext}`;
   }
 
   async uploadPrivate(input: {

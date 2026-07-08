@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { documentsApi } from '@/services/documentsApi';
 import DeleteDocumentModal from '@/components/documents/DeleteDocumentModal';
 import { getVisibilityPresentation } from '@/utils/visibility-status';
+import { getCleanFileType } from '@/utils/fileUtils';
 
 export default function DocumentDetailPage() {
   const { id } = useParams() as { id: string };
@@ -110,14 +111,19 @@ export default function DocumentDetailPage() {
     }
   };
 
-  // Toast notifications state
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef(0);
+
+  const removeToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   const addToast = useCallback((message: string, variant: ToastVariant) => {
     const toastId = ++toastIdRef.current;
     setToasts((prev) => [...prev, { id: toastId, message, variant }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toastId)), 5000);
-  }, []);
+    setTimeout(() => removeToast(toastId), 5000);
+    return toastId;
+  }, [removeToast]);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -144,21 +150,25 @@ export default function DocumentDetailPage() {
     if (!id) return;
     setIsAnalyzing(true);
 
-    // Toast 1: Loading
-    addToast('Loading document data...', 'info');
+    const loadingToastId1 = addToast('Loading document data...', 'info');
+    let loadingToastId2: number | undefined;
 
-    // Transition Toast 2
     const timer = setTimeout(() => {
-      addToast('AI is analyzing and generating questions...', 'info');
+      removeToast(loadingToastId1);
+      loadingToastId2 = addToast('AI is analyzing and generating questions...', 'info');
     }, 1500);
 
     try {
       await documentsApi.analyzeDocument(id);
       clearTimeout(timer);
+      removeToast(loadingToastId1);
+      if (loadingToastId2) removeToast(loadingToastId2);
       addToast('Completed! Document has been successfully processed.', 'success');
       mutate();
     } catch (err: any) {
       clearTimeout(timer);
+      removeToast(loadingToastId1);
+      if (loadingToastId2) removeToast(loadingToastId2);
       console.error('Analysis failed:', err);
       const errMsg = err.response?.data?.message || err.message || 'Document analysis error';
       addToast(`Error: ${errMsg}`, 'error');
@@ -238,7 +248,7 @@ export default function DocumentDetailPage() {
     if (!id) return;
     try {
       setIsSubmittingCopyright(true);
-      
+
       const cleanStr = (val: string) => {
         const trimmed = val.trim();
         return trimmed === '' ? undefined : trimmed;
@@ -252,20 +262,11 @@ export default function DocumentDetailPage() {
         payload.sourceUrl = cleanStr(copyrightSourceUrl);
         payload.license = cleanStr(copyrightLicense);
         payload.attribution = cleanStr(copyrightAttribution);
-      } else if (copyrightSourceType === 'AUTHORIZED') {
-        payload.permissionReference = cleanStr(copyrightPermissionReference);
-      } else if (copyrightSourceType === 'FPT_OFFICIAL') {
-        payload.sourceUrl = cleanStr(copyrightSourceUrl);
-        payload.permissionReference = cleanStr(copyrightPermissionReference);
-      } else if (copyrightSourceType === 'THIRD_PARTY') {
-        payload.authorName = cleanStr(copyrightAuthorName);
-        payload.sourceUrl = cleanStr(copyrightSourceUrl);
       }
 
       await documentsApi.updateCopyright(id, payload);
-      addToast('Khai báo bản quyền thành công.', 'success');
-      
-      // Update cache optimistically so that document state reflects new data before async load finishes
+      addToast('Copyright declared successfully.', 'success');
+
       mutate((currentData: any) => {
         if (!currentData) return currentData;
         return {
@@ -279,7 +280,7 @@ export default function DocumentDetailPage() {
           copyrightDeclaredAt: new Date().toISOString(),
         };
       }, { revalidate: true });
-      
+
       setIsCopyrightModalOpen(false);
     } catch (err: any) {
       const { mapDocumentError } = await import('@/utils/errorMapper');
@@ -290,15 +291,18 @@ export default function DocumentDetailPage() {
   };
 
   const handleRequestPublic = async () => {
+    let loadingToastId: number | undefined;
     try {
-      addToast('Processing request...', 'info');
+      loadingToastId = addToast('Processing request...', 'info');
       await documentsApi.requestDocumentPublic(id);
+      if (loadingToastId) removeToast(loadingToastId);
       addToast('Public review request submitted.', 'success');
       mutate();
       import('swr').then(({ mutate: globalMutate }) => {
         globalMutate((key: any) => Array.isArray(key) && key[0] === '/documents/me');
       });
     } catch (err: any) {
+      if (loadingToastId) removeToast(loadingToastId);
       const { mapDocumentError } = await import('@/utils/errorMapper');
       addToast(mapDocumentError(err), 'error');
     }
@@ -340,74 +344,73 @@ export default function DocumentDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-100px)] w-full items-center justify-center">
-        <span className="material-symbols-outlined text-primary animate-spin text-4xl">sync</span>
+      <div className="flex h-[calc(100vh-100px)] w-full items-center justify-center bg-[#FAFAFA]">
+        <span className="material-symbols-outlined animate-spin text-3xl text-gray-400">sync</span>
       </div>
     );
   }
 
   if (error || !document) {
     return (
-      <div className="flex h-[calc(100vh-100px)] w-full flex-col items-center justify-center p-8 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-500">
-          <span className="material-symbols-outlined text-3xl">error</span>
+      <div className="flex h-[calc(100vh-100px)] w-full flex-col items-center justify-center bg-[#FAFAFA] p-8 text-center">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500 border border-red-100">
+          <span className="material-symbols-outlined text-2xl">error</span>
         </div>
-        <h2 className="mb-2 text-2xl font-bold text-gray-900">Access Denied / Not Found</h2>
-        <p className="mb-6 text-gray-500">
+        <h2 className="mb-2 text-xl font-bold tracking-tight text-gray-900">Access Denied</h2>
+        <p className="mb-6 text-[13px] text-gray-500 max-w-sm">
           You do not have permission to view this document or it does not exist.
         </p>
         <Link
           href="/dashboard/documents"
-          className="rounded-lg bg-[#1a1c23] px-6 py-2.5 font-semibold text-white transition-colors hover:bg-black"
+          className="rounded-md bg-gray-900 px-5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-black"
         >
-          Back to My Documents
+          Back to Documents
         </Link>
       </div>
     );
   }
 
-  // Extract status presentation logic
   const getExtractionStatusUI = () => {
     switch (document.extractionStatus) {
       case 'READY':
         return {
-          title: 'PDF successfully extracted',
+          title: 'Successfully extracted',
           icon: 'check_circle',
-          color: 'text-green-600',
-          bg: 'bg-green-50',
-          border: 'border-green-200',
+          color: 'text-emerald-700',
+          bg: 'bg-emerald-50/50',
+          border: 'border-emerald-200/60',
           detail: document.pageCount ? `Document contains ${document.pageCount} pages.` : '',
         };
       case 'FAILED':
         return {
-          title: 'Failed to extract text from this document.',
+          title: 'Extraction failed.',
           icon: 'error',
-          color: 'text-red-600',
-          bg: 'bg-red-50',
-          border: 'border-red-200',
+          color: 'text-red-700',
+          bg: 'bg-red-50/50',
+          border: 'border-red-200/60',
           detail: 'You can still view the original PDF.',
         };
       case 'PENDING':
         return {
-          title: 'Document is being processed.',
+          title: 'Document is processing.',
           icon: 'hourglass_empty',
-          color: 'text-yellow-600',
-          bg: 'bg-yellow-50',
-          border: 'border-yellow-200',
+          color: 'text-amber-700',
+          bg: 'bg-amber-50/50',
+          border: 'border-amber-200/60',
           detail: 'Please check back in a few minutes.',
         };
       case 'UNSUPPORTED':
         return {
-          title: 'File format not supported for AI analysis.',
+          title: 'Format not supported for AI.',
           icon: 'do_not_disturb',
           color: 'text-gray-600',
-          bg: 'bg-gray-100',
-          border: 'border-gray-300',
-          detail: 'You can still view/download the original file, but AI features are disabled.',
+          bg: 'bg-gray-100/50',
+          border: 'border-gray-200',
+          detail: 'View/download only. AI features disabled.',
         };
       default:
         return {
-          title: 'No extraction info available.',
+          title: 'No extraction info.',
           icon: 'info',
           color: 'text-gray-600',
           bg: 'bg-gray-50',
@@ -418,91 +421,101 @@ export default function DocumentDetailPage() {
   };
 
   const extractionUI = getExtractionStatusUI();
-  const publishCtaText = currentUser?.role === 'STUDENT' ? 'Gửi yêu cầu chia sẻ' : 'Chia sẻ trong AI Study Hub';
+  const publishCtaText = currentUser?.role === 'STUDENT' ? 'Request to publish' : 'Publish to Explore';
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-6xl bg-[#F8F9FA] p-6 font-sans md:p-8">
-      {/* Top Breadcrumb / Nav */}
-      <div className="mb-6 flex items-center text-sm font-medium text-gray-500">
+    <div className="mx-auto min-h-screen w-full max-w-6xl bg-[#FAFAFA] p-6 font-sans md:p-10 lg:px-12 text-gray-900">
+
+      {/* Top Breadcrumb */}
+      <div className="mb-8 flex items-center text-[13px] font-medium text-gray-500">
         <Link
           href="/dashboard/documents"
           className="flex items-center transition-colors hover:text-gray-900"
         >
-          <span className="material-symbols-outlined mr-1 text-[18px]">arrow_back</span>
-          Back to My Documents
+          <span className="material-symbols-outlined mr-1 text-[16px]">arrow_back</span>
+          Documents
         </Link>
-        <span className="mx-2 text-gray-300">|</span>
-        <span className="max-w-[200px] truncate text-gray-400 sm:max-w-md">{document.title}</span>
+        <span className="material-symbols-outlined mx-1.5 text-[14px] text-gray-300">chevron_right</span>
+        <span className="max-w-[200px] truncate text-gray-900 sm:max-w-md">{document.title}</span>
       </div>
 
-      {/* Moderation Warning Alert */}
+      {/* Moderation Warning */}
       {document.status === 'UNDER_REVIEW' && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-yellow-800 shadow-sm animate-in fade-in slide-in-from-top-4 duration-200">
-          <span className="material-symbols-outlined text-yellow-600 shrink-0 mt-0.5">warning</span>
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/50 p-4 text-amber-800 shadow-sm">
+          <span className="material-symbols-outlined text-amber-600 shrink-0 mt-0.5 text-[20px]">warning</span>
           <div>
-            <h4 className="font-bold text-yellow-900">Document Under Review</h4>
-            <p className="text-sm text-yellow-700 mt-1">
-              This document has received multiple user reports and is currently being moderated.
-              {document.moderationWarning && ` Detailed reason: ${document.moderationWarning}`}
+            <h4 className="text-[13px] font-semibold text-amber-900 tracking-tight">Under Moderation Review</h4>
+            <p className="text-[12.5px] text-amber-700/90 mt-0.5 leading-relaxed">
+              This document has received user reports and is being moderated.
+              {document.moderationWarning && ` Reason: ${document.moderationWarning}`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {(document.status === 'HIDDEN' || document.status === 'REMOVED') && (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50/50 p-4 text-rose-800 shadow-sm">
+          <span className="material-symbols-outlined text-rose-600 shrink-0 mt-0.5 text-[20px]">block</span>
+          <div>
+            <h4 className="text-[13px] font-semibold text-rose-900 tracking-tight">Tài liệu đã bị ẩn hoặc gỡ bỏ bởi Admin</h4>
+            <p className="text-[12.5px] text-rose-700/90 mt-0.5 leading-relaxed">
+              Tài liệu này đã bị gỡ bỏ khỏi chế độ tìm kiếm công khai (Explore) và chế độ luyện tập (Practice Mode) do vi phạm quy chế hoặc bị báo cáo vi phạm. Chỉ có bạn (chủ sở hữu) mới có thể xem tài liệu này trong kho cá nhân.
             </p>
           </div>
         </div>
       )}
 
       {/* Main Header Area */}
-      <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+      <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex-1">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {document.isAIGenerated && (
-              <span className="flex items-center gap-1 rounded bg-gray-200 px-2.5 py-1 text-xs font-bold text-gray-700">
-                <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
-                AI Generated
+              <span className="flex items-center gap-1 rounded bg-gray-900 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white shadow-sm">
+                <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
+                AI GENERATED
               </span>
             )}
             <span
-              className={`rounded px-2.5 py-1 text-xs font-bold uppercase ${getVisibilityPresentation(document.visibilityStatus).className}`}
+              className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-sm border ${getVisibilityPresentation(document.visibilityStatus).className}`}
             >
               {getVisibilityPresentation(document.visibilityStatus).label}
             </span>
           </div>
 
-          <h1 className="mb-4 text-3xl leading-tight font-bold tracking-tight text-gray-900 sm:text-4xl">
+          <h1 className="mb-3 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
             {document.title}
           </h1>
 
-          <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-gray-500 sm:gap-6 mt-4">
+          <div className="flex flex-wrap items-center gap-4 text-[13px] font-medium text-gray-500 sm:gap-6">
             <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px]">calendar_today</span>
-              Added {formatDate(document.createdAt)}
+              <span className="material-symbols-outlined text-[16px] text-gray-400">calendar_today</span>
+              {formatDate(document.createdAt)}
+            </div>
+            <div className="flex items-center gap-1.5 uppercase">
+              <span className="material-symbols-outlined text-[16px] text-gray-400">draft</span>
+              {formatSize(document.fileSize)} • {getCleanFileType(document.fileType)}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px]">draft</span>
-              {formatSize(document.fileSize)} •{' '}
-              {document.fileType.split('/')[1] || document.fileType}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px]">visibility</span>
+              <span className="material-symbols-outlined text-[16px] text-gray-400">visibility</span>
               {document.viewCount} views
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              {document.downloadCount} downloads
+              <span className="material-symbols-outlined text-[16px] text-gray-400">download</span>
+              {document.downloadCount} dls
             </div>
           </div>
 
           {document.copyrightSourceType && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
-              <span className="material-symbols-outlined text-[16px] text-blue-600">copyright</span>
-              <span className="font-semibold text-blue-800">
-                {document.copyrightSourceType === 'OWN_ORIGINAL' && 'Tự biên soạn'}
-                {document.copyrightSourceType === 'OPEN_LICENSE' && 'Nguồn mở'}
-                {document.copyrightSourceType === 'AUTHORIZED' && 'Được cấp quyền sử dụng'}
-                {document.copyrightSourceType === 'FPT_OFFICIAL' && 'Tài liệu chính thức FPT'}
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-[12px] text-gray-600 bg-gray-100/80 px-3 py-2 rounded-md border border-gray-200/50 w-fit">
+              <span className="material-symbols-outlined text-[14px] text-gray-500">copyright</span>
+              <span className="font-semibold text-gray-700">
+                {document.copyrightSourceType === 'OWN_ORIGINAL' && 'Self-authored'}
+                {document.copyrightSourceType === 'OPEN_LICENSE' && 'Open Source'}
               </span>
               {document.copyrightLicense && (
                 <>
                   <span className="text-gray-300">|</span>
-                  <span className="bg-white border border-gray-200 px-2 py-0.5 rounded text-xs font-medium">
+                  <span className="font-mono text-[11px] font-semibold text-gray-600">
                     {document.copyrightLicense}
                   </span>
                 </>
@@ -510,16 +523,16 @@ export default function DocumentDetailPage() {
               {document.copyrightSourceUrl && (
                 <>
                   <span className="text-gray-300">|</span>
-                  <a href={document.copyrightSourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5 text-xs font-medium">
-                    Nguồn gốc <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                  <a href={document.copyrightSourceUrl} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-1 font-medium">
+                    Source <span className="material-symbols-outlined text-[12px]">open_in_new</span>
                   </a>
                 </>
               )}
               {document.copyrightAttribution && (
                 <>
                   <span className="text-gray-300">|</span>
-                  <span className="text-gray-500 text-xs italic">
-                    By: {document.copyrightAttribution}
+                  <span className="text-gray-500 italic">
+                    By {document.copyrightAttribution}
                   </span>
                 </>
               )}
@@ -527,26 +540,26 @@ export default function DocumentDetailPage() {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 lg:shrink-0 ">
+        <div className="flex flex-wrap items-center gap-2.5 lg:shrink-0">
           {document.summary && (
             <button
               onClick={() => setViewType((prev) => (prev === 'text' ? 'summary' : 'text'))}
-              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+              className="flex items-center gap-1.5 rounded-md border border-gray-200/80 bg-white px-3 py-1.5 text-[13px] font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
             >
-              <span className="material-symbols-outlined text-[18px]">
-                {viewType === 'text' ? 'summarize' : 'text_snippet'}
+              <span className="material-symbols-outlined text-[16px]">
+                {viewType === 'text' ? 'auto_awesome' : 'subject'}
               </span>
-              {viewType === 'text' ? 'View Summary' : 'View Full Text'}
+              {viewType === 'text' ? 'View AI Summary' : 'View Details'}
             </button>
           )}
 
           {document.isOwner !== false && (
             <button
               onClick={() => router.push(`/dashboard/documents/${document.id}/edit`)}
-              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+              className="flex items-center gap-1.5 rounded-md border border-gray-200/80 bg-white px-3 py-1.5 text-[13px] font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
             >
-              <span className="material-symbols-outlined text-[18px]">edit</span>
-              Edit
+              <span className="material-symbols-outlined text-[16px]">edit</span>
+              Edit Details
             </button>
           )}
 
@@ -554,9 +567,9 @@ export default function DocumentDetailPage() {
             <>
               <button
                 onClick={() => setIsReportModalOpen(true)}
-                className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-100"
+                className="flex items-center gap-1.5 rounded-md border border-red-200/80 bg-white px-3 py-1.5 text-[13px] font-medium text-red-600 shadow-sm transition-colors hover:bg-red-50"
               >
-                <span className="material-symbols-outlined text-[18px]">report</span>
+                <span className="material-symbols-outlined text-[16px]">report</span>
                 Report
               </button>
 
@@ -565,72 +578,60 @@ export default function DocumentDetailPage() {
                   try {
                     if (document.isFollowed) {
                       await documentsApi.unfollowDocument(document.id);
-                      addToast('Unfollowed document successfully.', 'success');
+                      addToast('Unfollowed document.', 'success');
                     } else {
                       await documentsApi.followDocument(document.id);
-                      addToast('Followed document successfully.', 'success');
+                      addToast('Followed document.', 'success');
                     }
                     mutate();
                   } catch (err) {
                     console.error('Follow toggle failed:', err);
                   }
                 }}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold shadow-sm transition-colors border ${document.isFollowed
-                  ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
-                  : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium shadow-sm transition-colors border ${document.isFollowed
+                  ? 'border-gray-200/80 bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'border-gray-900 bg-gray-900 text-white hover:bg-black'
                   }`}
               >
-                <span className="material-symbols-outlined text-[18px]">
-                  {document.isFollowed ? 'bookmark_remove' : 'bookmark'}
+                <span className="material-symbols-outlined text-[16px]">
+                  {document.isFollowed ? 'bookmark_remove' : 'bookmark_add'}
                 </span>
-                {document.isFollowed ? 'Unfollow' : 'Follow'}
+                {document.isFollowed ? 'Unfollow' : 'Follow Document'}
               </button>
             </>
           )}
-
         </div>
       </div>
 
       {/* Content Grid */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+
         {/* Left Column (Main Content) */}
-        <div className="flex flex-col gap-6 lg:col-span-2">
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900">
-                <span className="material-symbols-outlined text-gray-400">
-                  {viewType === 'text' ? 'text_snippet' : 'auto_awesome'}
-                </span>
-                {viewType === 'text' ? 'Extraction Status / Description' : 'AI Summary & Key Insights'}
-              </h2>
-            </div>
+        <div className="flex flex-col gap-6 lg:col-span-8">
+
+          <div className="rounded-xl border border-gray-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.02)] sm:p-8">
+            <h3 className="mb-5 text-[11px] font-bold tracking-widest text-gray-400 uppercase flex items-center gap-1.5 border-b border-gray-100 pb-3">
+              <span className="material-symbols-outlined text-[16px]">
+                {viewType === 'text' ? 'analytics' : 'auto_awesome'}
+              </span>
+              {viewType === 'text' ? 'Extraction & Details' : 'AI Summary & Insights'}
+            </h3>
 
             {viewType === 'text' ? (
               <>
                 {document.description && (
-                  <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 p-4">
-                    <h3 className="mb-2 text-sm font-bold text-gray-700">Description</h3>
-                    <p className="text-sm text-gray-600">{document.description}</p>
+                  <div className="mb-6">
+                    <p className="text-[13px] leading-relaxed text-gray-600">{document.description}</p>
                   </div>
                 )}
 
-                <div className={`flex items-start gap-4 rounded-xl border p-5 ${extractionUI.bg} ${extractionUI.border}`}>
-                  <span className={`material-symbols-outlined text-2xl ${extractionUI.color}`}>
+                <div className={`flex items-start gap-3 rounded-lg border p-4 ${extractionUI.bg} ${extractionUI.border}`}>
+                  <span className={`material-symbols-outlined text-[20px] shrink-0 mt-0.5 ${extractionUI.color}`}>
                     {extractionUI.icon}
                   </span>
                   <div>
-                    <h4 className={`font-bold ${extractionUI.color}`}>{extractionUI.title}</h4>
-                    {extractionUI.detail && <p className="mt-1 text-sm text-gray-700">{extractionUI.detail}</p>}
-
-                    <div className="mt-4">
-                      <Link
-                        href={`/dashboard/documents/${document.id}/preview`}
-                        className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm border border-gray-300 transition-colors hover:bg-gray-50"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">preview</span>
-                        View Original PDF
-                      </Link>
-                    </div>
+                    <h4 className={`text-[13px] font-semibold tracking-tight ${extractionUI.color}`}>{extractionUI.title}</h4>
+                    {extractionUI.detail && <p className="mt-0.5 text-[12.5px] opacity-90 text-gray-700">{extractionUI.detail}</p>}
                   </div>
                 </div>
               </>
@@ -638,23 +639,23 @@ export default function DocumentDetailPage() {
               <div className="space-y-6">
                 {document.summary ? (
                   <>
-                    <div className="prose prose-sm max-w-none leading-relaxed text-gray-700">
-                      <p className="whitespace-pre-wrap font-medium">{document.summary.summaryText}</p>
+                    <div className="prose prose-sm max-w-none">
+                      <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-gray-700">{document.summary.summaryText}</p>
                     </div>
 
                     {document.summary.keyPoints && (
-                      <div className="mt-6 border-t border-gray-100 pt-6">
-                        <h3 className="mb-3 text-lg font-bold text-gray-900 flex items-center gap-2">
-                          <span className="material-symbols-outlined text-amber-500">lightbulb</span>
+                      <div className="mt-8">
+                        <h4 className="mb-4 text-[12px] font-bold tracking-widest text-gray-400 uppercase flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-gray-400">lightbulb</span>
                           Key Insights
-                        </h3>
-                        <ul className="space-y-2.5">
+                        </h4>
+                        <ul className="space-y-3 pl-1">
                           {document.summary.keyPoints
                             .split('\n')
                             .filter(Boolean)
                             .map((point: string, idx: number) => (
-                              <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
-                                <span className="text-primary mt-1 font-bold">•</span>
+                              <li key={idx} className="flex items-start gap-2.5 text-[13.5px] text-gray-600 leading-relaxed">
+                                <span className="text-gray-300 mt-1.5 h-1.5 w-1.5 rounded-full bg-gray-300 shrink-0"></span>
                                 <span>{point.replace(/^•\s*/, '')}</span>
                               </li>
                             ))}
@@ -663,109 +664,92 @@ export default function DocumentDetailPage() {
                     )}
                   </>
                 ) : (
-                  <p className="text-gray-500 italic">No summary available.</p>
+                  <p className="text-[13px] text-gray-400 italic">No AI summary generated yet.</p>
                 )}
               </div>
             )}
 
-            <div className="mt-8 grid grid-cols-3 gap-4 border-t border-gray-100 pt-6 text-center">
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
+            {/* Quick Stats Banner */}
+            <div className="mt-8 flex items-center rounded-lg border border-gray-100 bg-gray-50/50 p-4 divide-x divide-gray-200">
+              <div className="flex-1 text-center">
+                <p className="text-xl font-bold tracking-tight text-gray-900">
                   {(document as any).quizzes?.length || 0}
                 </p>
-                <p className="mt-1 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
-                  QUIZZES
-                </p>
+                <p className="mt-0.5 text-[10px] font-bold tracking-widest text-gray-400 uppercase">Quizzes</p>
               </div>
-              <div className="border-r border-l border-gray-100">
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="flex-1 text-center">
+                <p className="text-xl font-bold tracking-tight text-gray-900">
                   {document.summary ? 1 : 0}
                 </p>
-                <p className="mt-1 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
-                  SUMMARIES
-                </p>
+                <p className="mt-0.5 text-[10px] font-bold tracking-widest text-gray-400 uppercase">Summaries</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {document.subject?.name ??
-                    (document.subjectId ? `SUB-${document.subjectId}` : 'N/A')}
+              <div className="flex-1 text-center px-2">
+                <p className="text-sm font-semibold tracking-tight text-gray-900 truncate">
+                  {document.subject?.name ?? (document.subjectId ? `SUB-${document.subjectId}` : 'Unfiled')}
                 </p>
-                <p className="mt-1 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
-                  STUDY FOLDER
-                </p>
+                <p className="mt-0.5 text-[10px] font-bold tracking-widest text-gray-400 uppercase">Folder</p>
               </div>
             </div>
           </div>
 
           {/* Rating Card */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-            <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px] text-amber-500">star</span>
-              Document Reviews
+          <div className="rounded-xl border border-gray-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.02)] sm:p-8">
+            <h3 className="mb-6 text-[11px] font-bold tracking-widest text-gray-400 uppercase flex items-center gap-1.5 border-b border-gray-100 pb-3">
+              <span className="material-symbols-outlined text-[16px]">star</span>
+              Reviews & Feedback
             </h3>
 
             {/* Average Rating Summary */}
-            <div className="mb-6 flex items-center gap-3 bg-amber-50/50 rounded-xl p-4 border border-amber-100 max-w-sm">
-              <div className="text-3xl font-extrabold text-amber-600">
+            <div className="mb-6 flex items-center gap-4 bg-gray-50 rounded-lg p-4 border border-gray-100 max-w-sm">
+              <div className="text-3xl font-bold tracking-tighter text-gray-900">
                 {document.averageRating ? document.averageRating.toFixed(1) : '0.0'}
               </div>
               <div>
-                <div className="flex">
+                <div className="flex gap-0.5">
                   {Array.from({ length: 5 }, (_, i) => (
-                    <span key={i} className={`material-symbols-outlined text-[18px] ${i < Math.round(document.averageRating || 0) ? 'filled text-amber-500' : 'text-gray-300'}`}>
+                    <span key={i} className={`material-symbols-outlined text-[16px] ${i < Math.round(document.averageRating || 0) ? 'filled text-gray-900' : 'text-gray-200'}`}>
                       star
                     </span>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {document.ratingCount || 0} reviews
+                <p className="text-[11px] text-gray-500 font-medium mt-1 uppercase tracking-wide">
+                  Based on {document.ratingCount || 0} reviews
                 </p>
               </div>
             </div>
 
             {/* User review form (only if not owner) */}
             {document.isOwner === false && (
-              <div className="mb-6 border-b border-gray-100 pb-6">
+              <div className="mb-8 border-b border-gray-100 pb-8">
                 {myRating && !isEditingRating ? (
-                  <div className="rounded-xl bg-gray-50 p-4 border border-gray-100 max-w-xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-gray-700 bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                  <div className="rounded-lg bg-gray-50 p-4 border border-gray-100 max-w-xl">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">
                         Your review
                       </span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setIsEditingRating(true)}
-                          className="text-xs font-semibold text-blue-600 hover:text-blue-800"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={handleDeleteRating}
-                          className="text-xs font-semibold text-red-600 hover:text-red-800"
-                        >
-                          Delete
-                        </button>
+                      <div className="flex gap-3">
+                        <button onClick={() => setIsEditingRating(true)} className="text-[12px] font-medium text-gray-600 hover:text-gray-900 transition-colors">Edit</button>
+                        <button onClick={handleDeleteRating} className="text-[12px] font-medium text-red-600 hover:text-red-800 transition-colors">Delete</button>
                       </div>
                     </div>
-                    <div className="flex mb-1.5">
+                    <div className="flex gap-0.5 mb-2">
                       {Array.from({ length: 5 }, (_, i) => (
-                        <span key={i} className={`material-symbols-outlined text-[16px] ${i < myRating.rating ? 'filled text-amber-500' : 'text-gray-300'}`}>
+                        <span key={i} className={`material-symbols-outlined text-[14px] ${i < myRating.rating ? 'filled text-gray-900' : 'text-gray-200'}`}>
                           star
                         </span>
                       ))}
                     </div>
                     {myRating.comment ? (
-                      <p className="text-sm text-gray-600 italic">"{myRating.comment}"</p>
+                      <p className="text-[13px] text-gray-700">{myRating.comment}</p>
                     ) : (
-                      <p className="text-xs text-gray-400 italic">No comment</p>
+                      <p className="text-[12px] text-gray-400 italic">No written feedback.</p>
                     )}
                   </div>
                 ) : (
                   <form onSubmit={handleSubmitRating} className="space-y-4 max-w-xl">
-                    <h4 className="text-sm font-bold text-gray-700">
-                      {isEditingRating ? 'Update Review' : 'Write a new review'}
+                    <h4 className="text-[12px] font-bold tracking-wide text-gray-700">
+                      {isEditingRating ? 'Update your review' : 'Write a review'}
                     </h4>
-                    {/* Star Picker */}
                     <div className="flex items-center gap-1">
                       {Array.from({ length: 5 }, (_, i) => {
                         const starValue = i + 1;
@@ -779,31 +763,30 @@ export default function DocumentDetailPage() {
                             onClick={() => setRatingValue(starValue)}
                             className="focus:outline-none transition-transform hover:scale-110"
                           >
-                            <span className={`material-symbols-outlined text-[28px] ${isHighlighted ? 'filled text-amber-500' : 'text-gray-300'}`}>
+                            <span className={`material-symbols-outlined text-[24px] ${isHighlighted ? 'filled text-gray-900' : 'text-gray-200'}`}>
                               star
                             </span>
                           </button>
                         );
                       })}
                     </div>
-                    {/* Comment Input */}
                     <div>
                       <textarea
                         value={ratingComment}
                         onChange={(e) => setRatingComment(e.target.value)}
-                        placeholder="Write a short review (max 500 characters)..."
+                        placeholder="Share your thoughts on this document..."
                         maxLength={500}
                         rows={3}
-                        className="w-full rounded-xl border border-gray-300 p-3 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none bg-white"
+                        className="w-full rounded-md border border-gray-200 p-3 text-[13px] focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none resize-none bg-white transition-all"
                       />
                     </div>
                     <div className="flex gap-2">
                       <button
                         type="submit"
                         disabled={isSubmittingRating || ratingValue === 0}
-                        className="flex-1 max-w-[150px] rounded-lg bg-[#1a1c23] hover:bg-black text-white text-xs font-semibold py-2 px-3 shadow transition-colors disabled:opacity-50"
+                        className="rounded-md bg-gray-900 hover:bg-black text-white text-[13px] font-medium py-1.5 px-4 transition-colors disabled:opacity-50"
                       >
-                        {isSubmittingRating ? 'Submitting...' : 'Submit review'}
+                        {isSubmittingRating ? 'Saving...' : 'Submit'}
                       </button>
                       {isEditingRating && (
                         <button
@@ -813,7 +796,7 @@ export default function DocumentDetailPage() {
                             setRatingValue(myRating?.rating || 0);
                             setRatingComment(myRating?.comment || '');
                           }}
-                          className="rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-semibold py-2 px-3 transition-colors"
+                          className="rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700 text-[13px] font-medium py-1.5 px-4 transition-colors"
                         >
                           Cancel
                         </button>
@@ -825,189 +808,155 @@ export default function DocumentDetailPage() {
             )}
 
             {/* Other reviews list */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-700 border-b border-gray-100 pb-2">
-                Recent reviews ({ratings?.length || 0})
+            <div>
+              <h4 className="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-4">
+                Recent Reviews ({ratings?.length || 0})
               </h4>
               {ratings && ratings.length > 0 ? (
-                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
-                  {/* Sort by createdAt descending and take 5 most recent */}
+                <div className="space-y-5 max-h-[400px] overflow-y-auto pr-2">
                   {[...ratings]
                     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                     .slice(0, 5)
                     .map((review: any) => (
-                      <div key={review.id} className="text-sm border-b border-gray-50 pb-3 last:border-b-0 last:pb-0">
-                        <div className="flex items-center justify-between mb-1">
+                      <div key={review.id} className="text-[13px] border-b border-gray-100 pb-4 last:border-b-0 last:pb-0">
+                        <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
                             {review.user?.avatarUrl ? (
-                              <img
-                                src={review.user.avatarUrl}
-                                alt={review.user.fullName || 'User'}
-                                className="h-5 w-5 rounded-full object-cover"
-                              />
+                              <img src={review.user.avatarUrl} alt="Avatar" className="h-5 w-5 rounded-full object-cover border border-gray-200" />
                             ) : (
-                              <span className="material-symbols-outlined text-[18px] text-gray-400">
-                                account_circle
-                              </span>
+                              <div className="h-5 w-5 rounded-full bg-gray-100 flex items-center justify-center border border-gray-200">
+                                <span className="material-symbols-outlined text-[12px] text-gray-400">person</span>
+                              </div>
                             )}
-                            <span className="font-semibold text-gray-800">
-                              {review.user?.fullName || 'User'}
+                            <span className="font-semibold text-gray-900 tracking-tight">
+                              {review.user?.fullName || 'Anonymous User'}
                             </span>
                           </div>
-                          <span className="text-[10px] text-gray-400">
+                          <span className="text-[11px] font-medium text-gray-400">
                             {formatDate(review.createdAt)}
                           </span>
                         </div>
-                        <div className="flex mb-1">
+                        <div className="flex gap-0.5 mb-1.5 pl-7">
                           {Array.from({ length: 5 }, (_, i) => (
-                            <span key={i} className={`material-symbols-outlined text-[14px] ${i < review.rating ? 'filled text-amber-500' : 'text-gray-300'}`}>
+                            <span key={i} className={`material-symbols-outlined text-[12px] ${i < review.rating ? 'filled text-gray-900' : 'text-gray-200'}`}>
                               star
                             </span>
                           ))}
                         </div>
-                        {review.comment ? (
-                          <p className="text-gray-600 text-xs whitespace-pre-wrap">
-                            {review.comment}
-                          </p>
-                        ) : (
-                          <p className="text-gray-400 italic text-[11px]">No comment.</p>
+                        {review.comment && (
+                          <p className="text-gray-600 pl-7">{review.comment}</p>
                         )}
                       </div>
                     ))}
                 </div>
               ) : (
-                <p className="text-xs text-gray-400 italic text-center py-4">
-                  No reviews yet for this document.
-                </p>
+                <p className="text-[13px] text-gray-400 italic">No reviews yet.</p>
               )}
             </div>
           </div>
         </div>
 
         {/* Right Column (Sidebar) */}
-        <div className="flex flex-col gap-6">
-          {/* Copyright Section */}
-          {document.isOwner && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px]">copyright</span>
-                Copyright & Source Material
-              </h3>
+        <div className="flex flex-col gap-6 lg:col-span-4">
 
-              {!document.copyrightSourceType ? (
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm text-gray-600">
-                    You need to cite the source before sharing the document.
-                  </p>
-                  <button
-                    onClick={handleOpenCopyrightModal}
-                    className="flex items-center justify-center gap-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 text-sm font-semibold hover:bg-blue-100 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                    Declare source
-                  </button>
-                </div>
-              ) : (document.copyrightSourceType === 'THIRD_PARTY' || document.copyrightSourceType === 'UNKNOWN') ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start gap-2 text-red-700 bg-red-50 p-3 rounded-xl border border-red-200">
-                    <span className="material-symbols-outlined text-[18px] shrink-0">warning</span>
-                    <p className="text-sm font-medium">
-                      This document can only be saved privately and cannot be shared yet.
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleOpenCopyrightModal}
-                    className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">update</span>
-                    Update source
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start gap-2 text-emerald-700 bg-emerald-50 p-3 rounded-xl border border-emerald-200">
-                    <span className="material-symbols-outlined text-[18px] shrink-0">check_circle</span>
-                    <div className="text-sm">
-                      <p className="font-bold">Copyright information is valid.</p>
-                      <p className="text-emerald-600 mt-0.5">
-                        Loại nguồn:{' '}
-                        {document.copyrightSourceType === 'OWN_ORIGINAL' ? 'Tự biên soạn' : document.copyrightSourceType === 'OPEN_LICENSE' ? 'Nguồn mở' : document.copyrightSourceType === 'AUTHORIZED' ? 'Có quyền sử dụng' : 'Tài liệu chính thức FPT'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleOpenCopyrightModal}
-                    className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">edit</span>
-                    Chỉnh sửa
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Action Card (Premium Dark UI) */}
+          <div className="rounded-xl bg-gray-950 p-6 text-white shadow-lg relative overflow-hidden border border-gray-800">
+            {isAnalyzing && (
+              <div className="absolute inset-0 bg-gray-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-10 transition-all">
+                <span className="material-symbols-outlined text-4xl text-white animate-spin mb-3">
+                  sync
+                </span>
+                <h4 className="text-[14px] font-semibold tracking-tight text-white mb-1">AI Processing...</h4>
+                <p className="text-[12px] text-gray-400">Generating insights and quizzes.</p>
+              </div>
+            )}
 
-          {/* Actions Card */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
-              Document Actions
+            <h3 className="mb-2 text-[15px] font-semibold tracking-tight">AI Assistant</h3>
+            <p className="mb-6 text-[12px] text-gray-400 leading-relaxed">
+              Unlock the full potential of this document with AI generated insights and study materials.
+            </p>
+
+            {document.isAIGenerated ? (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-gray-800 bg-gray-900/50 p-4 text-center">
+                <span className="material-symbols-outlined text-2xl text-white mb-2">
+                  check_circle
+                </span>
+                <p className="text-[13px] font-medium text-white tracking-tight">Processed Successfully</p>
+                <p className="text-[11px] text-gray-500 mt-1 uppercase tracking-widest">Assets Ready</p>
+              </div>
+            ) : document.isOwner !== false ? (
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing || document.extractionStatus === 'UNSUPPORTED'}
+                  title={document.extractionStatus === 'UNSUPPORTED' ? 'Unsupported format' : ''}
+                  className="flex items-center justify-between rounded-md bg-white px-4 py-2.5 text-[13px] font-semibold text-black transition-colors hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed w-full shadow-sm"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                    Generate AI
+                  </span>
+                  <span className="material-symbols-outlined text-[16px] opacity-50">arrow_forward</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-gray-800 bg-gray-900/50 p-4 text-center">
+                <span className="material-symbols-outlined text-2xl text-gray-500 mb-2">lock</span>
+                <p className="text-[13px] font-medium text-gray-300">Read Only Access</p>
+                <p className="text-[11px] text-gray-500 mt-1">AI generation disabled for guests.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Document Actions Card */}
+          <div className="rounded-xl border border-gray-200/80 bg-white p-5 shadow-sm">
+            <h3 className="mb-4 text-[10px] font-bold tracking-widest text-gray-400 uppercase">
+              Manage Document
             </h3>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2.5">
               {document.deletionStatus !== 'ACTIVE' ? (
-                <p className="text-sm text-gray-500">This document is no longer available for this action.</p>
+                <p className="text-[13px] text-gray-500">Not available.</p>
               ) : document.isOwner === false ? (
-                <p className="text-sm text-gray-500">You do not have permission to perform actions on this document.</p>
+                <p className="text-[13px] text-gray-500">You are viewing a public document.</p>
               ) : (
                 <>
                   <Link
                     href={`/dashboard/documents/${document.id}/preview`}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-md border border-gray-200/80 bg-white px-3 py-2 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
                   >
-                    <span className="material-symbols-outlined text-[18px]">preview</span>
-                    Preview PDF
+                    <span className="material-symbols-outlined text-[16px]">preview</span>
+                    Preview Document
                   </Link>
 
                   <button
                     onClick={handleOpenOriginal}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-md border border-gray-200/80 bg-white px-3 py-2 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
                   >
-                    <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-                    Download / Open Original
+                    <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                    Open Original URL
                   </button>
                   <button
                     onClick={handleDownload}
                     disabled={isDownloading}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-md bg-gray-900 px-3 py-2 text-[13px] font-medium text-white transition-colors hover:bg-black disabled:opacity-50"
                   >
-                    <span className="material-symbols-outlined text-[18px]">download</span>
-                    {isDownloading ? 'Downloading...' : 'Download'}
+                    <span className="material-symbols-outlined text-[16px]">download</span>
+                    {isDownloading ? 'Downloading...' : 'Download File'}
                   </button>
 
-                  {/* {document.isOwner && (
-                    <button
-                      onClick={handleAnalyze}
-                      disabled={isAnalyzing || document.extractionStatus === 'UNSUPPORTED'}
-                      title={document.extractionStatus === 'UNSUPPORTED' ? 'AI Analysis not supported for this file format' : ''}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-                      {isAnalyzing ? 'Analyzing AI...' : 'Analyze with AI'}
-                    </button>
-                  )} */}
+                  <div className="my-2 border-t border-gray-100"></div>
 
-                  {/* System Info Card */}
                   {document.isOwner && (
-                    <div className="border-gray-100 pt-3">
-                      <button
-                        onClick={() => setIsDeleteModalOpen(true)}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
-                      >
-                        Delete Document
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setIsDeleteModalOpen(true)}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-red-200/60 bg-white px-3 py-2 text-[13px] font-medium text-red-600 transition-colors hover:bg-red-50"
+                    >
+                      Delete Document
+                    </button>
                   )}
 
+                  {/* Public Request Logic */}
                   {document.visibilityStatus === 'PRIVATE' && (
                     <div className="mt-2 border-t border-gray-100 pt-3">
                       {document.rejectReason && (
@@ -1028,55 +977,55 @@ export default function DocumentDetailPage() {
                       )}
 
                       {!document.canRequestPublic ? (
-                        <div className="group relative">
-                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
-                            <span className="material-symbols-outlined text-[18px]">public</span> {publishCtaText}
+                        <div className="group relative text-center">
+                          <button disabled className="flex w-full items-center justify-center gap-1.5 rounded-md bg-gray-100 px-3 py-2 text-[13px] font-medium text-gray-400 opacity-70">
+                            <span className="material-symbols-outlined text-[16px]">public</span> {publishCtaText}
                           </button>
-                          <p className="mt-1.5 text-xs text-red-500 text-center">
+                          <p className="mt-2 text-[11px] text-gray-500 px-2 leading-relaxed">
                             {document.publicationEligibilityReason === 'AI_ANALYSIS_UNSUPPORTED'
-                              ? 'File này chỉ được lưu trữ riêng tư và không thể chia sẻ.'
+                              ? 'This format cannot be shared.'
                               : document.publicationEligibilityReason === 'AI_ANALYSIS_PROCESSING'
-                                ? 'AI Analyze đang xử lý...'
+                                ? 'AI Analysis is processing...'
                                 : document.publicationEligibilityReason === 'AI_ANALYSIS_FAILED'
-                                  ? 'AI Analyze thất bại. Vui lòng thử lại.'
+                                  ? 'AI analysis failed.'
                                   : document.publicationEligibilityReason === 'AI_ANALYSIS_REQUIRED'
-                                    ? 'Hãy chạy AI Analyze trước khi chia sẻ tài liệu.'
+                                    ? 'Requires AI Analysis before sharing.'
                                     : document.publicationEligibilityReason === 'COPYRIGHT_SHARING_NOT_ALLOWED'
-                                      ? 'Nguồn gốc tài liệu này không được phép chia sẻ.'
+                                      ? 'Copyright prevents sharing.'
                                       : document.publicationEligibilityReason === 'COPYRIGHT_DECLARATION_REQUIRED' || document.publicationEligibilityReason === 'COPYRIGHT_METADATA_INCOMPLETE'
-                                        ? 'Vui lòng khai báo bản quyền để chia sẻ.'
-                                        : 'Tài liệu cần hoàn tất AI Analyze và Khai báo bản quyền trước khi chia sẻ.'}
+                                        ? 'Missing copyright declaration.'
+                                        : 'Requires AI analysis & copyright.'}
                           </p>
                           {(document.publicationEligibilityReason === 'COPYRIGHT_DECLARATION_REQUIRED' || document.publicationEligibilityReason === 'COPYRIGHT_METADATA_INCOMPLETE') && (
                             <button
                               onClick={handleOpenCopyrightModal}
-                              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-md bg-gray-900 text-white px-3 py-2 text-[12px] font-medium hover:bg-black transition-colors"
                             >
-                              <span className="material-symbols-outlined text-[18px]">copyright</span>
-                              Khai báo nguồn / Bản quyền
+                              <span className="material-symbols-outlined text-[16px]">copyright</span>
+                              Declare Source Now
                             </button>
                           )}
                         </div>
                       ) : !document.subject ? (
-                        <div className="group relative">
-                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
-                            <span className="material-symbols-outlined text-[18px]">public</span> {publishCtaText}
+                        <div className="text-center">
+                          <button disabled className="flex w-full items-center justify-center gap-1.5 rounded-md bg-gray-100 px-3 py-2 text-[13px] font-medium text-gray-400 opacity-70">
+                            <span className="material-symbols-outlined text-[16px]">public</span> {publishCtaText}
                           </button>
-                          <p className="mt-1.5 text-xs text-gray-500 text-center">Checking subject eligibility.</p>
+                          <p className="mt-2 text-[11px] text-gray-500">Checking subject eligibility.</p>
                         </div>
                       ) : !document.subject.isSystem ? (
-                        <div className="group relative">
-                          <button disabled className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 opacity-60">
-                            <span className="material-symbols-outlined text-[18px]">public</span> {publishCtaText}
+                        <div className="text-center">
+                          <button disabled className="flex w-full items-center justify-center gap-1.5 rounded-md bg-gray-100 px-3 py-2 text-[13px] font-medium text-gray-400 opacity-70">
+                            <span className="material-symbols-outlined text-[16px]">public</span> {publishCtaText}
                           </button>
-                          <p className="mt-1.5 text-xs text-red-500 text-center">Only System Subjects can be submitted for public review.</p>
+                          <p className="mt-2 text-[11px] text-gray-500">Only System Subjects can be published.</p>
                         </div>
                       ) : (
                         <button
                           onClick={handleRequestPublic}
-                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black"
+                          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-gray-900 bg-white px-3 py-2 text-[13px] font-medium text-gray-900 transition-colors hover:bg-gray-50"
                         >
-                          <span className="material-symbols-outlined text-[18px]">public</span>
+                          <span className="material-symbols-outlined text-[16px]">public</span>
                           {publishCtaText}
                         </button>
                       )}
@@ -1084,12 +1033,12 @@ export default function DocumentDetailPage() {
                   )}
 
                   {document.visibilityStatus === 'PUBLIC' && (
-                    <div className="mt-2 border-t border-gray-100 pt-3">
+                    <div className="mt-1">
                       <button
                         onClick={() => setIsWithdrawModalOpen(true)}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-amber-200/60 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-700 transition-colors hover:bg-amber-100"
                       >
-                        <span className="material-symbols-outlined text-[18px]">public_off</span>
+                        <span className="material-symbols-outlined text-[16px]">public_off</span>
                         Withdraw from Explore
                       </button>
                     </div>
@@ -1098,98 +1047,91 @@ export default function DocumentDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Copyright Section (Owner Only) */}
+          {document.isOwner && (
+            <div className="rounded-xl border border-gray-200/80 bg-white p-5 shadow-sm">
+              <h3 className="mb-4 text-[10px] font-bold tracking-widest text-gray-400 uppercase flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">copyright</span>
+                Copyright Status
+              </h3>
+
+              {!document.copyrightSourceType ? (
+                <div className="flex flex-col gap-3">
+                  <p className="text-[12.5px] text-gray-500 leading-relaxed">
+                    Declaration required before sharing publicly.
+                  </p>
+                  <button
+                    onClick={handleOpenCopyrightModal}
+                    className="flex items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add</span>
+                    Declare Source
+                  </button>
+                </div>
+              ) : (document.copyrightSourceType === 'UNKNOWN') ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2 rounded-md bg-gray-50 p-3 border border-gray-200/80">
+                    <span className="material-symbols-outlined text-[16px] text-gray-400 shrink-0">lock</span>
+                    <p className="text-[12px] text-gray-600">
+                      Private document. Update source to share.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleOpenCopyrightModal}
+                    className="flex items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                    Update Source
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2 rounded-md bg-gray-50 p-3 border border-gray-200/80">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600 shrink-0">check_circle</span>
+                    <div className="text-[12px]">
+                      <p className="font-semibold text-gray-900">Valid Declaration</p>
+                      <p className="text-gray-500 mt-0.5">
+                        {document.copyrightSourceType === 'OWN_ORIGINAL' ? 'Self-compiled' : 'Open source'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleOpenCopyrightModal}
+                    className="flex items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                    Edit details
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Tags Card */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-bold tracking-wider text-gray-500 uppercase">
-              Study Tags
+          <div className="rounded-xl border border-gray-200/80 bg-white p-5 shadow-sm">
+            <h3 className="mb-4 text-[10px] font-bold tracking-widest text-gray-400 uppercase">
+              Tags
             </h3>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {document.tags && document.tags.length > 0 ? (
                 document.tags.map((t: any) => (
                   <span
                     key={t.id}
-                    className="inline-flex items-center rounded-full bg-[#1a1c23] px-3 py-1 text-xs font-medium text-white"
+                    className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-700 border border-gray-200/50"
                   >
                     {t.name}
                   </span>
                 ))
               ) : (
-                <span className="text-sm text-gray-500 italic">No tags</span>
+                <span className="text-[12.5px] text-gray-400 italic">No tags</span>
               )}
             </div>
           </div>
-
-          {/* Action Card matching "AI Assistant" dark styling */}
-          <div className="rounded-2xl bg-[#1a1c23] p-6 text-white shadow-md relative overflow-hidden">
-            {isAnalyzing && (
-              <div className="absolute inset-0 bg-[#1a1c23]/95 flex flex-col items-center justify-center p-6 text-center z-10">
-                <span className="material-symbols-outlined text-5xl text-blue-400 animate-pulse mb-3">
-                  psychology
-                </span>
-                <h4 className="text-lg font-bold mb-1">AI Document Analysis</h4>
-                <p className="text-xs text-gray-400 mb-4">
-                  Processing content & generating questions...
-                </p>
-                <div className="flex items-center gap-2 text-sm text-gray-300">
-                  <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
-                  <span>Please wait (15-30 seconds)</span>
-                </div>
-              </div>
-            )}
-
-            <h3 className="mb-2 text-xl font-bold">Document Actions</h3>
-            <p className="mb-6 text-sm text-gray-400">
-              What would you like to do with this document today?
-            </p>
-
-            {document.isAIGenerated ? (
-              <div className="flex flex-col items-center justify-center py-4 text-center">
-                <span className="material-symbols-outlined text-4xl text-emerald-400 mb-2">
-                  check_circle
-                </span>
-                <p className="text-sm font-semibold text-gray-200">
-                  Document successfully processed
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Summary and Quiz are ready
-                </p>
-              </div>
-            ) : document.isOwner !== false ? (
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing || document.extractionStatus === 'UNSUPPORTED'}
-                  title={document.extractionStatus === 'UNSUPPORTED' ? 'AI Analysis not supported for this file format' : ''}
-                  className="flex items-center justify-between rounded-xl bg-[#2a2c35] px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed w-full"
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[18px] text-blue-400">auto_awesome</span>
-                    Generate Quiz and Summary
-                  </span>
-                  <span className="material-symbols-outlined text-[18px] text-gray-400">
-                    chevron_right
-                  </span>
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-4 text-center">
-                <span className="material-symbols-outlined text-4xl text-gray-400 mb-2">
-                  lock
-                </span>
-                <p className="text-sm font-semibold text-gray-200">
-                  Followed Document
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  AI Quiz and Summary are not available.
-                </p>
-              </div>
-            )}
-          </div>
-
-
         </div>
       </div>
 
+      {/* Delete Modal */}
       <DeleteDocumentModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
@@ -1215,108 +1157,91 @@ export default function DocumentDetailPage() {
         }}
       />
 
+      {/* Withdraw Modal */}
       {isWithdrawModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-xl font-bold text-gray-900">Withdraw from Explore</h3>
-            <p className="mb-6 text-sm text-gray-500">
-              Are you sure you want to withdraw this document from Explore? It will return to PRIVATE status.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl animate-in zoom-in-95 duration-200">
+            <h3 className="mb-2 text-[16px] font-semibold tracking-tight text-gray-900">Withdraw Document</h3>
+            <p className="mb-6 text-[13px] text-gray-500 leading-relaxed">
+              Remove this document from Explore? It will return to PRIVATE status.
             </p>
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-2">
               <button
                 onClick={() => setIsWithdrawModalOpen(false)}
                 disabled={isWithdrawing}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                className="rounded-md px-3 py-1.5 text-[13px] font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleWithdrawPublic}
                 disabled={isWithdrawing}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                className="rounded-md bg-red-600 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-red-700 disabled:opacity-50 shadow-sm transition-colors"
               >
-                {isWithdrawing ? 'Processing...' : 'Confirm'}
+                {isWithdrawing ? 'Processing...' : 'Withdraw'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Report Modal Popup */}
+      {/* Report Modal */}
       {isReportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-2 text-red-600 mb-3">
-              <span className="material-symbols-outlined text-2xl">report</span>
-              <h3 className="text-xl font-bold text-gray-900">Report Document</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl border border-gray-200 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-2 text-red-600 mb-2">
+              <span className="material-symbols-outlined text-[20px]">report</span>
+              <h3 className="text-[15px] font-semibold tracking-tight text-gray-900">Report Document</h3>
             </div>
-
-            <p className="mb-4 text-xs text-gray-500">
-              Please select the reason for reporting this document. Accurate reports help build a healthy learning community.
+            <p className="mb-5 text-[12px] text-gray-500">
+              Help us keep the community clean. Select a reason below.
             </p>
-
             <form onSubmit={handleSubmitReport} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Reason for report
-                </label>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Reason</label>
                 <select
                   value={reportReason}
                   onChange={(e) => setReportReason(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                  className="w-full rounded-md border border-gray-200 p-2 text-[13px] focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none bg-white"
                 >
                   <option value="INCORRECT_CONTENT">Incorrect content / Misinformation</option>
                   <option value="WRONG_SUBJECT">Wrong subject</option>
                   <option value="OUTDATED_SYLLABUS">Outdated syllabus</option>
                   <option value="DUPLICATED_DOCUMENT">Duplicate document</option>
-                  <option value="FILE_ERROR">File error (cannot open, blurry, etc.)</option>
+                  <option value="FILE_ERROR">File error</option>
                   <option value="LOW_QUALITY">Low quality</option>
-                  <option value="SPAM">Spam / Advertising</option>
+                  <option value="SPAM">Spam</option>
                   <option value="COPYRIGHT_VIOLATION">Copyright violation</option>
                   <option value="INAPPROPRIATE_CONTENT">Inappropriate content</option>
                   <option value="OTHER">Other</option>
                 </select>
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Detailed description (optional)
-                </label>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Details (Optional)</label>
                 <textarea
                   value={reportDescription}
                   onChange={(e) => setReportDescription(e.target.value)}
-                  placeholder="Describe the issue in detail (max 500 characters)..."
+                  placeholder="Additional information..."
                   maxLength={500}
-                  rows={4}
-                  className="w-full rounded-xl border border-gray-300 p-3 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+                  rows={3}
+                  className="w-full rounded-md border border-gray-200 p-2.5 text-[13px] focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none resize-none"
                 />
               </div>
-
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsReportModalOpen(false);
-                    setReportDescription('');
-                  }}
+                  onClick={() => { setIsReportModalOpen(false); setReportDescription(''); }}
                   disabled={isSubmittingReport}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                  className="rounded-md px-3 py-1.5 text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingReport}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors shadow disabled:opacity-50 flex items-center gap-1.5"
+                  className="rounded-md bg-gray-900 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-black transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {isSubmittingReport ? (
-                    <>
-                      <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
-                      Submitting...
-                    </>
-                  ) : (
-                    'Submit Report'
-                  )}
+                  {isSubmittingReport ? 'Submitting...' : 'Submit'}
                 </button>
               </div>
             </form>
@@ -1326,128 +1251,57 @@ export default function DocumentDetailPage() {
 
       {/* Copyright Modal */}
       {document.isOwner && isCopyrightModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-0">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => !isSubmittingCopyright && setIsCopyrightModalOpen(false)} />
-          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8 animate-in zoom-in-95 duration-200">
-            <div className="mb-6 flex items-center gap-3 text-blue-600">
-              <span className="material-symbols-outlined text-2xl">copyright</span>
-              <h3 className="text-xl font-bold text-gray-900">Khai báo bản quyền</h3>
+          <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="mb-5 flex items-center gap-2 text-gray-900 border-b border-gray-100 pb-3">
+              <span className="material-symbols-outlined text-[20px]">copyright</span>
+              <h3 className="text-[15px] font-semibold tracking-tight">Copyright Declaration</h3>
             </div>
-
-            <p className="mb-4 text-xs text-gray-500">
-              Để chia sẻ tài liệu, bạn cần khai báo nguồn gốc và quyền sử dụng theo chính sách của AI Study Hub.
-            </p>
-
             <form onSubmit={handleSubmitCopyright} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Nguồn tài liệu
-                </label>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Source Type</label>
                 <select
                   value={copyrightSourceType}
                   onChange={(e) => setCopyrightSourceType(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                  className="w-full rounded-md border border-gray-200 p-2.5 text-[13px] focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none bg-white"
                 >
-                  <option value="UNKNOWN">Chưa xác định</option>
-                  <option value="OWN_ORIGINAL">Tự biên soạn (Do chính bạn tạo ra)</option>
-                  <option value="OPEN_LICENSE">Nguồn mở (Open License / Creative Commons)</option>
-                  <option value="AUTHORIZED">Có quyền sử dụng (Được cấp quyền)</option>
-                  <option value="FPT_OFFICIAL">Tài liệu chính thức FPT</option>
-                  <option value="THIRD_PARTY">Nội dung bên thứ ba (Không có quyền chia sẻ)</option>
+                  <option value="UNKNOWN">Unknown source</option>
+                  <option value="OWN_ORIGINAL">My original document</option>
+                  <option value="OPEN_LICENSE">Open license document</option>
                 </select>
               </div>
-
               {copyrightSourceType === 'OWN_ORIGINAL' && (
-                <div className="rounded border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
-                  Bạn xác nhận mình là tác giả duy nhất của tài liệu này và có toàn quyền chia sẻ nó.
+                <div className="rounded-md border border-gray-200 bg-gray-50 p-2.5 text-[12px] text-gray-600 italic">
+                  I confirm this document was authored by me.
                 </div>
               )}
-
-              {(copyrightSourceType === 'OPEN_LICENSE' || copyrightSourceType === 'FPT_OFFICIAL') && (
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                    URL Nguồn gốc (Bắt buộc)
-                  </label>
-                  <input
-                    type="url"
-                    value={copyrightSourceUrl}
-                    onChange={(e) => setCopyrightSourceUrl(e.target.value)}
-                    required
-                    placeholder="https://..."
-                    className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
-                  />
-                </div>
-              )}
-
               {copyrightSourceType === 'OPEN_LICENSE' && (
                 <>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                      Giấy phép (Bắt buộc)
-                    </label>
-                    <input
-                      type="text"
-                      value={copyrightLicense}
-                      onChange={(e) => setCopyrightLicense(e.target.value)}
-                      required
-                      placeholder="VD: CC BY 4.0, MIT, GPL..."
-                      className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
-                    />
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Source URL</label>
+                    <input type="url" value={copyrightSourceUrl} onChange={(e) => setCopyrightSourceUrl(e.target.value)} required placeholder="https://..." className="w-full rounded-md border border-gray-200 p-2.5 text-[13px] focus:border-gray-900 outline-none" />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                      Ghi công tác giả (Bắt buộc)
-                    </label>
-                    <input
-                      type="text"
-                      value={copyrightAttribution}
-                      onChange={(e) => setCopyrightAttribution(e.target.value)}
-                      required
-                      placeholder="Tên tác giả gốc..."
-                      className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">License</label>
+                      <input type="text" value={copyrightLicense} onChange={(e) => setCopyrightLicense(e.target.value)} required placeholder="MIT, CC BY..." className="w-full rounded-md border border-gray-200 p-2.5 text-[13px] focus:border-gray-900 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Author</label>
+                      <input type="text" value={copyrightAttribution} onChange={(e) => setCopyrightAttribution(e.target.value)} required placeholder="Name..." className="w-full rounded-md border border-gray-200 p-2.5 text-[13px] focus:border-gray-900 outline-none" />
+                    </div>
                   </div>
                 </>
               )}
-
-              {(copyrightSourceType === 'AUTHORIZED' || copyrightSourceType === 'FPT_OFFICIAL') && (
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                    Minh chứng quyền sử dụng {copyrightSourceType === 'AUTHORIZED' ? '(Bắt buộc)' : '(Nếu không có URL)'}
-                  </label>
-                  <input
-                    type="text"
-                    value={copyrightPermissionReference}
-                    onChange={(e) => setCopyrightPermissionReference(e.target.value)}
-                    required={copyrightSourceType === 'AUTHORIZED'}
-                    placeholder="Tham chiếu email, văn bản cấp quyền..."
-                    className="w-full rounded-xl border border-gray-300 p-2.5 text-sm focus:border-blue-500 outline-none"
-                  />
+              {copyrightSourceType === 'UNKNOWN' && (
+                <div className="rounded-md border border-gray-200 bg-gray-50 p-2.5 text-[12px] text-gray-600 italic">
+                  Cannot be shared publicly.
                 </div>
               )}
-
-              {(copyrightSourceType === 'UNKNOWN' || copyrightSourceType === 'THIRD_PARTY') && (
-                <div className="rounded border border-red-100 bg-red-50 p-3 text-xs text-red-800">
-                  Tài liệu có nguồn gốc chưa xác định hoặc thuộc bên thứ ba sẽ không được phép chia sẻ công khai trên hệ thống.
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCopyrightModalOpen(false)}
-                  disabled={isSubmittingCopyright}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingCopyright || copyrightSourceType === 'UNKNOWN' || copyrightSourceType === 'THIRD_PARTY'}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {isSubmittingCopyright ? 'Đang lưu...' : 'Lưu khai báo'}
-                </button>
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                <button type="button" onClick={() => setIsCopyrightModalOpen(false)} disabled={isSubmittingCopyright} className="rounded-md px-3 py-1.5 text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50">Cancel</button>
+                <button type="submit" disabled={isSubmittingCopyright} className="rounded-md bg-gray-900 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-black transition-colors shadow-sm disabled:opacity-50">{isSubmittingCopyright ? 'Saving...' : 'Save'}</button>
               </div>
             </form>
           </div>
@@ -1460,42 +1314,15 @@ export default function DocumentDetailPage() {
 }
 
 type ToastVariant = 'success' | 'error' | 'info';
-
-interface Toast {
-  id: number;
-  message: string;
-  variant: ToastVariant;
-}
-
+interface Toast { id: number; message: string; variant: ToastVariant; }
 function ToastNotification({ toasts }: { toasts: Toast[] }) {
   return (
     <div className="pointer-events-none fixed right-6 bottom-6 z-[110] flex flex-col gap-2">
       {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${t.variant === 'success'
-            ? 'bg-emerald-600'
-            : t.variant === 'error'
-              ? 'bg-red-600'
-              : 'bg-blue-600'
-            }`}
-        >
-          {t.variant === 'success' && (
-            <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          )}
-          {t.variant === 'error' && (
-            <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          )}
-          {t.variant === 'info' && (
-            <svg className="h-4.5 w-4.5 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          )}
+        <div key={t.id} className={`pointer-events-auto flex max-w-[320px] items-center gap-3 rounded-lg px-4 py-3 text-[13px] font-medium text-white shadow-lg transition-all duration-300 ${t.variant === 'success' ? 'bg-gray-900' : t.variant === 'error' ? 'bg-red-600' : 'bg-gray-700'}`}>
+          {t.variant === 'success' && <span className="material-symbols-outlined text-[18px]">check_circle</span>}
+          {t.variant === 'error' && <span className="material-symbols-outlined text-[18px]">error</span>}
+          {t.variant === 'info' && <span className="material-symbols-outlined text-[18px] animate-spin">sync</span>}
           {t.message}
         </div>
       ))}

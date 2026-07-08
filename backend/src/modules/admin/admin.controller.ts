@@ -157,4 +157,16 @@ export class AdminController {
   ) {
     return this.adminService.updateReport(reportId, adminId, dto);
   }
+
+  /**
+   * Hạ quyền và chặn Giảng viên vi phạm
+   * PATCH /api/admin/users/:userId/ban-teacher
+   */
+  @Patch('users/:userId/ban-teacher')
+  async banTeacher(
+    @Param('userId', new ParseUUIDPipe({ version: '4' })) userId: string,
+    @Body() body: { adminNote?: string },
+  ) {
+    return this.adminService.banTeacher(userId, body.adminNote);
+  }
 }

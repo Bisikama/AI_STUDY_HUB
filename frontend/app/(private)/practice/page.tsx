@@ -283,7 +283,7 @@ export default function PracticePage() {
 
       if (!response.ok) {
         const errData = await response.json();
-        throw new Error(errData.message || 'Yêu cầu phân tích thất bại');
+        throw new Error(errData.message || 'Analysis request failed');
       }
 
       await reloadAiCache();
@@ -316,9 +316,8 @@ export default function PracticePage() {
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${
-          mobileMenuOpen ? 'flex' : 'hidden'
-        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
+        className={`${mobileMenuOpen ? 'flex' : 'hidden'
+          } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
         <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
@@ -377,7 +376,7 @@ export default function PracticePage() {
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
-          
+
           <li>
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
@@ -521,8 +520,8 @@ export default function PracticePage() {
                       >
                         <div className="flex items-start justify-between">
                           <span className="bg-secondary-container text-on-secondary-container rounded px-2.5 py-1 text-xs font-semibold">
-                            {doc.subject?.code || 'Chung'} -{' '}
-                            {doc.subject?.name || 'Tài liệu học tập'}
+                            {doc.subject?.code || 'General'} -{' '}
+                            {doc.subject?.name || 'Study materials'}
                           </span>
                           <span className="material-symbols-outlined text-secondary opacity-0 transition-opacity group-hover:opacity-100">
                             arrow_forward
@@ -534,12 +533,12 @@ export default function PracticePage() {
                         <div className="text-on-surface-variant border-outline-variant/30 mt-auto flex items-center gap-4 border-t pt-2 text-xs">
                           <span className="flex items-center gap-1">
                             <span className="material-symbols-outlined text-sm">quiz</span>
-                            {doc.quizCount > 0 ? `${doc.quizCount} câu hỏi` : 'Chưa có câu hỏi'}
+                            {doc.quizCount > 0 ? `${doc.quizCount} questions` : 'No questions'}
                           </span>
                           <span className="bg-outline-variant h-1.5 w-1.5 rounded-full"></span>
                           <span className="flex items-center gap-1">
                             <span className="material-symbols-outlined text-sm">assignment</span>
-                            {doc.hasSummary ? 'Đã tóm tắt' : 'Chưa tóm tắt'}
+                            {doc.hasSummary ? 'Summarized' : 'Not summarized'}
                           </span>
                         </div>
                       </div>
@@ -549,7 +548,7 @@ export default function PracticePage() {
               </section>
 
               {/* Bento Row giống giao diện mẫu */}
-             
+
             </>
           ) : (
             /* =======================================================
@@ -571,7 +570,7 @@ export default function PracticePage() {
               {/* Header Info */}
               <div className="mb-6">
                 <span className="bg-secondary-container text-on-secondary-container mb-2 inline-block rounded px-2.5 py-1 text-xs font-semibold">
-                  {currentDoc?.subject?.code || 'Chung'} -{' '}
+                  {currentDoc?.subject?.code || 'General'} -{' '}
                   {currentDoc?.subject?.name || 'Study materials'}
                 </span>
                 <h1 className="text-primary text-xl leading-tight font-bold md:text-2xl">
@@ -601,7 +600,7 @@ export default function PracticePage() {
                   </p>
                   {analyzeError && (
                     <p className="text-error bg-error-container border-error/10 max-w-md rounded border p-2 text-xs">
-                      Lỗi: {analyzeError}
+                      Error: {analyzeError}
                     </p>
                   )}
                   <button
@@ -627,9 +626,8 @@ export default function PracticePage() {
                 <div className="flex flex-col items-center">
                   <div
                     onClick={() => setIsFlipped((prev) => !prev)}
-                    className={`group perspective-1000 relative h-[480px] w-full max-w-[700px] cursor-pointer ${
-                      isFlipped ? 'flashcard-flipped' : ''
-                    }`}
+                    className={`group perspective-1000 relative h-[480px] w-full max-w-[700px] cursor-pointer ${isFlipped ? 'flashcard-flipped' : ''
+                      }`}
                   >
                     <div className="flashcard-inner border-outline-variant relative h-full w-full rounded-xl border text-center shadow-[0px_4px_16px_rgba(0,0,0,0.06)]">
                       {/* Mặt Trước (Front Side): Câu hỏi + 4 đáp án A, B, C, D */}
@@ -692,7 +690,7 @@ export default function PracticePage() {
                             );
                           })()}
 
-                       
+
                         </div>
 
                         <div className="text-on-surface-variant absolute bottom-6 flex items-center gap-1.5 text-xs">

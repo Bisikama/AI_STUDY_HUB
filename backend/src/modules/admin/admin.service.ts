@@ -664,6 +664,7 @@ export class AdminService {
                   select: {
                     fullName: true,
                     email: true,
+                    role: true,
                   },
                 },
               },
@@ -816,15 +817,39 @@ export class AdminService {
 
         // 3. If resolved and documentStatus is provided
         if (dto.status === 'RESOLVED' && dto.documentStatus) {
-          await tx.document.update({
+          const doc = await tx.document.update({
             where: { id: report.documentId },
             data: {
               status: dto.documentStatus,
+            },
+            include: {
+              user: true,
             },
           });
 
           // If documentStatus is HIDDEN or REMOVED, auto resolve all other active reports
           if (dto.documentStatus === 'HIDDEN' || dto.documentStatus === 'REMOVED') {
+            // Auto ban/demote the teacher if banTeacher is true OR if it's set by default
+            const shouldBan = dto.banTeacher !== undefined ? dto.banTeacher : true;
+            if (shouldBan && doc.user.role === 'TEACHER') {
+              await tx.user.update({
+                where: { id: doc.uploadedBy },
+                data: {
+                  role: 'STUDENT',
+                  isTeacherBanned: true,
+                },
+              });
+
+              await tx.teacherVerification.updateMany({
+                where: { userId: doc.uploadedBy },
+                data: {
+                  status: 'REJECTED',
+                  adminNote:
+                    'Tự động bị hạ quyền và chặn đăng ký Giảng viên do vi phạm điều khoản (tài liệu bị báo cáo và gỡ bỏ).',
+                },
+              });
+            }
+
             await tx.documentReport.updateMany({
               where: {
                 documentId: report.documentId,
@@ -852,6 +877,49 @@ export class AdminService {
       if (error instanceof NotFoundException) throw error;
       console.error('Lỗi khi cập nhật báo cáo:', error);
       throw new InternalServerErrorException('Không thể cập nhật báo cáo');
+    }
+  }
+
+  async banTeacher(userId: string, adminNote?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng.');
+    }
+
+    if (user.role !== 'TEACHER') {
+      throw new BadRequestException('Người dùng này không có vai trò Giảng viên.');
+    }
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const updatedUser = await tx.user.update({
+          where: { id: userId },
+          data: {
+            role: 'STUDENT',
+            isTeacherBanned: true,
+          },
+        });
+
+        await tx.teacherVerification.updateMany({
+          where: { userId },
+          data: {
+            status: 'REJECTED',
+            adminNote:
+              adminNote?.trim() ||
+              'Bị quản trị viên hạ quyền thủ công và chặn nâng quyền Giảng viên.',
+          },
+        });
+
+        return updatedUser;
+      });
+
+      return this.sanitizeData(result);
+    } catch (error) {
+      console.error('Lỗi khi hạ quyền và chặn giảng viên:', error);
+      throw new InternalServerErrorException('Không thể hạ quyền và chặn giảng viên');
     }
   }
 }

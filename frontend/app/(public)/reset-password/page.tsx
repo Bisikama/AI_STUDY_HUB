@@ -10,13 +10,13 @@ import { toast } from 'sonner';
 
 const resetPasswordSchema = z
   .object({
-    email: z.string().min(1, 'Email không được để trống').email('Email không đúng định dạng'),
-    otp: z.string().length(6, 'Mã OTP phải có đúng 6 chữ số'),
-    password: z.string().min(6, 'Mật khẩu mới phải từ 6 ký tự trở lên'),
-    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu mới'),
+    email: z.string().min(1, 'Email cannot be empty').email('Invalid email format'),
+    otp: z.string().length(6, 'OTP must be exactly 6 digits'),
+    password: z.string().min(6, 'New password must be at least 6 characters'),
+    confirmPassword: z.string().min(1, 'Please confirm your new password'),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: 'Mật khẩu xác nhận không khớp!',
+    message: 'Passwords do not match!',
     path: ['confirmPassword'],
   });
 
@@ -55,11 +55,11 @@ function ResetPasswordForm() {
         otp: data.otp,
         password: data.password,
       });
-      toast.success('Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.');
+      toast.success('Password reset successful! Please log in with your new password.');
       router.push('/login');
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { message?: string } } };
-      const errorMsg = axiosError.response?.data?.message || 'Đã có lỗi xảy ra!';
+      const errorMsg = axiosError.response?.data?.message || 'An error occurred!';
       setApiError(errorMsg);
     } finally {
       setIsLoading(false);

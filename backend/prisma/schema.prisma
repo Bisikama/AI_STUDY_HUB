@@ -106,9 +106,6 @@ enum ReservationStatus {
 enum CopyrightSourceType {
   OWN_ORIGINAL
   OPEN_LICENSE
-  AUTHORIZED
-  FPT_OFFICIAL
-  THIRD_PARTY
   UNKNOWN
 }
 
@@ -123,6 +120,7 @@ model User {
   avatarUrl    String?  @map("avatar_url")
   role         UserRole @default(STUDENT)
   isActive     Boolean  @default(true) @map("is_active")
+  isTeacherBanned Boolean @default(false) @map("is_teacher_banned")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -160,7 +158,7 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
-/// Quản lý Yêu cầu xác thực Giảng viên
+/// Quản lý Yêu cầu Xác Thực Giảng Viên
 model TeacherVerification {
   id          String             @id @default(uuid()) @db.Uuid
   userId      String             @unique @map("user_id") @db.Uuid
