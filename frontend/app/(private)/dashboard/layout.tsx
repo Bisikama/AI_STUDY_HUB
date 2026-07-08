@@ -15,12 +15,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [search, setSearch] = useState('');
   const [userFullName, setUserFullName] = useState('User');
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser && storedUser !== 'undefined') {
       try {
         const userObj = JSON.parse(storedUser);
+        setUser(userObj);
         if (userObj && userObj.fullName) {
           setUserFullName(userObj.fullName);
         }
@@ -172,7 +174,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="relative">
                 <button
                   onClick={() => setShowAvatarDropdown(!showAvatarDropdown)}
-                  className="border-outline-variant hover:border-primary focus:ring-primary flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border transition-colors focus:ring-2 focus:ring-offset-2"
+                  className={`border-outline-variant hover:border-primary focus:ring-primary flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border transition-colors focus:ring-2 focus:ring-offset-2 ${
+                    user?.role === 'TEACHER'
+                      ? 'ring-2 ring-emerald-500 ring-offset-1 border-transparent'
+                      : user?.role === 'ADMIN'
+                      ? 'ring-2 ring-blue-600 ring-offset-1 border-transparent'
+                      : ''
+                  }`}
                 >
                   <img
                     alt="User profile avatar"
@@ -193,16 +201,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           {userFullName}
                         </p>
                       </div>
-                      <button
-                        className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
-                        onClick={() => {
-                          setShowAvatarDropdown(false);
-                          setShowVerificationModal(true);
-                        }}
-                      >
-                        <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
-                        Instructor Verification
-                      </button>
+                      {user?.role !== 'TEACHER' && user?.role !== 'ADMIN' && (
+                        <button
+                          className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
+                          onClick={() => {
+                            setShowAvatarDropdown(false);
+                            setShowVerificationModal(true);
+                          }}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
+                          Instructor Verification
+                        </button>
+                      )}
                       <hr className="border-outline-variant my-1" />
                       <button
                         onClick={handleLogout}

@@ -37,7 +37,14 @@ export class DashboardService {
   async getDashboardData(userId: string) {
     // 1. Recently Viewed: Top 4 documents viewed by the user
     const recentlyViewedRecords = await this.prisma.userDocumentView.findMany({
-      where: { userId },
+      where: {
+        userId,
+        document: {
+          status: 'ACTIVE',
+          deletionStatus: 'ACTIVE',
+          deletedAt: null,
+        },
+      },
       orderBy: { viewedAt: 'desc' },
       take: 12,
       include: {
