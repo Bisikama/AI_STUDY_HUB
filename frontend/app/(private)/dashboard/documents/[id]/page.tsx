@@ -453,6 +453,18 @@ export default function DocumentDetailPage() {
         </div>
       )}
 
+      {(document.status === 'HIDDEN' || document.status === 'REMOVED') && (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50/50 p-4 text-rose-800 shadow-sm">
+          <span className="material-symbols-outlined text-rose-600 shrink-0 mt-0.5 text-[20px]">block</span>
+          <div>
+            <h4 className="text-[13px] font-semibold text-rose-900 tracking-tight">Tài liệu đã bị ẩn hoặc gỡ bỏ bởi Admin</h4>
+            <p className="text-[12.5px] text-rose-700/90 mt-0.5 leading-relaxed">
+              Tài liệu này đã bị gỡ bỏ khỏi chế độ tìm kiếm công khai (Explore) và chế độ luyện tập (Practice Mode) do vi phạm quy chế hoặc bị báo cáo vi phạm. Chỉ có bạn (chủ sở hữu) mới có thể xem tài liệu này trong kho cá nhân.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main Header Area */}
       <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex-1">
