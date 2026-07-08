@@ -5,6 +5,32 @@ import { adminApi, AdminMetrics, AdminUser } from '@/services/adminApi';
 import { teacherVerificationApi, TeacherVerificationData } from '@/services/teacherVerificationApi';
 import { toast } from 'sonner';
 
+export interface AdminReport {
+  id: string;
+  documentId: string;
+  reporterId: string;
+  reason: string;
+  description: string | null;
+  status: 'PENDING' | 'REVIEWING' | 'RESOLVED' | 'REJECTED';
+  adminNote: string | null;
+  createdAt: string;
+  document?: {
+    id: string;
+    title: string;
+    uploadedBy: string;
+    user?: {
+      id: string;
+      fullName: string;
+      role: string;
+    };
+  };
+  reporter?: {
+    id: string;
+    fullName: string;
+    email: string;
+  };
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatStorage(bytes: number): string {
@@ -169,12 +195,21 @@ export default function AdminOverviewPage() {
   const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [verifications, setVerifications] = useState<TeacherVerificationData[]>([]);
-  const [activeTab, setActiveTab] = useState<'USERS' | 'VERIFICATIONS'>('USERS');
+  const [activeTab, setActiveTab] = useState<'USERS' | 'VERIFICATIONS' | 'REPORTS'>('USERS');
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(true);
   const [verificationsLoading, setVerificationsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
+
+  // States for Document Reports
+  const [reports, setReports] = useState<AdminReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
+  const [resolveModalOpen, setResolveModalOpen] = useState(false);
+  const [resolveDocStatus, setResolveDocStatus] = useState<'HIDDEN' | 'REMOVED'>('HIDDEN');
+  const [resolveAdminNote, setResolveAdminNote] = useState('');
+  const [resolveBanTeacher, setResolveBanTeacher] = useState(true);
 
   // Filter & pagination
   const [search, setSearch] = useState('');
@@ -210,6 +245,19 @@ export default function AdminOverviewPage() {
       .finally(() => setVerificationsLoading(false));
   };
 
+  const loadReports = () => {
+    setReportsLoading(true);
+    adminApi
+      .getReports()
+      .then((res: unknown) => {
+        const resObj = res as { data?: AdminReport[] };
+        const list = Array.isArray(res) ? res : Array.isArray(resObj?.data) ? resObj.data : [];
+        setReports(list as AdminReport[]);
+      })
+      .catch(() => setError('Không thể tải danh sách báo cáo'))
+      .finally(() => setReportsLoading(false));
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -217,6 +265,8 @@ export default function AdminOverviewPage() {
   useEffect(() => {
     if (activeTab === 'VERIFICATIONS') {
       loadVerifications();
+    } else if (activeTab === 'REPORTS') {
+      loadReports();
     }
   }, [activeTab]);
 
@@ -226,9 +276,82 @@ export default function AdminOverviewPage() {
       await teacherVerificationApi.reviewRequest(id, { status });
       loadVerifications();
       loadData(); // refresh user list role updates
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi phê duyệt!');
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } } };
+      toast.error(errorObj.response?.data?.message || 'Có lỗi xảy ra khi phê duyệt!');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleBanTeacher = async (userId: string) => {
+    const confirm = window.confirm(
+      'Bạn có chắc chắn muốn hạ quyền Giảng viên của người này về Sinh viên và chặn nâng quyền Giảng viên vĩnh viễn không?',
+    );
+    if (!confirm) return;
+
+    setProcessingId(userId);
+    try {
+      await adminApi.banTeacher(userId);
+      toast.success('Đã hạ quyền và chặn Giảng viên thành công!');
+      loadData(); // refresh user list
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } } };
+      toast.error(errorObj.response?.data?.message || 'Có lỗi xảy ra khi chặn Giảng viên!');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const openResolveModal = (report: AdminReport) => {
+    setSelectedReport(report);
+    setResolveDocStatus('HIDDEN');
+    setResolveAdminNote('');
+    // Auto-check banTeacher if document uploader is a teacher
+    const isTeacher = report.document?.user?.role === 'TEACHER';
+    setResolveBanTeacher(isTeacher);
+    setResolveModalOpen(true);
+  };
+
+  const handleResolveReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedReport) return;
+    setProcessingId(selectedReport.id);
+    try {
+      await adminApi.resolveReport(selectedReport.id, {
+        status: 'RESOLVED',
+        documentStatus: resolveDocStatus,
+        adminNote: resolveAdminNote.trim(),
+        banTeacher: resolveBanTeacher,
+      });
+      toast.success('Xử lý báo cáo vi phạm thành công!');
+      setResolveModalOpen(false);
+      setSelectedReport(null);
+      setResolveAdminNote('');
+      loadReports();
+      loadData();
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } } };
+      toast.error(errorObj.response?.data?.message || 'Có lỗi xảy ra khi giải quyết báo cáo!');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRejectReport = async (reportId: string) => {
+    const confirm = window.confirm('Bạn có chắc chắn muốn bác bỏ báo cáo này không?');
+    if (!confirm) return;
+    setProcessingId(reportId);
+    try {
+      await adminApi.resolveReport(reportId, {
+        status: 'REJECTED',
+        adminNote: 'Báo cáo bị bác bỏ bởi quản trị viên.',
+      });
+      toast.success('Đã bác bỏ báo cáo thành công!');
+      loadReports();
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } } };
+      toast.error(errorObj.response?.data?.message || 'Có lỗi xảy ra khi bác bỏ báo cáo!');
     } finally {
       setProcessingId(null);
     }
@@ -277,24 +400,42 @@ export default function AdminOverviewPage() {
           <div className="flex items-center gap-2 self-start rounded-xl bg-slate-200/60 p-1.5">
             <button
               onClick={() => setActiveTab('USERS')}
-              className={`rounded-lg px-4 py-2 text-xs font-bold transition-all ${activeTab === 'USERS'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-                }`}
+              className={`rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                activeTab === 'USERS'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
               Quản lý Người dùng ({users.length})
             </button>
             <button
               onClick={() => setActiveTab('VERIFICATIONS')}
-              className={`relative rounded-lg px-4 py-2 text-xs font-bold transition-all ${activeTab === 'VERIFICATIONS'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-                }`}
+              className={`relative rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                activeTab === 'VERIFICATIONS'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
               Phê duyệt Giảng viên
               {pendingVerificationsCount > 0 && (
                 <span className="ml-2 inline-flex items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                   {pendingVerificationsCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('REPORTS')}
+              className={`relative rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                activeTab === 'REPORTS'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Báo cáo vi phạm
+              {reports.filter((r) => r.status === 'PENDING' || r.status === 'REVIEWING').length >
+                0 && (
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  {reports.filter((r) => r.status === 'PENDING' || r.status === 'REVIEWING').length}
                 </span>
               )}
             </button>
@@ -374,10 +515,11 @@ export default function AdminOverviewPage() {
                     <button
                       key={r}
                       onClick={() => handleFilterChange(r)}
-                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${roleFilter === r
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-slate-500 hover:bg-slate-100'
-                        }`}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        roleFilter === r
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-500 hover:bg-slate-100'
+                      }`}
                     >
                       {r === 'ALL'
                         ? 'Tất cả'
@@ -417,17 +559,20 @@ export default function AdminOverviewPage() {
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
                       Trạng thái
                     </th>
+                    <th className="px-6 py-3 text-right text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                      Hành động
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {usersLoading ? (
                     Array.from({ length: 5 }).map((_, i) => (
                       <tr key={i}>
-                        {Array.from({ length: 7 }).map((_, j) => (
+                        {Array.from({ length: 8 }).map((_, j) => (
                           <td key={j} className="px-6 py-4">
                             <div
                               className="h-3.5 animate-pulse rounded bg-slate-100"
-                              style={{ width: `${60 + j * 10}%` }}
+                              style={{ width: `${60 + j * 5}%` }}
                             />
                           </td>
                         ))}
@@ -435,7 +580,7 @@ export default function AdminOverviewPage() {
                     ))
                   ) : paginated.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-400">
+                      <td colSpan={8} className="px-6 py-12 text-center text-sm text-slate-400">
                         Không có người dùng nào khớp với bộ lọc.
                       </td>
                     </tr>
@@ -456,6 +601,17 @@ export default function AdminOverviewPage() {
                         </td>
                         <td className="px-6 py-4">
                           <StatusBadge isActive={user.isActive} />
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {user.role === 'TEACHER' && (
+                            <button
+                              onClick={() => handleBanTeacher(user.id)}
+                              disabled={processingId === user.id}
+                              className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
+                            >
+                              Hạ quyền & Chặn
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -482,10 +638,11 @@ export default function AdminOverviewPage() {
                     <button
                       key={p}
                       onClick={() => setCurrentPage(p)}
-                      className={`flex h-7 w-7 items-center justify-center rounded border text-xs font-semibold transition ${currentPage === p
-                        ? 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
+                      className={`flex h-7 w-7 items-center justify-center rounded border text-xs font-semibold transition ${
+                        currentPage === p
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
                     >
                       {p}
                     </button>
@@ -641,7 +798,265 @@ export default function AdminOverviewPage() {
             </div>
           </div>
         )}
+
+        {/* ── TAB CONTENT: DOCUMENT REPORTS ── */}
+        {activeTab === 'REPORTS' && (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 px-6 py-4">
+              <h2 className="text-sm font-semibold text-slate-800">Báo cáo vi phạm Tài liệu</h2>
+              <p className="mt-0.5 text-xs text-slate-400">
+                Xem xét báo cáo của người dùng về tài liệu học thuật và thực hiện các biện pháp điều
+                duyệt.
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/60">
+                    <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                      Tài liệu bị báo cáo
+                    </th>
+                    <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                      Người upload (Vai trò)
+                    </th>
+                    <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                      Lý do & Mô tả
+                    </th>
+                    <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                      Người báo cáo
+                    </th>
+                    <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                      Trạng thái
+                    </th>
+                    <th className="px-6 py-3 text-right text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                      Hành động
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {reportsLoading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <tr key={i}>
+                        {Array.from({ length: 6 }).map((_, j) => (
+                          <td key={j} className="px-6 py-4">
+                            <div className="h-4 animate-pulse rounded bg-slate-100" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : reports.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
+                        Chưa có báo cáo vi phạm tài liệu nào.
+                      </td>
+                    </tr>
+                  ) : (
+                    reports.map((item) => (
+                      <tr key={item.id} className="transition-colors hover:bg-slate-50/70">
+                        <td className="px-6 py-4">
+                          <div className="max-w-xs truncate font-semibold text-slate-800">
+                            {item.document?.title || 'Tài liệu không xác định'}
+                          </div>
+                          {item.document?.id && (
+                            <a
+                              href={`/dashboard/documents/${item.document.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-blue-500 hover:underline"
+                            >
+                              Xem tài liệu
+                            </a>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-medium text-slate-700">
+                            {item.document?.user?.fullName || 'N/A'}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {item.document?.user?.role === 'TEACHER' ? (
+                              <span className="font-semibold text-violet-600">Giảng viên</span>
+                            ) : item.document?.user?.role === 'ADMIN' ? (
+                              <span className="text-blue-600">Admin</span>
+                            ) : (
+                              <span>Sinh viên</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex rounded bg-rose-50 px-2 py-0.5 text-xs font-bold text-rose-700">
+                            {item.reason}
+                          </span>
+                          {item.description && (
+                            <p className="mt-1 max-w-xs text-xs break-words text-slate-500">
+                              {item.description}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-medium text-slate-700">
+                            {item.reporter?.fullName}
+                          </div>
+                          <div className="text-xs text-slate-400">{item.reporter?.email}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {item.status === 'PENDING' && (
+                            <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+                              Chờ xử lý
+                            </span>
+                          )}
+                          {item.status === 'REVIEWING' && (
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+                              Đang xem xét
+                            </span>
+                          )}
+                          {item.status === 'RESOLVED' && (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                              Đã giải quyết
+                            </span>
+                          )}
+                          {item.status === 'REJECTED' && (
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
+                              Bác bỏ
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {item.status === 'PENDING' || item.status === 'REVIEWING' ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => openResolveModal(item)}
+                                disabled={processingId === item.id}
+                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                Giải quyết
+                              </button>
+                              <button
+                                onClick={() => handleRejectReport(item.id)}
+                                disabled={processingId === item.id}
+                                className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-300 disabled:opacity-50"
+                              >
+                                Bác bỏ
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">Hoàn tất</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* ── RESOLVE REPORT MODAL ── */}
+      {resolveModalOpen && selectedReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl transition-all">
+            <button
+              onClick={() => {
+                setResolveModalOpen(false);
+                setSelectedReport(null);
+              }}
+              className="absolute top-4 right-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                <span className="material-symbols-outlined">gavel</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Giải quyết báo cáo vi phạm</h3>
+                <p className="text-xs text-slate-500">
+                  Xử lý tài liệu:{' '}
+                  <span className="font-semibold text-slate-700">
+                    {selectedReport.document?.title}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleResolveReport} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-bold tracking-wider text-slate-700 uppercase">
+                  Hành động tài liệu <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={resolveDocStatus}
+                  onChange={(e) => setResolveDocStatus(e.target.value as 'HIDDEN' | 'REMOVED')}
+                  className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="HIDDEN">Ẩn tài liệu (HIDDEN)</option>
+                  <option value="REMOVED">Gỡ bỏ tài liệu (REMOVED)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold tracking-wider text-slate-700 uppercase">
+                  Lý do / Ghi chú <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  required
+                  placeholder="Nhập lý do ẩn/gỡ bỏ tài liệu..."
+                  value={resolveAdminNote}
+                  onChange={(e) => setResolveAdminNote(e.target.value)}
+                  className="h-24 w-full resize-none rounded-lg border border-slate-300 p-2.5 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Chặn & Hạ quyền nếu uploader là TEACHER */}
+              {selectedReport.document?.user?.role === 'TEACHER' && (
+                <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
+                  <p className="font-bold text-amber-800">
+                    ⚠️ PHÁT HIỆN TÀI KHOẢN GIẢNG VIÊN VI PHẠM
+                  </p>
+                  <p className="font-medium text-slate-600">
+                    Người upload tài liệu này hiện tại đang giữ quyền Giảng viên (`TEACHER`).
+                  </p>
+                  <label className="flex cursor-pointer items-start gap-2 pt-1 font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={resolveBanTeacher}
+                      onChange={(e) => setResolveBanTeacher(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                    />
+                    <span>
+                      Hạ quyền tài khoản này về Sinh viên (STUDENT) và chặn duyệt làm Giảng viên
+                      vĩnh viễn
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResolveModalOpen(false);
+                    setSelectedReport(null);
+                  }}
+                  className="rounded-lg px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={processingId === selectedReport.id}
+                  className="rounded-lg bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-md transition hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {processingId === selectedReport.id ? 'Đang xử lý...' : 'Xác nhận xử lý'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,13 +6,13 @@ export class CreateTeacherVerificationDto {
   @IsString()
   teacherCode: string;
 
-  @IsDefined({ message: 'Khoa là bắt buộc' })
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Khoa/Bộ môn không được để trống' })
+  @IsDefined({ message: 'Khoa/Bộ môn là bắt buộc' })
   @IsString()
   department: string;
 
-  @IsDefined({ message: 'Khoa là bắt buộc' })
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Minh chứng không được để trống' })
+  @IsDefined({ message: 'Minh chứng là bắt buộc' })
   @IsString()
   proofUrl: string;
 }

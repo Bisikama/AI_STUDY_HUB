@@ -1,4 +1,4 @@
-import axiosClient from "@/utils/axios";
+import axiosClient from '@/utils/axios';
 
 export interface AdminMetrics {
   totalUsers: number;
@@ -25,7 +25,7 @@ export interface PendingDocument {
   fileSize: number;
   fileType: string;
   status: 'PENDING' | 'APPROVED' | 'PRIVATE';
-  fullText: string | null;   // nội dung text đầy đủ
+  fullText: string | null; // nội dung text đầy đủ
   createdAt: string;
   subject: { id: number; name: string; code: string };
   user: { id: string; fullName: string; email: string };
@@ -96,30 +96,30 @@ export interface QuizAnalytics {
 export const adminApi = {
   /** GET /api/admin/metrics */
   getMetrics: async (): Promise<AdminMetrics> => {
-    const response = await axiosClient.get("/admin/metrics");
+    const response = await axiosClient.get('/admin/metrics');
     return response.data;
   },
 
   /** GET /api/admin/users */
   getAllUsers: async (): Promise<AdminUser[]> => {
-    const response = await axiosClient.get("/admin/users");
+    const response = await axiosClient.get('/admin/users');
     return response.data;
   },
 
   /** GET /api/admin/documents/pending */
   getPendingDocuments: async (): Promise<PendingDocument[]> => {
-    const response = await axiosClient.get("/admin/documents/pending");
+    const response = await axiosClient.get('/admin/documents/pending');
     return response.data;
   },
 
   /** PATCH /api/admin/documents/:id/approve */
   approveDocument: async (id: string): Promise<void> => {
-    await axiosClient.patch(`/admin/documents/${id}/approve`, { status: "APPROVED" });
+    await axiosClient.patch(`/admin/documents/${id}/approve`, { status: 'APPROVED' });
   },
 
   /** PATCH /api/admin/documents/:id/approve  — reject maps to PRIVATE in BE */
   rejectDocument: async (id: string): Promise<void> => {
-    await axiosClient.patch(`/admin/documents/${id}/approve`, { status: "REJECTED" });
+    await axiosClient.patch(`/admin/documents/${id}/approve`, { status: 'REJECTED' });
   },
 
   /** DELETE /api/admin/documents/:id */
@@ -128,8 +128,13 @@ export const adminApi = {
   },
 
   /** GET /api/admin/quizzes */
-  getQuizzes: async (params: { page?: number; limit?: number; search?: string; subjectId?: number }): Promise<GetQuizzesResponse> => {
-    const response = await axiosClient.get("/admin/quizzes", { params });
+  getQuizzes: async (params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    subjectId?: number;
+  }): Promise<GetQuizzesResponse> => {
+    const response = await axiosClient.get('/admin/quizzes', { params });
     return response.data;
   },
 
@@ -140,7 +145,13 @@ export const adminApi = {
   },
 
   /** PATCH /api/admin/quizzes/questions/:questionId */
-  updateQuizQuestion: async (questionId: string, payload: { questionText?: string; options?: Array<{ id: string; optionText: string; isCorrect: boolean }> }): Promise<any> => {
+  updateQuizQuestion: async (
+    questionId: string,
+    payload: {
+      questionText?: string;
+      options?: Array<{ id: string; optionText: string; isCorrect: boolean }>;
+    },
+  ): Promise<unknown> => {
     const response = await axiosClient.patch(`/admin/quizzes/questions/${questionId}`, payload);
     return response.data;
   },
@@ -154,6 +165,36 @@ export const adminApi = {
   /** GET /api/admin/quizzes/:id/analytics */
   getQuizAnalytics: async (id: string): Promise<QuizAnalytics> => {
     const response = await axiosClient.get(`/admin/quizzes/${id}/analytics`);
+    return response.data;
+  },
+
+  /** GET /api/admin/reports */
+  getReports: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }): Promise<unknown> => {
+    const response = await axiosClient.get('/admin/reports', { params });
+    return response.data;
+  },
+
+  /** PATCH /api/admin/reports/:reportId */
+  resolveReport: async (
+    reportId: string,
+    payload: {
+      status: 'RESOLVED' | 'REJECTED';
+      documentStatus?: string;
+      adminNote?: string;
+      banTeacher?: boolean;
+    },
+  ): Promise<unknown> => {
+    const response = await axiosClient.patch(`/admin/reports/${reportId}`, payload);
+    return response.data;
+  },
+
+  /** PATCH /api/admin/users/:userId/ban-teacher */
+  banTeacher: async (userId: string, adminNote?: string): Promise<unknown> => {
+    const response = await axiosClient.patch(`/admin/users/${userId}/ban-teacher`, { adminNote });
     return response.data;
   },
 };

@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { SupabaseService } from '../../supabase/supabase.service';
 import {
   CreateTeacherVerificationDto,
   ReviewTeacherVerificationDto,
@@ -12,12 +13,21 @@ import {
 
 @Injectable()
 export class TeacherVerificationService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly supabase: SupabaseService,
+  ) {}
 
   async submitRequest(userId: string, dto: CreateTeacherVerificationDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('Không tìm thấy người dùng');
+    }
+
+    if (user.isTeacherBanned) {
+      throw new BadRequestException(
+        'Tài khoản của bạn đã bị chặn quyền đăng ký làm Giảng viên do vi phạm điều khoản!',
+      );
     }
 
     if (user.role === 'TEACHER') {
@@ -37,7 +47,7 @@ export class TeacherVerificationService {
       update: {
         teacherCode: dto.teacherCode.trim(),
         department: dto.department.trim(),
-        proofUrl: dto.proofUrl,
+        proofUrl: dto.proofUrl.trim(),
         status: 'PENDING',
         adminNote: null,
       },
@@ -45,7 +55,7 @@ export class TeacherVerificationService {
         userId,
         teacherCode: dto.teacherCode.trim(),
         department: dto.department.trim(),
-        proofUrl: dto.proofUrl,
+        proofUrl: dto.proofUrl.trim(),
         status: 'PENDING',
       },
     });
@@ -111,5 +121,9 @@ export class TeacherVerificationService {
         verification: updated,
       };
     });
+  }
+
+  async uploadProofImage(file: Express.Multer.File): Promise<string> {
+    return this.supabase.uploadToSupabase(file.buffer, file.originalname, file.mimetype);
   }
 }
