@@ -16,6 +16,8 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
   const [teacherCode, setTeacherCode] = useState('');
   const [department, setDepartment] = useState('');
   const [proofUrl, setProofUrl] = useState('');
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -57,15 +59,8 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
       setError('Vui lòng nhập Khoa / Bộ môn');
       return;
     }
-    if (!proofUrl.trim()) {
-      setError('Vui lòng nhập Link minh chứng');
-      return;
-    }
-
-    try {
-      new URL(proofUrl.trim());
-    } catch {
-      setError('Link minh chứng phải là một URL hợp lệ (ví dụ: https://...)');
+    if (!proofFile && !proofUrl) {
+      setError('Vui lòng tải lên ảnh minh chứng (Thẻ GV / Quyết định)');
       return;
     }
 
@@ -79,18 +74,28 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
     setSuccessMsg(null);
 
     try {
+      let finalProofUrl = proofUrl;
+      if (proofFile) {
+        setUploading(true);
+        finalProofUrl = await teacherVerificationApi.uploadProof(proofFile);
+        setUploading(false);
+        setProofUrl(finalProofUrl);
+      }
+
       await teacherVerificationApi.submit({
         teacherCode: teacherCode.trim(),
         department: department.trim(),
-        proofUrl: proofUrl.trim(),
+        proofUrl: finalProofUrl,
       });
       setSuccessMsg('Gửi yêu cầu Xác Thực Giảng viên thành công! Admin sẽ duyệt sớm.');
+      setProofFile(null);
       await loadStatus();
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
       setError(errorObj.response?.data?.message || 'Có lỗi xảy ra khi gửi yêu cầu.');
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -194,16 +199,46 @@ export default function TeacherVerificationModal({ isOpen, onClose }: Props) {
 
                 <div>
                   <label className="mb-1 block text-xs font-bold tracking-wider text-slate-700 uppercase">
-                    Link minh chứng (Thẻ GV / Quyết định) <span className="text-red-500">*</span>
+                    Ảnh minh chứng (Thẻ GV / Quyết định) <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="url"
-                    required
-                    placeholder="https://example.com/the-giang-vien.jpg"
-                    value={proofUrl}
-                    onChange={(e) => setProofUrl(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 p-2.5 text-sm text-slate-800 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-                  />
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="file"
+                      id="proofFile"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setProofFile(file);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-3">
+                      <label
+                        htmlFor="proofFile"
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 active:bg-slate-100"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">upload</span>
+                        Chọn ảnh từ máy
+                      </label>
+                      {proofFile && (
+                        <span className="max-w-[250px] truncate text-xs font-medium text-slate-600">
+                          📁 {proofFile.name}
+                        </span>
+                      )}
+                      {!proofFile && proofUrl && (
+                        <a
+                          href={proofUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-emerald-600 hover:underline"
+                        >
+                          ✅ Đã tải lên minh chứng (Xem ảnh)
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Cam kết luật lệ */}

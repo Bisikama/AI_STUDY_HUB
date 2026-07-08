@@ -7,7 +7,11 @@ import {
   Param,
   UseGuards,
   ParseUUIDPipe,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -57,5 +61,19 @@ export class TeacherVerificationController {
     @Body() dto: ReviewTeacherVerificationDto,
   ) {
     return this.verificationService.reviewRequest(id, dto);
+  }
+
+  @Post('upload')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadProof(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn file ảnh minh chứng.');
+    }
+    const url = await this.verificationService.uploadProofImage(file);
+    return {
+      statusCode: 201,
+      url,
+    };
   }
 }

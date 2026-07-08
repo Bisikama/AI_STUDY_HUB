@@ -1,4 +1,4 @@
-import axiosClient from "@/utils/axios";
+import axiosClient from '@/utils/axios';
 
 export interface TeacherVerificationData {
   id: string;
@@ -6,7 +6,7 @@ export interface TeacherVerificationData {
   teacherCode: string;
   department: string | null;
   proofUrl: string | null;
-  status: "PENDING" | "APPROVED" | "REJECTED";
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
   adminNote: string | null;
   createdAt: string;
   user?: {
@@ -20,21 +20,35 @@ export interface TeacherVerificationData {
 
 export const teacherVerificationApi = {
   submit: async (payload: { teacherCode: string; department?: string; proofUrl?: string }) => {
-    const response = await axiosClient.post("/teacher-verification", payload);
+    const response = await axiosClient.post('/teacher-verification', payload);
     return response.data;
   },
 
+  uploadProof: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await axiosClient.post('/teacher-verification/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.url;
+  },
+
   getMyStatus: async (): Promise<TeacherVerificationData | null> => {
-    const response = await axiosClient.get("/teacher-verification/me");
+    const response = await axiosClient.get('/teacher-verification/me');
     return response.data;
   },
 
   getAdminList: async (): Promise<TeacherVerificationData[]> => {
-    const response = await axiosClient.get("/teacher-verification/admin/list");
+    const response = await axiosClient.get('/teacher-verification/admin/list');
     return response.data;
   },
 
-  reviewRequest: async (id: string, payload: { status: "APPROVED" | "REJECTED"; adminNote?: string }) => {
+  reviewRequest: async (
+    id: string,
+    payload: { status: 'APPROVED' | 'REJECTED'; adminNote?: string },
+  ) => {
     const response = await axiosClient.patch(`/teacher-verification/admin/${id}/status`, payload);
     return response.data;
   },

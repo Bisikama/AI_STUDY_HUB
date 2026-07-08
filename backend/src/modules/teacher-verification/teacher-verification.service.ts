@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { SupabaseService } from '../../supabase/supabase.service';
 import {
   CreateTeacherVerificationDto,
   ReviewTeacherVerificationDto,
@@ -12,7 +13,10 @@ import {
 
 @Injectable()
 export class TeacherVerificationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly supabase: SupabaseService,
+  ) {}
 
   async submitRequest(userId: string, dto: CreateTeacherVerificationDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -117,5 +121,9 @@ export class TeacherVerificationService {
         verification: updated,
       };
     });
+  }
+
+  async uploadProofImage(file: Express.Multer.File): Promise<string> {
+    return this.supabase.uploadToSupabase(file.buffer, file.originalname, file.mimetype);
   }
 }
