@@ -53,4 +53,21 @@ export class MailService {
       return false;
     }
   }
+
+  async sendDocumentRejection(to: string, fullName: string, docTitle: string, reason: string): Promise<boolean> {
+    try {
+      console.log('\n==================================================');
+      console.log(`✉️ [EMAIL NOTIFICATION - DOCUMENT REJECTED]`);
+      console.log(`👉 To: ${fullName} <${to}>`);
+      console.log(`📄 Document: "${docTitle}"`);
+      console.log(`🚫 Reason: ${reason}`);
+      console.log('==================================================\n');
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `❌ Lỗi gửi email thông báo từ chối: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
+  }
 }

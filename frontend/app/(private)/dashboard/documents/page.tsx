@@ -485,17 +485,33 @@ export default function MyDocumentsPage() {
                         ) : null}
                       </div>
 
-                      {/* Icon & Primary Info */}
-                      <div className={`flex ${viewMode === 'list' ? 'items-center gap-4 flex-1 min-w-0' : 'flex-col'}`}>
-                        <div className={`${viewMode === 'grid' ? 'mb-4' : ''} shrink-0`}>
-                          {doc.isAIGenerated ? (
-                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-900 text-white shadow-sm">
-                              <span className="material-symbols-outlined">data_object</span>
-                            </div>
-                          ) : isFollowed ? (
-                            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600 shadow-sm">
-                              <span className="material-symbols-outlined">
-                                {isPdf ? 'picture_as_pdf' : 'description'}
+                    <h3 className="mb-1 truncate font-semibold text-gray-900 flex items-center gap-1.5" title={doc.title}>
+                      <span className="truncate">{doc.title}</span>
+                      {doc.visibilityStatus === 'PRIVATE' && doc.rejectReason && (
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-red-500 animate-pulse" title="Yêu cầu chia sẻ công khai bị từ chối" />
+                      )}
+                    </h3>
+
+                    <p className="mb-2 truncate text-[12px] font-medium text-[#1a1c23]">
+                      {doc.subject?.name ?? `SUB-${doc.subjectId ?? 'GEN'}`}
+                    </p>
+
+                    <p className="mb-3 text-[13px] text-gray-500">
+                      {doc.isAIGenerated ? 'AI Generated' : `Added ${formatDate(doc.createdAt)}`} •{' '}
+                      {formatSize(doc.fileSizeBytes !== undefined ? doc.fileSizeBytes : doc.fileSize)}
+                    </p>
+
+                    {!doc.isAIGenerated && (
+                      <div className="mt-auto flex flex-wrap items-center gap-1.5">
+                        {doc.tags && doc.tags.length > 0 ? (
+                          <>
+                            {doc.tags.slice(0, 3).map((t) => (
+                              <span
+                                key={t.tag.id}
+                                className="inline-flex max-w-[80px] items-center truncate rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600"
+                                title={t.tag.name}
+                              >
+                                {t.tag.name}
                               </span>
                             </div>
                           ) : (

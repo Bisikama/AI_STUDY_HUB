@@ -13,6 +13,7 @@ import { TeacherVerificationModule } from './modules/teacher-verification/teache
 import { ApiResponseInterceptor } from './common/interceptors';
 import { HttpExceptionFilter } from './common/filters';
 import { PersonalFoldersModule } from './modules/personal-folders/personal-folders.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { PersonalFoldersModule } from './modules/personal-folders/personal-folde
     TagsModule,
     TeacherVerificationModule,
     PersonalFoldersModule,
+    NotificationsModule,
   ],
   controllers: [],
   providers: [
