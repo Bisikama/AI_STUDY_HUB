@@ -60,6 +60,13 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu!');
     }
+
+    if (user.provider === 'google') {
+      throw new BadRequestException(
+        'Tài khoản này được đăng ký bằng Google. Vui lòng đăng nhập qua Google!',
+      );
+    }
+
     // 2. Kiểm tra mật khẩu
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
@@ -112,9 +119,16 @@ export class AuthService {
       // 1. Kiểm tra xem user đã tồn tại chưa
       let user = await this.prisma.user.findUnique({ where: { email } });
 
-      // 2. Nếu chưa tồn tại, tạo mới tài khoản
-      if (!user) {
-        // Tạo password ngẫu nhiên và mã hóa nó
+      if (user) {
+        // Nếu user đã tồn tại nhưng provider chưa phải là 'google', tự động cập nhật thành 'google'
+        if (user.provider !== 'google') {
+          user = await this.prisma.user.update({
+            where: { id: user.id },
+            data: { provider: 'google' },
+          });
+        }
+      } else {
+        // 2. Nếu chưa tồn tại, tạo mới tài khoản
         const randomPassword =
           Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
         const salt = await bcrypt.genSalt(10);
@@ -127,6 +141,7 @@ export class AuthService {
             fullName: name,
             avatarUrl,
             role: 'STUDENT',
+            provider: 'google',
             storageUsage: {
               create: { quotaBytes: 1073741824n, usedBytes: 0n, reservedBytes: 0n, trashBytes: 0n },
             },
@@ -227,7 +242,10 @@ export class AuthService {
     // 4. Cập nhật mật khẩu mới cho user
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: hashedPassword },
+      data: {
+        passwordHash: hashedPassword,
+        provider: 'local',
+      },
     });
 
     // 5. Đánh dấu token đã sử dụng

@@ -121,6 +121,7 @@ model User {
   role         UserRole @default(STUDENT)
   isActive     Boolean  @default(true) @map("is_active")
   isTeacherBanned Boolean @default(false) @map("is_teacher_banned")
+  provider     String   @default("local") @map("provider")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
