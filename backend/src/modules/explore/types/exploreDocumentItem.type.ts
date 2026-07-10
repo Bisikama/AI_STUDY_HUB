@@ -6,11 +6,17 @@ export type ExploreDocumentItem = {
     id: number;
     name: string;
     code: string;
+    majors?: {
+      code: string;
+      name: string;
+    }[];
   };
   fileType: string;
   fileSize: string;
   downloadCount: number;
   viewCount: number;
+  averageRating: number;
+  ratingCount: number;
   quizCount: number;
   hasSummary: boolean;
   uploader: {

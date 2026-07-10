@@ -59,7 +59,15 @@ export class ExploreService {
           : {}),
       },
       include: {
-        subject: true,
+        subject: {
+          include: {
+            majors: {
+              include: {
+                major: true,
+              },
+            },
+          },
+        },
         summary: true,
         _count: {
           select: {
@@ -88,11 +96,17 @@ export class ExploreService {
           id: document.subject.id,
           name: document.subject.name,
           code: document.subject.code,
+          majors: document.subject.majors.map((item) => ({
+            code: item.major.code,
+            name: item.major.name,
+          })),
         },
         fileType: document.fileType,
         fileSize: document.fileSize.toString(),
         downloadCount: document.downloadCount,
         viewCount: document.viewCount,
+        averageRating: Number(document.averageRating ?? 0),
+        ratingCount: document.ratingCount,
         quizCount: document._count.quizzes,
         hasSummary: document.summary !== null,
         uploader: {
@@ -127,7 +141,15 @@ export class ExploreService {
         },
       },
       include: {
-        subject: true,
+        subject: {
+          include: {
+            majors: {
+              include: {
+                major: true,
+              },
+            },
+          },
+        },
         summary: true,
         quizzes: {
           include: {
@@ -161,6 +183,10 @@ export class ExploreService {
           id: document.subject.id,
           name: document.subject.name,
           code: document.subject.code,
+          majors: document.subject.majors.map((item) => ({
+            code: item.major.code,
+            name: item.major.name,
+          })),
         },
         fileType: document.fileType,
         fileSize: document.fileSize.toString(),
