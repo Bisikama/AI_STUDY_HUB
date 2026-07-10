@@ -119,12 +119,20 @@ interface SlideOverProps {
   pendingAction: 'approve' | 'reject' | null;
   onClose: () => void;
   onApprove: (doc: PendingDocument) => void;
-  onReject: (doc: PendingDocument) => void;
+  onReject: (doc: PendingDocument, reason: string) => void;
   actionLoading: boolean;
 }
 
 function FullTextPanel({ doc, pendingAction, onClose, onApprove, onReject, actionLoading }: SlideOverProps) {
   const isOpen = !!doc;
+  const [rejectReason, setRejectReason] = useState('');
+
+  // Reset rejectReason when slide-over state changes
+  useEffect(() => {
+    if (!isOpen) {
+      setRejectReason('');
+    }
+  }, [isOpen]);
 
   // Trap focus / close on Escape
   useEffect(() => {
@@ -177,6 +185,55 @@ function FullTextPanel({ doc, pendingAction, onClose, onApprove, onReject, actio
               <span><span className="font-semibold text-slate-700">Email: </span>{doc.user.email}</span>
             </div>
 
+            {/* ── Copyright & Duplicate Alert strip ── */}
+            <div className="border-b border-slate-100 px-6 py-4 space-y-3">
+              {/* Copyright Info */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Bản quyền</p>
+                <div className="mt-1 flex items-center gap-2 text-xs">
+                  <span className="font-semibold text-slate-700">Nguồn gốc:</span>
+                  <span className={`rounded-lg px-2 py-0.5 font-bold ${
+                    doc.copyrightSourceType === 'OWN_ORIGINAL' 
+                      ? 'bg-blue-50 text-blue-600' 
+                      : doc.copyrightSourceType === 'OPEN_LICENSE' 
+                      ? 'bg-emerald-50 text-emerald-600' 
+                      : doc.copyrightSourceType === 'AUTHORIZED' 
+                      ? 'bg-indigo-50 text-indigo-600'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {doc.copyrightSourceType === 'OWN_ORIGINAL' ? 'Tự biên soạn' : doc.copyrightSourceType}
+                  </span>
+                  {doc.copyrightAuthorName && (
+                    <span className="text-slate-500">· Tác giả: {doc.copyrightAuthorName}</span>
+                  )}
+                  {doc.copyrightDeclaredAt && (
+                    <span className="text-slate-400">· Khai báo: {formatDate(doc.copyrightDeclaredAt)}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Duplicate Alert Card */}
+              {doc.isDuplicateDetected && doc.duplicateSourceInfo && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs">
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 text-red-600 text-base">⚠️</span>
+                    <div className="space-y-1">
+                      <p className="font-bold text-red-800">CẢNH BÁO: TỆP TRÙNG LẶP 100%</p>
+                      <p className="text-red-700 leading-relaxed">
+                        Tệp tin này trùng khớp hoàn toàn với một tài liệu đã được công khai trên hệ thống. 
+                        Người đăng có dấu hiệu sao chép và khai báo sai thông tin bản quyền.
+                      </p>
+                      <div className="mt-2 rounded-lg bg-white/70 p-2.5 text-slate-700 space-y-1 border border-red-100">
+                        <p><span className="font-semibold text-slate-900">Tài liệu gốc:</span> {doc.duplicateSourceInfo.title}</p>
+                        <p><span className="font-semibold text-slate-900">Người đăng:</span> {doc.duplicateSourceInfo.author} ({doc.duplicateSourceInfo.email})</p>
+                        <p><span className="font-semibold text-slate-900">Ngày đăng:</span> {formatDate(doc.duplicateSourceInfo.createdAt)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* ── Full Text Content ── */}
             <div className="flex-1 overflow-y-auto px-6 py-5">
               <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">Full Text Content</p>
@@ -194,6 +251,23 @@ function FullTextPanel({ doc, pendingAction, onClose, onApprove, onReject, actio
                 </div>
               )}
             </div>
+
+            {/* ── Rejection Reason Input ── */}
+            {pendingAction === 'reject' && (
+              <div className="border-t border-slate-100 bg-amber-50/40 px-6 py-4 space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-amber-800">
+                  Lý do từ chối <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Nhập lý do từ chối phê duyệt tài liệu này (lý do này sẽ được gửi tới email của người đăng)..."
+                  className="w-full rounded-lg border border-amber-200 bg-white p-3 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                  rows={3}
+                  disabled={actionLoading}
+                />
+              </div>
+            )}
 
             {/* ── Action Footer ── */}
             <div className="border-t border-slate-100 bg-white px-6 py-4">
@@ -217,7 +291,7 @@ function FullTextPanel({ doc, pendingAction, onClose, onApprove, onReject, actio
                     className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
                     Cancel
                   </button>
-                  <button onClick={() => onReject(doc)} disabled={actionLoading}
+                  <button onClick={() => onReject(doc, rejectReason.trim())} disabled={actionLoading || !rejectReason.trim()}
                     className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-amber-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-600 disabled:opacity-50">
                     {actionLoading
                       ? <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
@@ -300,13 +374,13 @@ export default function AdminDocumentsPage() {
   };
 
   // ── Execute reject from panel ──
-  const handleReject = async (doc: PendingDocument) => {
+  const handleReject = async (doc: PendingDocument, reason: string) => {
     setActionLoading((p) => ({ ...p, [doc.id]: true }));
     try {
-      await adminApi.rejectDocument(doc.id);
+      await adminApi.rejectDocument(doc.id, reason);
       setDocs((prev) => prev.filter((d) => d.id !== doc.id));
       setPanel({ doc: null, intent: null });
-      addToast(`🚫 "${doc.title}" đã bị từ chối.`, 'success');
+      addToast(`🚫 "${doc.title}" đã bị từ chối. Lý do: ${reason}`, 'success');
     } catch {
       addToast(`Reject thất bại. Vui lòng thử lại.`, 'error');
     } finally {
@@ -412,7 +486,14 @@ export default function AdminDocumentsPage() {
                             {ext}
                           </span>
                           <div>
-                            <p className="font-semibold text-slate-800 line-clamp-1">{doc.title}</p>
+                            <p className="font-semibold text-slate-800 line-clamp-1">
+                              {doc.title}
+                              {doc.isDuplicateDetected && (
+                                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                                  ⚠️ TRÙNG LẶP
+                                </span>
+                              )}
+                            </p>
                             {doc.description && (
                               <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{doc.description}</p>
                             )}

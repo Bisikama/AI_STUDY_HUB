@@ -74,6 +74,7 @@ describe('DocumentsService', () => {
     document: {
       create: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       delete: jest.fn(),
@@ -1599,7 +1600,14 @@ describe('DocumentsService', () => {
       });
 
       it('should throw ConflictException if user already has active report', async () => {
-        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-other' });
+        mockPrisma.document.findUnique.mockResolvedValue({
+          id: 'doc-1',
+          uploadedBy: 'user-other',
+          visibilityStatus: 'PUBLIC',
+          deletionStatus: 'ACTIVE',
+          status: 'ACTIVE',
+          deletedAt: null,
+        });
         mockPrisma.documentReport.findFirst.mockResolvedValue({ id: 'report-1' });
 
         await expect(
@@ -1608,7 +1616,14 @@ describe('DocumentsService', () => {
       });
 
       it('should create report and auto moderate document if reports >= 3', async () => {
-        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-other' });
+        mockPrisma.document.findUnique.mockResolvedValue({
+          id: 'doc-1',
+          uploadedBy: 'user-other',
+          visibilityStatus: 'PUBLIC',
+          deletionStatus: 'ACTIVE',
+          status: 'ACTIVE',
+          deletedAt: null,
+        });
         mockPrisma.documentReport.findFirst.mockResolvedValue(null);
         mockPrisma.documentReport.create.mockResolvedValue({ id: 'report-new' });
         mockPrisma.document.update

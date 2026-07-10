@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../../database/prisma.service';
 import { SupabaseService } from '../../supabase/supabase.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -17,6 +18,12 @@ describe('AdminService', () => {
         {
           provide: SupabaseService,
           useValue: {},
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            create: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -53,6 +60,12 @@ describe('AdminService', () => {
           AdminService,
           { provide: PrismaService, useValue: mockPrisma },
           { provide: SupabaseService, useValue: mockSupabase },
+          {
+            provide: NotificationsService,
+            useValue: {
+              create: jest.fn(),
+            },
+          },
         ],
       }).compile();
 
