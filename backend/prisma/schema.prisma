@@ -1,17 +1,432 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider        = "prisma-client"
   output          = "../generated/prisma"
-  moduleFormat    = "cjs"
   previewFeatures = ["fullTextSearchPostgres"]
+  moduleFormat    = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+/// Quản lý thông tin tài khoản người dùng
+model User {
+  id                      String                 @id @default(uuid()) @db.Uuid
+  email                   String                 @unique
+  passwordHash            String                 @map("password_hash")
+  fullName                String                 @map("full_name")
+  username                String?                @unique
+  phoneNumber             String?                @map("phone_number")
+  avatarUrl               String?                @map("avatar_url")
+  role                    UserRole               @default(STUDENT)
+  isActive                Boolean                @default(true) @map("is_active")
+  createdAt               DateTime               @default(now()) @map("created_at")
+  updatedAt               DateTime               @updatedAt @map("updated_at")
+  isTeacherBanned         Boolean                @default(false) @map("is_teacher_banned")
+  documentRatings         DocumentRating[]
+  documentReportsMade     DocumentReport[]       @relation("DocumentReporter")
+  documentReportsReviewed DocumentReport[]       @relation("DocumentReviewer")
+  copyrightDeclarations   Document[]             @relation("DocumentCopyrightDeclarer")
+  documents               Document[]
+  notifications           Notification[]
+  passwordResetTokens     PasswordResetToken[]
+  personalFolders         PersonalFolder[]
+  quizzes                 Quiz[]
+  storageReservations     StorageReservation[]
+  teacherVerification     TeacherVerification?
+  uploadStatuses          UploadStatus[]
+  documentViews           UserDocumentView[]
+  followedDocuments       UserFollowedDocument[]
+  quizAttempts            UserQuizAttempt[]
+  storageUsage            UserStorageUsage?
+
+  @@map("users")
+}
+
+/// Quản lý Token reset mật khẩu (Quên mật khẩu)
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+/// Quản lý Yêu cầu Xác Thực Giảng Viên
+model TeacherVerification {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @unique @map("user_id") @db.Uuid
+  teacherCode String             @map("teacher_code")
+  department  String
+  proofUrl    String?            @map("proof_url")
+  status      VerificationStatus @default(PENDING)
+  adminNote   String?            @map("admin_note")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("teacher_verifications")
+}
+
+/// Danh mục Môn học/Mã học phần
+model Subject {
+  id          Int            @id @default(autoincrement())
+  name        String         @unique
+  code        String         @unique
+  description String?
+  isSystem    Boolean        @default(false) @map("is_system")
+  isActive    Boolean        @default(true) @map("is_active")
+  createdBy   String?        @map("created_by") @db.Uuid
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at")
+  documents   Document[]
+  majors      MajorSubject[]
+
+  @@map("subjects")
+}
+
+/// Chuyên ngành/Ngành học (Major)
+model Major {
+  id        String         @id @default(uuid()) @db.Uuid
+  code      String         @unique
+  name      String
+  isActive  Boolean        @default(true) @map("is_active")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  subjects  MajorSubject[]
+
+  @@map("majors")
+}
+
+/// Bảng trung gian Course Catalog: Ngành học ↔ Học phần
+model MajorSubject {
+  majorId   String  @map("major_id") @db.Uuid
+  subjectId Int     @map("subject_id")
+  major     Major   @relation(fields: [majorId], references: [id], onDelete: Cascade)
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([majorId, subjectId])
+  @@map("major_subjects")
+}
+
+/// Thư mục cá nhân của người dùng
+model PersonalFolder {
+  id        String           @id @default(uuid()) @db.Uuid
+  ownerId   String           @map("owner_id") @db.Uuid
+  name      String
+  parentId  String?          @map("parent_id") @db.Uuid
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  documents Document[]
+  owner     User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent    PersonalFolder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Restrict)
+  children  PersonalFolder[] @relation("FolderToFolder")
+
+  @@map("personal_folders")
+}
+
+/// Tag quản lý nhãn dán cho Document
+model Tag {
+  id        Int           @id @default(autoincrement())
+  name      String
+  slug      String
+  createdBy String?       @map("created_by") @db.Uuid
+  isSystem  Boolean       @default(false) @map("is_system")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at")
+  documents DocumentTag[]
+
+  @@unique([slug, createdBy])
+  @@map("tags")
+}
+
+/// Bảng trung gian Document và Tag
+model DocumentTag {
+  documentId String   @map("document_id") @db.Uuid
+  tagId      Int      @map("tag_id")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, tagId])
+  @@map("document_tags")
+}
+
+/// Thông tin siêu dữ liệu tài liệu học thuật
+model Document {
+  id                           String                 @id @default(uuid()) @db.Uuid
+  title                        String
+  description                  String?
+  subjectId                    Int                    @map("subject_id")
+  personalFolderId             String?                @map("personal_folder_id") @db.Uuid
+  uploadedBy                   String                 @map("uploaded_by") @db.Uuid
+  fileUrl                      String                 @map("file_url") @db.VarChar(512)
+  previewUrl                   String?                @map("preview_url") @db.VarChar(512)
+  fileSize                     BigInt                 @map("file_size")
+  fileType                     String                 @map("file_type")
+  downloadCount                Int                    @default(0) @map("download_count")
+  viewCount                    Int                    @default(0) @map("view_count")
+  status                       DocumentStatus         @default(ACTIVE)
+  fullText                     String?                @map("full_text")
+  pageCount                    Int?                   @map("page_count")
+  isAIGenerated                Boolean                @default(false) @map("is_ai_generated")
+  averageRating                Float                  @default(0.0) @map("average_rating")
+  ratingCount                  Int                    @default(0) @map("rating_count")
+  reportCount                  Int                    @default(0) @map("report_count")
+  deletedAt                    DateTime?              @map("deleted_at")
+  createdAt                    DateTime               @default(now()) @map("created_at")
+  updatedAt                    DateTime               @updatedAt @map("updated_at")
+  visibilityStatus             VisibilityStatus       @default(PRIVATE) @map("visibility_status")
+  deletionStatus               DeletionStatus         @default(ACTIVE) @map("deletion_status")
+  extractionStatus             ExtractionStatus       @default(PENDING) @map("extraction_status")
+  storagePath                  String?                @map("storage_path") @db.VarChar(512)
+  requestedAt                  DateTime?              @map("requested_at")
+  aiStatus                     AIStatus               @default(NOT_REQUESTED) @map("ai_status")
+  aiRunId                      String?                @map("ai_run_id")
+  aiProcessingStartedAt        DateTime?              @map("ai_processing_started_at")
+  aiGeneratedAt                DateTime?              @map("ai_generated_at")
+  aiAttemptCount               Int                    @default(0) @map("ai_attempt_count")
+  aiFailureReason              String?                @map("ai_failure_reason")
+  copyrightSourceType          CopyrightSourceType    @default(UNKNOWN) @map("copyright_source_type")
+  copyrightAuthorName          String?                @map("copyright_author_name") @db.VarChar(255)
+  copyrightSourceUrl           String?                @map("copyright_source_url") @db.VarChar(512)
+  copyrightLicense             String?                @map("copyright_license") @db.VarChar(100)
+  copyrightAttribution         String?                @map("copyright_attribution")
+  copyrightPermissionReference String?                @map("copyright_permission_reference")
+  copyrightDeclaredAt          DateTime?              @map("copyright_declared_at")
+  copyrightDeclaredBy          String?                @map("copyright_declared_by") @db.Uuid
+  fileHash                     String?                @map("file_hash") @db.VarChar(64)
+  rejectReason                 String?                @map("reject_reason")
+  chunks                       DocumentChunk[]
+  ratings                      DocumentRating[]
+  reports                      DocumentReport[]
+  summary                      DocumentSummary?
+  tags                         DocumentTag[]
+  copyrightDeclarer            User?                  @relation("DocumentCopyrightDeclarer", fields: [copyrightDeclaredBy], references: [id])
+  personalFolder               PersonalFolder?        @relation(fields: [personalFolderId], references: [id], onDelete: Restrict)
+  subject                      Subject                @relation(fields: [subjectId], references: [id])
+  user                         User                   @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  quizzes                      Quiz[]
+  storageReservations          StorageReservation[]
+  uploadStatuses               UploadStatus[]
+  documentViews                UserDocumentView[]
+  followers                    UserFollowedDocument[]
+
+  @@index([subjectId, status])
+  @@index([fileHash])
+  @@map("documents")
+}
+
+/// Tóm tắt nội dung tài liệu học thuật do AI thực hiện
+model DocumentSummary {
+  id           String        @id @default(uuid()) @db.Uuid
+  documentId   String        @unique @map("document_id") @db.Uuid
+  summaryText  String        @map("summary_text")
+  keyPoints    String?       @map("key_points")
+  status       SummaryStatus @default(PROCESSING)
+  errorMessage String?       @map("error_message")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  document     Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_summaries")
+}
+
+/// Theo dõi tiến trình tải file lên Cloud Storage
+model UploadStatus {
+  id           String               @id @default(uuid()) @db.Uuid
+  documentId   String?              @map("document_id") @db.Uuid
+  userId       String               @map("user_id") @db.Uuid
+  fileName     String               @map("file_name")
+  fileSize     BigInt               @map("file_size")
+  status       UploadProgressStatus @default(UPLOADING)
+  progress     Int                  @default(0)
+  errorMessage String?              @map("error_message")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  document     Document?            @relation(fields: [documentId], references: [id])
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("upload_status")
+}
+
+/// Bộ câu hỏi trắc nghiệm AI sinh ra từ tài liệu
+model Quiz {
+  id         String            @id @default(uuid()) @db.Uuid
+  documentId String            @map("document_id") @db.Uuid
+  createdBy  String?           @map("created_by") @db.Uuid
+  title      String
+  createdAt  DateTime          @default(now()) @map("created_at")
+  questions  QuizQuestion[]
+  user       User?             @relation(fields: [createdBy], references: [id])
+  document   Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  attempts   UserQuizAttempt[]
+
+  @@index([documentId])
+  @@map("quizzes")
+}
+
+/// Chi tiết câu hỏi trong bộ Quiz trắc nghiệm
+model QuizQuestion {
+  id           String       @id @default(uuid()) @db.Uuid
+  quizId       String       @map("quiz_id") @db.Uuid
+  questionText String       @map("question_text")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  options      QuizOption[]
+  quiz         Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@map("quiz_questions")
+}
+
+/// Các đáp án lựa chọn trắc nghiệm của câu hỏi
+model QuizOption {
+  id         String       @id @default(uuid()) @db.Uuid
+  questionId String       @map("question_id") @db.Uuid
+  optionText String       @map("option_text")
+  isCorrect  Boolean      @default(false) @map("is_correct")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("quiz_options")
+}
+
+/// Nhật ký/Lịch sử làm bài làm trắc nghiệm của sinh viên
+model UserQuizAttempt {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  quizId      String   @map("quiz_id") @db.Uuid
+  score       Int
+  completedAt DateTime @default(now()) @map("completed_at")
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt(sort: Desc)])
+  @@map("user_quiz_attempts")
+}
+
+/// Nhật ký/Lịch sử xem tài liệu của người dùng
+model UserDocumentView {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  viewedAt   DateTime @default(now()) @map("viewed_at")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@index([userId, viewedAt(sort: Desc)])
+  @@map("user_document_views")
+}
+
+/// Lưu/Theo dõi tài liệu của người dùng
+model UserFollowedDocument {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  followedAt DateTime @default(now()) @map("followed_at")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@map("user_followed_documents")
+}
+
+/// Chia nhỏ nội dung tài liệu để xử lý AI (RAG)
+model DocumentChunk {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  chunkIndex Int      @map("chunk_index")
+  content    String
+  charStart  Int      @map("char_start")
+  charEnd    Int      @map("char_end")
+  createdAt  DateTime @default(now()) @map("created_at")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@map("document_chunks")
+}
+
+model DocumentRating {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
+  @@map("document_ratings")
+}
+
+model DocumentReport {
+  id          String       @id @default(uuid()) @db.Uuid
+  documentId  String       @map("document_id") @db.Uuid
+  reporterId  String       @map("reporter_id") @db.Uuid
+  reason      ReportReason
+  description String?
+  status      ReportStatus @default(PENDING)
+  reviewedBy  String?      @map("reviewed_by") @db.Uuid
+  reviewedAt  DateTime?    @map("reviewed_at")
+  adminNote   String?      @map("admin_note")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  document    Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  reporter    User         @relation("DocumentReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reviewer    User?        @relation("DocumentReviewer", fields: [reviewedBy], references: [id])
+
+  @@map("document_reports")
+}
+
+model UserStorageUsage {
+  userId        String   @id @map("user_id") @db.Uuid
+  quotaBytes    BigInt   @map("quota_bytes")
+  usedBytes     BigInt   @map("used_bytes")
+  reservedBytes BigInt   @map("reserved_bytes")
+  trashBytes    BigInt   @map("trash_bytes")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_storage_usages")
+}
+
+model StorageReservation {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @map("user_id") @db.Uuid
+  documentId  String?           @map("document_id") @db.Uuid
+  bytes       BigInt
+  status      ReservationStatus @default(PENDING)
+  expiresAt   DateTime          @map("expires_at")
+  finalizedAt DateTime?         @map("finalized_at")
+  releasedAt  DateTime?         @map("released_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  document    Document?         @relation(fields: [documentId], references: [id])
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, expiresAt])
+  @@map("storage_reservations")
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String
+  content   String
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
 
 /// Vai trò người dùng trong hệ thống
@@ -107,461 +522,4 @@ enum CopyrightSourceType {
   OWN_ORIGINAL
   OPEN_LICENSE
   UNKNOWN
-}
-
-/// Quản lý thông tin tài khoản người dùng
-model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  fullName     String   @map("full_name")
-  username     String?  @unique
-  phoneNumber  String?  @map("phone_number")
-  avatarUrl    String?  @map("avatar_url")
-  role         UserRole @default(STUDENT)
-  isActive     Boolean  @default(true) @map("is_active")
-  isTeacherBanned Boolean @default(false) @map("is_teacher_banned")
-  provider     String   @default("local") @map("provider")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  // Quan hệ
-  passwordResetTokens     PasswordResetToken[]
-  documents               Document[]
-  uploadStatuses          UploadStatus[]
-  quizzes                 Quiz[]
-  quizAttempts            UserQuizAttempt[]
-  documentViews           UserDocumentView[]
-  followedDocuments       UserFollowedDocument[]
-  documentRatings         DocumentRating[]
-  documentReportsMade     DocumentReport[]       @relation("DocumentReporter")
-  documentReportsReviewed DocumentReport[]       @relation("DocumentReviewer")
-  teacherVerification     TeacherVerification?
-  storageUsage            UserStorageUsage?
-  storageReservations     StorageReservation[]
-  personalFolders         PersonalFolder[]
-  copyrightDeclarations   Document[]             @relation("DocumentCopyrightDeclarer")
-  notifications           Notification[]
-
-  @@map("users")
-}
-
-/// Quản lý Token reset mật khẩu (Quên mật khẩu)
-model PasswordResetToken {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String    @unique
-  expiresAt DateTime  @map("expires_at")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  @@map("password_reset_tokens")
-}
-
-/// Quản lý Yêu cầu Xác Thực Giảng Viên
-model TeacherVerification {
-  id          String             @id @default(uuid()) @db.Uuid
-  userId      String             @unique @map("user_id") @db.Uuid
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teacherCode String             @map("teacher_code")
-  department  String
-  proofUrl    String?            @map("proof_url")
-  status      VerificationStatus @default(PENDING)
-  adminNote   String?            @map("admin_note") @db.Text
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @updatedAt @map("updated_at")
-
-  @@map("teacher_verifications")
-}
-
-/// Danh mục Môn học/Mã học phần
-model Subject {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  code        String   @unique
-  description String?  @db.Text
-  isSystem    Boolean  @default(false) @map("is_system")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdBy   String?  @map("created_by") @db.Uuid
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // Quan hệ
-  documents Document[]
-  majors    MajorSubject[]
-
-  @@map("subjects")
-}
-
-/// Chuyên ngành/Ngành học (Major)
-model Major {
-  id        String   @id @default(uuid()) @db.Uuid
-  code      String   @unique
-  name      String
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  subjects MajorSubject[]
-
-  @@map("majors")
-}
-
-/// Bảng trung gian Course Catalog: Ngành học ↔ Học phần
-model MajorSubject {
-  majorId   String @map("major_id") @db.Uuid
-  subjectId Int    @map("subject_id")
-
-  major   Major   @relation(fields: [majorId], references: [id], onDelete: Cascade)
-  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-
-  @@id([majorId, subjectId])
-  @@map("major_subjects")
-}
-
-/// Thư mục cá nhân của người dùng
-model PersonalFolder {
-  id        String   @id @default(uuid()) @db.Uuid
-  ownerId   String   @map("owner_id") @db.Uuid
-  name      String
-  parentId  String?  @map("parent_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-
-  parent    PersonalFolder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Restrict)
-  children  PersonalFolder[] @relation("FolderToFolder")
-  documents Document[]
-
-  @@map("personal_folders")
-}
-
-/// Tag quản lý nhãn dán cho Document
-model Tag {
-  id        Int      @id @default(autoincrement())
-  name      String
-  slug      String
-  createdBy String?  @map("created_by") @db.Uuid
-  isSystem  Boolean  @default(false) @map("is_system")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-
-  documents DocumentTag[]
-
-  @@unique([slug, createdBy])
-  @@map("tags")
-}
-
-/// Bảng trung gian Document và Tag
-model DocumentTag {
-  documentId String   @map("document_id") @db.Uuid
-  tagId      Int      @map("tag_id")
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@id([documentId, tagId])
-  @@map("document_tags")
-}
-
-/// Thông tin siêu dữ liệu tài liệu học thuật
-model Document {
-  id               String          @id @default(uuid()) @db.Uuid
-  title            String
-  description      String?         @db.Text
-  subjectId        Int             @map("subject_id")
-  subject          Subject         @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  personalFolderId String?         @map("personal_folder_id") @db.Uuid
-  personalFolder   PersonalFolder? @relation(fields: [personalFolderId], references: [id], onDelete: Restrict)
-  uploadedBy       String          @map("uploaded_by") @db.Uuid
-  user             User            @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
-  fileUrl          String          @map("file_url") @db.VarChar(512)
-  previewUrl       String?         @map("preview_url") @db.VarChar(512)
-  fileSize         BigInt          @map("file_size")
-  fileType         String          @map("file_type")
-  downloadCount    Int             @default(0) @map("download_count")
-  viewCount        Int             @default(0) @map("view_count")
-  status           DocumentStatus  @default(ACTIVE)
-  fullText         String?         @map("full_text") @db.Text
-  pageCount        Int?            @map("page_count")
-  isAIGenerated    Boolean         @default(false) @map("is_ai_generated")
-  averageRating    Float           @default(0.0) @map("average_rating")
-  ratingCount      Int             @default(0) @map("rating_count")
-  reportCount      Int             @default(0) @map("report_count")
-  deletedAt        DateTime?       @map("deleted_at")
-  createdAt        DateTime        @default(now()) @map("created_at")
-  updatedAt        DateTime        @updatedAt @map("updated_at")
-
-  // Document Lifecycle
-  visibilityStatus VisibilityStatus @default(PRIVATE) @map("visibility_status")
-  deletionStatus   DeletionStatus   @default(ACTIVE) @map("deletion_status")
-  extractionStatus ExtractionStatus @default(PENDING) @map("extraction_status")
-  storagePath      String?          @map("storage_path") @db.VarChar(512)
-  requestedAt      DateTime?        @map("requested_at")
-
-  // AI Fields
-  aiStatus              AIStatus  @default(NOT_REQUESTED) @map("ai_status")
-  aiRunId               String?   @map("ai_run_id")
-  aiProcessingStartedAt DateTime? @map("ai_processing_started_at")
-  aiGeneratedAt         DateTime? @map("ai_generated_at")
-  aiAttemptCount        Int       @default(0) @map("ai_attempt_count")
-  aiFailureReason       String?   @map("ai_failure_reason") @db.Text
-
-  // Copyright Fields
-  copyrightSourceType          CopyrightSourceType @default(UNKNOWN) @map("copyright_source_type")
-  copyrightAuthorName          String?             @map("copyright_author_name") @db.VarChar(255)
-  copyrightSourceUrl           String?             @map("copyright_source_url") @db.VarChar(512)
-  copyrightLicense             String?             @map("copyright_license") @db.VarChar(100)
-  copyrightAttribution         String?             @map("copyright_attribution") @db.Text
-  copyrightPermissionReference String?             @map("copyright_permission_reference") @db.Text
-  copyrightDeclaredAt          DateTime?           @map("copyright_declared_at")
-  copyrightDeclaredBy          String?             @map("copyright_declared_by") @db.Uuid
-  copyrightDeclarer            User?               @relation("DocumentCopyrightDeclarer", fields: [copyrightDeclaredBy], references: [id], onDelete: SetNull)
-  fileHash                     String?             @map("file_hash") @db.VarChar(64)
-  rejectReason                 String?             @map("reject_reason") @db.Text
-
-  // Quan hệ
-  summary             DocumentSummary?
-  uploadStatuses      UploadStatus[]
-  quizzes             Quiz[]
-  documentViews       UserDocumentView[]
-  tags                DocumentTag[]
-  followers           UserFollowedDocument[]
-  chunks              DocumentChunk[]
-  ratings             DocumentRating[]
-  reports             DocumentReport[]
-  storageReservations StorageReservation[]
-
-  @@index([subjectId, status])
-  @@index([fileHash])
-  @@map("documents")
-}
-
-/// Tóm tắt nội dung tài liệu học thuật do AI thực hiện
-model DocumentSummary {
-  id           String        @id @default(uuid()) @db.Uuid
-  documentId   String        @unique @map("document_id") @db.Uuid
-  document     Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  summaryText  String        @map("summary_text") @db.Text
-  keyPoints    String?       @map("key_points") @db.Text
-  status       SummaryStatus @default(PROCESSING)
-  errorMessage String?       @map("error_message") @db.Text
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-
-  @@map("document_summaries")
-}
-
-/// Theo dõi tiến trình tải file lên Cloud Storage
-model UploadStatus {
-  id           String               @id @default(uuid()) @db.Uuid
-  documentId   String?              @map("document_id") @db.Uuid
-  document     Document?            @relation(fields: [documentId], references: [id], onDelete: SetNull)
-  userId       String               @map("user_id") @db.Uuid
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fileName     String               @map("file_name")
-  fileSize     BigInt               @map("file_size")
-  status       UploadProgressStatus @default(UPLOADING)
-  progress     Int                  @default(0)
-  errorMessage String?              @map("error_message") @db.Text
-  createdAt    DateTime             @default(now()) @map("created_at")
-  updatedAt    DateTime             @updatedAt @map("updated_at")
-
-  @@map("upload_status")
-}
-
-/// Bộ câu hỏi trắc nghiệm AI sinh ra từ tài liệu
-model Quiz {
-  id         String   @id @default(uuid()) @db.Uuid
-  documentId String   @map("document_id") @db.Uuid
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  createdBy  String?  @map("created_by") @db.Uuid
-  user       User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
-  title      String
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  // Quan hệ
-  questions QuizQuestion[]
-  attempts  UserQuizAttempt[]
-
-  @@index([documentId])
-  @@map("quizzes")
-}
-
-/// Chi tiết câu hỏi trong bộ Quiz trắc nghiệm
-model QuizQuestion {
-  id           String   @id @default(uuid()) @db.Uuid
-  quizId       String   @map("quiz_id") @db.Uuid
-  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  questionText String   @map("question_text") @db.Text
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  // Quan hệ
-  options QuizOption[]
-
-  @@index([quizId])
-  @@map("quiz_questions")
-}
-
-/// Các đáp án lựa chọn trắc nghiệm của câu hỏi
-model QuizOption {
-  id         String       @id @default(uuid()) @db.Uuid
-  questionId String       @map("question_id") @db.Uuid
-  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  optionText String       @map("option_text") @db.Text
-  isCorrect  Boolean      @default(false) @map("is_correct")
-  createdAt  DateTime     @default(now()) @map("created_at")
-
-  @@index([questionId])
-  @@map("quiz_options")
-}
-
-/// Nhật ký/Lịch sử làm bài làm trắc nghiệm của sinh viên
-model UserQuizAttempt {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @map("user_id") @db.Uuid
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quizId      String   @map("quiz_id") @db.Uuid
-  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  score       Int
-  completedAt DateTime @default(now()) @map("completed_at")
-
-  @@index([userId, completedAt(sort: Desc)])
-  @@map("user_quiz_attempts")
-}
-
-/// Nhật ký/Lịch sử xem tài liệu của người dùng
-model UserDocumentView {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
-  documentId String   @map("document_id") @db.Uuid
-  viewedAt   DateTime @default(now()) @map("viewed_at")
-
-  // Quan hệ
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, documentId])
-  @@index([userId, viewedAt(sort: Desc)])
-  @@map("user_document_views")
-}
-
-/// Lưu/Theo dõi tài liệu của người dùng
-model UserFollowedDocument {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
-  documentId String   @map("document_id") @db.Uuid
-  followedAt DateTime @default(now()) @map("followed_at")
-
-  // Quan hệ
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, documentId])
-  @@map("user_followed_documents")
-}
-
-/// Chia nhỏ nội dung tài liệu để xử lý AI (RAG)
-model DocumentChunk {
-  id         String   @id @default(uuid()) @db.Uuid
-  documentId String   @map("document_id") @db.Uuid
-  chunkIndex Int      @map("chunk_index")
-  content    String   @db.Text
-  charStart  Int      @map("char_start")
-  charEnd    Int      @map("char_end")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@unique([documentId, chunkIndex])
-  @@index([documentId])
-  @@map("document_chunks")
-}
-
-model DocumentRating {
-  id         String @id @default(uuid()) @db.Uuid
-  documentId String @map("document_id") @db.Uuid
-  userId     String @map("user_id") @db.Uuid
-
-  rating  Int
-  comment String? @db.Text
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([documentId, userId])
-  @@map("document_ratings")
-}
-
-model DocumentReport {
-  id String @id @default(uuid()) @db.Uuid
-
-  documentId String @map("document_id") @db.Uuid
-  reporterId String @map("reporter_id") @db.Uuid
-
-  reason      ReportReason
-  description String?      @db.Text
-
-  status ReportStatus @default(PENDING)
-
-  reviewedBy String?   @map("reviewed_by") @db.Uuid
-  reviewedAt DateTime? @map("reviewed_at")
-  adminNote  String?   @map("admin_note") @db.Text
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  reporter User     @relation("DocumentReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  reviewer User?    @relation("DocumentReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-
-  @@map("document_reports")
-}
-
-model UserStorageUsage {
-  userId        String   @id @map("user_id") @db.Uuid
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quotaBytes    BigInt   @map("quota_bytes")
-  usedBytes     BigInt   @map("used_bytes")
-  reservedBytes BigInt   @map("reserved_bytes")
-  trashBytes    BigInt   @map("trash_bytes")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  @@map("user_storage_usages")
-}
-
-model StorageReservation {
-  id          String            @id @default(uuid()) @db.Uuid
-  userId      String            @map("user_id") @db.Uuid
-  documentId  String?           @map("document_id") @db.Uuid
-  bytes       BigInt
-  status      ReservationStatus @default(PENDING)
-  expiresAt   DateTime          @map("expires_at")
-  finalizedAt DateTime?         @map("finalized_at")
-  releasedAt  DateTime?         @map("released_at")
-  createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
-
-  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, status, expiresAt])
-  @@map("storage_reservations")
-}
-
-model Notification {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  title     String
-  content   String   @db.Text
-  isRead    Boolean  @default(false) @map("is_read")
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("notifications")
 }

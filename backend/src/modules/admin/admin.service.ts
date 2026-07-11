@@ -924,4 +924,46 @@ export class AdminService {
       throw new InternalServerErrorException('Không thể cập nhật báo cáo');
     }
   }
+  async banTeacher(userId: string, adminNote?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng.');
+    }
+
+    if (user.role !== 'TEACHER') {
+      throw new BadRequestException('Người dùng này không có vai trò Giảng viên.');
+    }
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const updatedUser = await tx.user.update({
+          where: { id: userId },
+          data: {
+            role: 'STUDENT',
+            isTeacherBanned: true,
+          },
+        });
+
+        await tx.teacherVerification.updateMany({
+          where: { userId },
+          data: {
+            status: 'REJECTED',
+            adminNote:
+              adminNote?.trim() ||
+              'Bị quản trị viên hạ quyền thủ công và chặn nâng quyền Giảng viên.',
+          },
+        });
+
+        return updatedUser;
+      });
+
+      return this.sanitizeData(result);
+    } catch (error) {
+      console.error('Lỗi khi hạ quyền và chặn giảng viên:', error);
+      throw new InternalServerErrorException('Không thể hạ quyền và chặn giảng viên');
+    }
+  }
 }
