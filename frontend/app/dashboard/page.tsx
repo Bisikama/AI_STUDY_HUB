@@ -622,7 +622,13 @@ function DashboardPage() {
               <div className="relative">
                 <button
                   onClick={() => setShowAvatarDropdown(!showAvatarDropdown)}
-                  className="border-outline-variant hover:border-primary focus:ring-primary flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border transition-colors focus:ring-2 focus:ring-offset-2"
+                  className={`border-outline-variant hover:border-primary focus:ring-primary flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border transition-colors focus:ring-2 focus:ring-offset-2 ${
+                    user?.role === 'TEACHER'
+                      ? 'ring-2 ring-emerald-500 ring-offset-1 border-transparent'
+                      : user?.role === 'ADMIN'
+                      ? 'ring-2 ring-blue-600 ring-offset-1 border-transparent'
+                      : ''
+                  }`}
                 >
                   <img
                     alt="User profile avatar"
@@ -650,16 +656,18 @@ function DashboardPage() {
                         </span>{' '}
                         Edit Account
                       </button>
-                      <button
-                        onClick={() => {
-                          setShowAvatarDropdown(false);
-                          setShowVerificationModal(true);
-                        }}
-                        className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
-                        Verify Teacher
-                      </button>
+                      {user?.role !== 'TEACHER' && user?.role !== 'ADMIN' && (
+                        <button
+                          onClick={() => {
+                            setShowAvatarDropdown(false);
+                            setShowVerificationModal(true);
+                          }}
+                          className="hover:bg-surface-container-low text-on-surface font-label-md text-label-md flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
+                          Verify Teacher
+                        </button>
+                      )}
                       <hr className="border-outline-variant my-1" />
                       <button
                         onClick={handleLogout}
