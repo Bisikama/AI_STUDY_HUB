@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { authApi, LoginCredentials, RegisterData } from '@/services/authApi';
+import { safeNavigateTo } from '../utils/navigation';
 
 export interface User {
   id: string;
@@ -76,7 +77,7 @@ export const useAuth = () => {
       localStorage.removeItem('user');
       // Xóa cookie ở domain frontend
       document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
-      window.location.href = '/login';
+      safeNavigateTo('/login');
     }
   };
 

@@ -122,13 +122,9 @@ const DOCUMENT_TYPES = ['Lecture notes', 'Summaries', 'Past Exams', 'Essays'];
 
 const MAJOR_OPTIONS = [
   { code: 'BA', name: 'Business Administration' },
-  { code: 'IB', name: 'International Business' },
-  { code: 'FIN', name: 'Finance' },
-  { code: 'MC', name: 'Multimedia Communications' },
   { code: 'SE', name: 'Software Engineering' },
   { code: 'IS', name: 'Information Systems' },
   { code: 'AI', name: 'Artificial Intelligence' },
-  { code: 'IA', name: 'Information Assurance' },
   { code: 'GD', name: 'Graphic Design' },
 ];
 
@@ -282,6 +278,7 @@ function SearchExplore() {
 
   const [sortBy, setSortBy] = useState<'recent' | 'viewed' | 'rating'>('recent');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [subjectSearch, setSubjectSearch] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('All majors');
 
   const [collapsedSections, setCollapsedSections] = useState<{ [key: string]: boolean }>({
@@ -389,6 +386,16 @@ function SearchExplore() {
     return getSubjectFilterOptions(displayDocs);
   }, [displayDocs]);
 
+  const visibleSubjectFilterOptions = useMemo(() => {
+    const keyword = subjectSearch.trim().toLowerCase();
+
+    if (!keyword) {
+      return subjectFilterOptions;
+    }
+
+    return subjectFilterOptions.filter((subject) => subject.toLowerCase().includes(keyword));
+  }, [subjectFilterOptions, subjectSearch]);
+
   const filteredDocuments = useMemo(() => {
     let list = [...displayDocs];
 
@@ -427,6 +434,7 @@ function SearchExplore() {
 
   const handleClearAll = () => {
     setSelectedSubjects([]);
+    setSubjectSearch('');
     setSelectedSemester('All majors');
     setSortBy('recent');
   };
@@ -903,19 +911,38 @@ function SearchExplore() {
               {!collapsedSections.subject && (
                 <div className="space-y-3">
                   {subjectFilterOptions.length > 0 ? (
-                    subjectFilterOptions.map((subject) => (
-                      <label key={subject} className="group flex cursor-pointer items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedSubjects.includes(subject)}
-                          onChange={() => handleSubjectChange(subject)}
-                          className="filter-checkbox border-outline-variant text-primary focus:ring-primary h-4 w-4 rounded"
-                        />
-                        <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
-                          {subject}
-                        </span>
-                      </label>
-                    ))
+                    <>
+                      <input
+                        type="text"
+                        value={subjectSearch}
+                        onChange={(e) => setSubjectSearch(e.target.value)}
+                        placeholder="Search subject code..."
+                        className="bg-surface-container-low font-label-md text-on-surface-variant placeholder:text-secondary/70 focus:ring-primary w-full rounded-lg border-none px-4 py-2.5 outline-none focus:ring-2"
+                      />
+
+                      <div className="custom-scrollbar max-h-72 space-y-3 overflow-y-auto pr-1">
+                        {visibleSubjectFilterOptions.length > 0 ? (
+                          visibleSubjectFilterOptions.map((subject) => (
+                            <label
+                              key={subject}
+                              className="group flex cursor-pointer items-center gap-3"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedSubjects.includes(subject)}
+                                onChange={() => handleSubjectChange(subject)}
+                                className="filter-checkbox border-outline-variant text-primary focus:ring-primary h-4 w-4 rounded"
+                              />
+                              <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
+                                {subject}
+                              </span>
+                            </label>
+                          ))
+                        ) : (
+                          <p className="text-secondary text-sm">No matching subjects.</p>
+                        )}
+                      </div>
+                    </>
                   ) : (
                     <p className="text-secondary text-sm">No subjects available yet.</p>
                   )}

@@ -7,7 +7,13 @@ export const mapDocumentError = (error: any): string => {
 
   const code = responseData?.code || responseData?.message || error?.message;
 
-  switch (errorCode) {
+  if (error?.response?.status === 409 && responseData?.message) {
+    return responseData.message;
+  }
+
+  const code = responseData?.code || responseData?.message || error?.message;
+
+  switch (code) {
     case 'DOCUMENT_INVALID_FILE':
       return 'Invalid file format or corrupted file. Please check again.';
     case 'STORAGE_OPERATION_FAILED':
@@ -66,8 +72,8 @@ export const mapDocumentError = (error: any): string => {
       if (error?.response?.status === 403) {
         return 'You do not have permission to perform this action.';
       }
-      if (data?.message) {
-        return data.message;
+      if (responseData?.message) {
+        return responseData.message;
       }
       return 'An unknown error occurred. Please try again.';
   }
