@@ -27,8 +27,8 @@ interface CustomWindow extends Window {
 
 // 1. ĐỊNH NGHĨA ZOD SCHEMA CHO LOGIN
 const loginSchema = z.object({
-  email: z.string().min(1, 'Email không được để trống').email('Email không đúng định dạng'),
-  password: z.string().min(6, 'Mật khẩu không được để trống'),
+  email: z.string().min(1, 'Email cannot be empty').email('Invalid email format'),
+  password: z.string().min(6, 'Password cannot be empty'),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -300,7 +300,7 @@ export default function LoginPage() {
                 <line x1="19" y1="12" x2="5" y2="12" />
                 <polyline points="12 19 5 12 12 5" />
               </svg>
-              Quay lại trang chủ
+              Return to the homepage
             </button>
           </div>
         </div>

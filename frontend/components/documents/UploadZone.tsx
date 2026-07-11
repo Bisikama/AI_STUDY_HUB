@@ -4,11 +4,12 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone, FileRejection } from 'react-dropzone';
 import { useUploadDocument } from '@/hooks/useUploadDocument';
 import useSWR, { mutate } from 'swr';
-import { subjectsApi, Major, CatalogItem, Subject } from '@/services/subjectsApi';
+import { subjectsApi, CatalogItem } from '@/services/subjectsApi';
 import { tagsApi, Tag } from '@/services/tagsApi';
 import { personalFoldersApi, PersonalFolder } from '@/services/personalFoldersApi';
+import { FPT_MAJOR_OPTIONS } from '@/constants/majorOptions';
 
-//  Constants
+// Constants
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ACCEPTED_TYPES: Record<string, string[]> = {
   'application/pdf': ['.pdf'],
@@ -22,7 +23,7 @@ const ACCEPTED_TYPES: Record<string, string[]> = {
 };
 const ACCEPTED_EXTENSIONS = ['.pdf', '.txt', '.doc', '.docx', '.zip', '.xlsx', '.jpg', '.png'];
 
-//  Toast types
+// Toast types
 type ToastVariant = 'success' | 'error';
 
 interface Toast {
@@ -31,45 +32,52 @@ interface Toast {
   variant: ToastVariant;
 }
 
-//  Toast Component
+// Toast Component
 function ToastNotification({ toasts }: { toasts: Toast[] }) {
   return (
-    <div className="pointer-events-none fixed right-6 bottom-6 z-50 flex flex-col gap-2">
+    <div className="pointer-events-none fixed right-6 bottom-6 z-50 flex flex-col gap-3">
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`pointer-events-auto flex max-w-sm min-w-[280px] items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${t.variant === 'success' ? 'bg-emerald-600' : 'bg-red-600'
-            }`}
+          className={`animate-in slide-in-from-bottom-5 fade-in pointer-events-auto flex max-w-sm min-w-[300px] items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium text-white shadow-xl ring-1 transition-all duration-300 ${
+            t.variant === 'success'
+              ? 'bg-emerald-600 shadow-emerald-900/20 ring-emerald-700/50'
+              : 'bg-red-600 shadow-red-900/20 ring-red-700/50'
+          }`}
         >
           {t.variant === 'success' ? (
-            <svg
-              className="h-4 w-4 shrink-0"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.5}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20">
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={3}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
           ) : (
-            <svg
-              className="h-4 w-4 shrink-0"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.5}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20">
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={3}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
           )}
-          {t.message}
+          <p className="leading-relaxed">{t.message}</p>
         </div>
       ))}
     </div>
   );
 }
 
-//  Sidebar
+// Sidebar Component
 function Sidebar() {
   const navItems = [
     {
@@ -80,7 +88,7 @@ function Sidebar() {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.8}
+          strokeWidth={2}
         >
           <circle cx="11" cy="11" r="8" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35" />
@@ -97,7 +105,7 @@ function Sidebar() {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.8}
+          strokeWidth={2}
         >
           <path
             strokeLinecap="round"
@@ -117,7 +125,7 @@ function Sidebar() {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.8}
+          strokeWidth={2}
         >
           <path
             strokeLinecap="round"
@@ -137,7 +145,7 @@ function Sidebar() {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.8}
+          strokeWidth={2}
         >
           <path
             strokeLinecap="round"
@@ -160,7 +168,7 @@ function Sidebar() {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.8}
+          strokeWidth={2}
         >
           <path
             strokeLinecap="round"
@@ -180,7 +188,7 @@ function Sidebar() {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.8}
+          strokeWidth={2}
         >
           <path
             strokeLinecap="round"
@@ -194,32 +202,35 @@ function Sidebar() {
   ];
 
   return (
-    <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-gray-200 bg-white">
+    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gray-900">
+      <div className="flex items-center gap-3 px-6 py-6">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 shadow-sm">
           <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
           </svg>
         </div>
         <div>
-          <p className="text-sm leading-none font-bold text-gray-900">AI STUDY HUB</p>
-          <p className="mt-0.5 text-[9px] font-semibold tracking-widest text-gray-400 uppercase">
+          <p className="text-sm leading-none font-bold tracking-tight text-slate-900">
+            AI STUDY HUB
+          </p>
+          <p className="mt-1 text-[10px] font-medium tracking-widest text-slate-500 uppercase">
             Academic Excellence
           </p>
         </div>
       </div>
 
       {/* Main Nav */}
-      <nav className="flex-1 px-3 py-2">
+      <nav className="flex-1 space-y-1 px-4 py-4">
         {navItems.map((item) => (
           <a
             key={item.label}
             href={item.href}
-            className={`mb-0.5 flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${item.active
-              ? 'bg-gray-100 text-gray-900'
-              : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-              }`}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+              item.active
+                ? 'bg-slate-100/80 text-slate-900'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
           >
             {item.icon}
             {item.label}
@@ -228,8 +239,8 @@ function Sidebar() {
       </nav>
 
       {/* New Research Button */}
-      <div className="px-3 pb-3">
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 active:bg-gray-950">
+      <div className="px-4 pb-4">
+        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800 active:scale-[0.98]">
           <svg
             className="h-4 w-4"
             viewBox="0 0 24 24"
@@ -244,12 +255,12 @@ function Sidebar() {
       </div>
 
       {/* Bottom Nav */}
-      <div className="border-t border-gray-200 px-3 py-3">
+      <div className="space-y-1 border-t border-slate-100 px-4 py-4">
         {bottomItems.map((item) => (
           <a
             key={item.label}
             href={item.href}
-            className="mb-0.5 flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-all duration-200 hover:bg-slate-50 hover:text-slate-900"
           >
             {item.icon}
             {item.label}
@@ -260,9 +271,9 @@ function Sidebar() {
   );
 }
 
-//  Main UploadZone Component
+// Main UploadZone Component
 export default function UploadZone() {
-  //  State
+  // State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const [title, setTitle] = useState('');
@@ -271,7 +282,7 @@ export default function UploadZone() {
   // Subject (Major -> Course) state
   const [selectedMajorCode, setSelectedMajorCode] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
-  
+
   // Study Folder state
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const [showCreateFolder, setShowCreateFolder] = useState(false);
@@ -288,26 +299,24 @@ export default function UploadZone() {
 
   const { trigger, isMutating } = useUploadDocument();
 
-  // Load majors
-  const { data: majorsResponse } = useSWR('/subjects/catalog/majors', () => subjectsApi.getMajors());
-  const majors: Major[] = majorsResponse || [];
+  // Mock FPT majors for upload form
+  const majors = FPT_MAJOR_OPTIONS;
 
   // Load catalog courses
   const { data: catalogResponse } = useSWR(
     selectedMajorCode ? `/subjects/catalog/courses?majorCode=${selectedMajorCode}` : null,
-    () => subjectsApi.getCatalog(selectedMajorCode)
+    () => subjectsApi.getCatalog(selectedMajorCode),
   );
   const courses: CatalogItem[] = catalogResponse || [];
 
   // Load personal folders
-  const { data: foldersResponse, mutate: mutateFolders } = useSWR('/personal-folders', () => personalFoldersApi.getFolders());
+  const { data: foldersResponse, mutate: mutateFolders } = useSWR('/personal-folders', () =>
+    personalFoldersApi.getFolders(),
+  );
   const folders: PersonalFolder[] = foldersResponse || [];
 
   // Load tags
-  const { data: tagsResponse, error: tagsError } = useSWR(
-    '/tags',
-    () => tagsApi.getTags(),
-  );
+  const { data: tagsResponse, error: tagsError } = useSWR('/tags', () => tagsApi.getTags());
   const availableTags: Tag[] = tagsResponse || [];
 
   // Warn if tags failed to load
@@ -315,21 +324,21 @@ export default function UploadZone() {
     if (tagsError) {
       addToast('Failed to load tags. You can still upload without them.', 'error');
     }
-  }, [tagsError]);
+  }, [tagsError, addToast]);
 
-  //  Toast helpers
-  const addToast = useCallback((message: string, variant: ToastVariant) => {
+  // Toast helpers
+  function addToast(message: string, variant: ToastVariant) {
     const id = ++toastIdRef.current;
     setToasts((prev) => [...prev, { id, message, variant }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
-  }, []);
+  }
 
-  //  Progress simulation
+  // Progress simulation
   const startProgress = useCallback(() => {
     setProgress(0);
     let current = 0;
     progressIntervalRef.current = setInterval(() => {
-      current += Math.random() * 8 + 2; // random increment 2-10%
+      current += Math.random() * 8 + 2;
       if (current >= 95) {
         current = 95;
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
@@ -343,24 +352,26 @@ export default function UploadZone() {
     if (success) setProgress(100);
   }, []);
 
-  // Cleanup interval on unmount
   useEffect(() => {
     return () => {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     };
   }, []);
 
-  //  Dropzone
+  // Dropzone
   const onDrop = useCallback(
     (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
       if (rejectedFiles.length > 0) {
         const err = rejectedFiles[0]?.errors[0];
         if (err?.code === 'file-too-large') {
-          addToast('File quá lớn! Kích thước tối đa là 10MB.', 'error');
+          addToast('File too large! Maximum size is 10MB.', 'error');
         } else if (err?.code === 'file-invalid-type') {
-          addToast(`Loại file không được hỗ trợ. Các loại hợp lệ: ${ACCEPTED_EXTENSIONS.join(', ')}`, 'error');
+          addToast(
+            `Unsupported file type. Allowed types: ${ACCEPTED_EXTENSIONS.join(', ')}`,
+            'error',
+          );
         } else {
-          addToast('File không hợp lệ. Vui lòng thử lại.', 'error');
+          addToast('Invalid file. Please try again.', 'error');
         }
         return;
       }
@@ -378,24 +389,24 @@ export default function UploadZone() {
     maxSize: MAX_FILE_SIZE,
     maxFiles: 1,
     disabled: isMutating,
-    noClick: true, // ← tắt mở picker khi click vào vùng dropzone
-    noKeyboard: true, // ← chỉ dùng nút Browse Files
+    noClick: true,
+    noKeyboard: true,
   });
 
-  // ── Remove selected file ────────────────────────────────────────────────────
   const handleRemoveFile = () => {
     setSelectedFile(null);
     setProgress(0);
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
   };
 
-  //  Tags logic
   const handleAddTag = (tagName: string) => {
     const trimmed = tagName.trim();
     if (!trimmed) return;
 
-    // Convert to slug logic for deduplication on FE side
-    const slug = trimmed.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w-]/g, '');
+    const slug = trimmed
+      .toLowerCase()
+      .replace(/[\s_]+/g, '-')
+      .replace(/[^\w-]/g, '');
     if (!slug) return;
 
     if (selectedTags.length >= 10) {
@@ -403,13 +414,13 @@ export default function UploadZone() {
       return;
     }
 
-    // Check duplicate
-    if (selectedTags.some((t) => t.slug === slug || t.name.toLowerCase() === trimmed.toLowerCase())) {
+    if (
+      selectedTags.some((t) => t.slug === slug || t.name.toLowerCase() === trimmed.toLowerCase())
+    ) {
       setNewTagName('');
       return;
     }
 
-    // Find if it matches an existing tag
     const existing = availableTags.find((t) => t.slug === slug);
     if (existing) {
       setSelectedTags([...selectedTags, existing]);
@@ -424,7 +435,7 @@ export default function UploadZone() {
   const handleRemoveTag = (tagToRemove: Tag) => {
     setSelectedTags(selectedTags.filter((t) => t.slug !== tagToRemove.slug));
   };
-  //  Reset form
+
   const handleCancel = () => {
     setSelectedFile(null);
     setProgress(0);
@@ -440,7 +451,6 @@ export default function UploadZone() {
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
   };
 
-  //  Create new folder inline
   const handleCreateFolder = async () => {
     const name = newFolderName.trim();
     if (!name) {
@@ -462,24 +472,23 @@ export default function UploadZone() {
     }
   };
 
-  //  Submit
   const handleSubmit = async () => {
     if (!selectedFile) {
-      addToast('Vui lòng chọn một file để upload.', 'error');
+      addToast('Please select a file to upload.', 'error');
       return;
     }
     if (!title.trim() || title.trim().length > 150) {
-      addToast('Tiêu đề tài liệu là bắt buộc và tối đa 150 ký tự.', 'error');
+      addToast('Document title is required and must be max 150 characters.', 'error');
       return;
     }
     if (!selectedMajorCode || !selectedSubjectId) {
-      addToast('Vui lòng chọn Major và Course trước khi upload.', 'error');
+      addToast('Please select a Major and Course before uploading.', 'error');
       return;
     }
 
     startProgress();
     try {
-      const payload: any = {
+      const payload = {
         file: selectedFile,
         title: title.trim(),
         description: description.trim() || undefined,
@@ -493,50 +502,45 @@ export default function UploadZone() {
       stopProgress(true);
 
       if (result.extractionStatus === 'READY') {
-        addToast('Tài liệu đã được upload thành công! PDF đã được trích xuất thành công.', 'success');
+        addToast('Document uploaded successfully! PDF text extracted successfully.', 'success');
       } else if (result.extractionStatus === 'FAILED') {
-        addToast('Upload thành công! Không thể trích xuất text nhưng file PDF vẫn được lưu riêng tư và có thể preview.', 'success');
+        addToast(
+          'Upload successful! Could not extract text, but the file is saved and previewable.',
+          'success',
+        );
       } else {
-        addToast('Tài liệu đã được upload thành công!', 'success');
+        addToast('Document uploaded successfully!', 'success');
       }
 
-      // Revalidate documents list (wildcard)
-      // trigger should handle mutation, or we can use SWR mutate directly if needed
       mutate((key) => Array.isArray(key) && key[0] === '/documents/me');
-
-      // Reset after short delay so user sees 100%
       setTimeout(() => handleCancel(), 1500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       stopProgress(false);
       const { mapDocumentError } = await import('@/utils/errorMapper');
       addToast(mapDocumentError(err), 'error');
     }
   };
 
-  //  File size formatter
   const formatSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  //  Render
   return (
     <>
-      {/* Toasts */}
       <ToastNotification toasts={toasts} />
 
-      <div className="mx-auto max-w-3xl px-4 py-8 md:px-8 md:py-10">
+      <div className="mx-auto max-w-4xl px-4 py-10 md:px-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Upload Materials</h1>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="mb-10">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Upload Materials</h1>
+          <p className="mt-2 text-base text-slate-500">
             Add new study documents, research papers, or lecture notes to your workspace.
           </p>
         </div>
 
-        {/*  Dropzone Card */}
-        {/* Hidden native file input — triggered by Browse Files button */}
+        {/* Dropzone Card */}
         <input
           ref={fileInputRef}
           type="file"
@@ -545,43 +549,48 @@ export default function UploadZone() {
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []);
             if (files.length === 0) return;
-            // Reuse the same onDrop validation path
             const f = files[0];
-            if (!ACCEPTED_TYPES[f.type as keyof typeof ACCEPTED_TYPES] && !ACCEPTED_EXTENSIONS.some(ext => f.name.toLowerCase().endsWith(ext))) {
-              addToast(`Loại file không được hỗ trợ. Các loại hợp lệ: ${ACCEPTED_EXTENSIONS.join(', ')}`, 'error');
+            if (
+              !ACCEPTED_TYPES[f.type as keyof typeof ACCEPTED_TYPES] &&
+              !ACCEPTED_EXTENSIONS.some((ext) => f.name.toLowerCase().endsWith(ext))
+            ) {
+              addToast(
+                `Unsupported file type. Allowed types: ${ACCEPTED_EXTENSIONS.join(', ')}`,
+                'error',
+              );
               e.target.value = '';
               return;
             }
             if (f.size > MAX_FILE_SIZE) {
-              addToast('File quá lớn! Kích thước tối đa là 10MB.', 'error');
+              addToast('File too large! Maximum size is 10MB.', 'error');
               e.target.value = '';
               return;
             }
             setSelectedFile(f);
             setProgress(0);
-            e.target.value = ''; // reset so same file can be re-selected
+            e.target.value = '';
           }}
         />
 
         <div
           {...getRootProps()}
-          className={`mb-4 cursor-default rounded-xl border-2 border-dashed px-8 py-14 text-center transition-colors ${isDragActive
-            ? 'border-gray-500 bg-gray-100'
-            : isMutating
-              ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
-              : 'border-gray-300 bg-white hover:border-gray-400'
-            }`}
+          className={`mb-6 cursor-default rounded-2xl border-2 border-dashed px-10 py-16 text-center transition-all duration-200 ${
+            isDragActive
+              ? 'border-indigo-400 bg-indigo-50/50'
+              : isMutating
+                ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-60'
+                : 'border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50/50'
+          }`}
         >
           <input {...getInputProps()} />
 
-          {/* Cloud upload icon */}
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 shadow-sm ring-4 ring-slate-50">
             <svg
-              className="h-6 w-6 text-gray-500"
+              className="h-7 w-7 text-slate-600"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth={1.8}
+              strokeWidth={2}
             >
               <path
                 strokeLinecap="round"
@@ -591,14 +600,13 @@ export default function UploadZone() {
             </svg>
           </div>
 
-          <p className="text-lg font-semibold text-gray-800">
-            {isDragActive ? 'Thả file vào đây...' : 'Drag and Drop your study materials here'}
+          <p className="text-lg font-semibold text-slate-800">
+            {isDragActive ? 'Drop file here...' : 'Drag and Drop your study materials here'}
           </p>
-          <p className="mt-1.5 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-slate-500">
             Supports {ACCEPTED_EXTENSIONS.join(', ')} up to 10MB per file.
           </p>
 
-          {/* Browse Files button — opens native file picker */}
           <button
             type="button"
             disabled={isMutating}
@@ -606,22 +614,21 @@ export default function UploadZone() {
               e.stopPropagation();
               fileInputRef.current?.click();
             }}
-            className="mt-6 rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-8 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Browse Files
           </button>
         </div>
 
-        {/* ── Active Uploads Card ─────────────────────────────────────────── */}
+        {/* Active Uploads Card */}
         {selectedFile && (
-          <div className="mb-4 rounded-xl border border-gray-200 bg-white px-5 py-4">
-            <p className="mb-3 text-xs font-semibold tracking-widest text-gray-400 uppercase">
-              Active Uploads
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="mb-4 text-xs font-bold tracking-widest text-slate-400 uppercase">
+              Active Upload
             </p>
-            <div className="flex items-center gap-3">
-              {/* PDF icon */}
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-red-50">
-                <svg className="h-5 w-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-50 ring-1 ring-red-100">
+                <svg className="h-6 w-6 text-red-500" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" />
                   <path fill="white" d="M14 2v6h6" />
                   <text x="6" y="18" fontSize="5" fontWeight="bold" fill="#ef4444">
@@ -630,35 +637,32 @@ export default function UploadZone() {
                 </svg>
               </div>
 
-              {/* File info + progress */}
               <div className="min-w-0 flex-1">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="truncate text-sm font-medium text-gray-800">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="truncate text-sm font-semibold text-slate-900">
                     {selectedFile.name}
                   </span>
-                  <span className="ml-3 shrink-0 text-xs font-semibold text-gray-500">
+                  <span className="ml-4 shrink-0 text-xs font-bold text-slate-500">
                     {isMutating || progress > 0 ? `${progress}%` : formatSize(selectedFile.size)}
                   </span>
                 </div>
-                {/* Progress bar */}
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
-                    className="h-full rounded-full bg-gray-900 transition-all duration-300"
+                    className="h-full rounded-full bg-slate-900 transition-all duration-300 ease-out"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
               </div>
 
-              {/* Remove button */}
               <button
                 type="button"
                 disabled={isMutating}
                 onClick={handleRemoveFile}
-                className="ml-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Remove file"
               >
                 <svg
-                  className="h-4 w-4"
+                  className="h-5 w-5"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -671,217 +675,246 @@ export default function UploadZone() {
           </div>
         )}
 
-        {/* ── Document Details Form ───────────────────────────────────────── */}
-        <div className="rounded-xl border border-gray-200 bg-white px-6 py-6">
-          <h2 className="mb-5 text-lg font-bold text-gray-900">Document Details</h2>
+        {/* Document Details Form */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <h2 className="text-xl font-bold text-slate-900">Document Details</h2>
+          <hr className="my-6 border-slate-100" />
 
-          <hr className="mb-6 border-gray-100" />
-
-          {/* Title */}
-          <div className="mb-5">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Document Title <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="doc-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              disabled={isMutating}
-              placeholder="e.g. Introduction to Quantum Computing Notes"
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors outline-none focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-            />
-          </div>
-
-          {/* Major */}
-          <div className="mb-5">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Major <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={selectedMajorCode}
-              onChange={(e) => {
-                setSelectedMajorCode(e.target.value);
-                setSelectedSubjectId(null);
-              }}
-              disabled={isMutating}
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <option value="">-- Select a Major --</option>
-              {majors.map((m) => (
-                <option key={m.code} value={m.code}>{m.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Course */}
-          <div className="mb-5">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Course <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={selectedSubjectId ?? ''}
-              onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
-              disabled={isMutating || !selectedMajorCode}
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <option value="">-- Select a Course --</option>
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Personal Folder */}
-          <div className="mb-5">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Personal Folder
-            </label>
-            <div className="flex gap-2">
-              <select
-                value={selectedFolderId}
-                onChange={(e) => setSelectedFolderId(e.target.value)}
+          <div className="space-y-6">
+            {/* Title */}
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Document Title <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="doc-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 disabled={isMutating}
-                className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <option value="">-- Unfiled (Root) --</option>
-                {folders.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setShowCreateFolder(!showCreateFolder)}
-                disabled={isMutating}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50"
-              >
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                New Folder
-              </button>
+                placeholder="e.g. Introduction to Quantum Computing Notes"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              />
             </div>
-            
-            {showCreateFolder && (
-              <div className="mt-2 flex gap-2">
-                <input
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  disabled={isCreatingFolder}
-                  placeholder="Folder name..."
-                  className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none transition-colors focus:border-gray-400"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleCreateFolder();
-                    }
+
+            {/* Grid for Major & Course */}
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Major <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedMajorCode}
+                  onChange={(e) => {
+                    setSelectedMajorCode(e.target.value);
+                    setSelectedSubjectId(null);
                   }}
-                />
+                  disabled={isMutating}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">-- Select a Major --</option>
+                  {majors.map((m) => (
+                    <option key={m.code} value={m.code}>
+                      {m.code} - {m.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Course <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedSubjectId ?? ''}
+                  onChange={(e) =>
+                    setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)
+                  }
+                  disabled={isMutating || !selectedMajorCode}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">-- Select a Course --</option>
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} - {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Personal Folder */}
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Personal Folder
+              </label>
+              <div className="flex gap-3">
+                <select
+                  value={selectedFolderId}
+                  onChange={(e) => setSelectedFolderId(e.target.value)}
+                  disabled={isMutating}
+                  className="flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">-- Unfiled (Root) --</option>
+                  {folders.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="button"
-                  onClick={handleCreateFolder}
-                  disabled={isCreatingFolder || !newFolderName.trim()}
-                  className="rounded-lg bg-[#1a1c23] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  onClick={() => setShowCreateFolder(!showCreateFolder)}
+                  disabled={isMutating}
+                  className="flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-[0.98] disabled:opacity-50"
                 >
-                  {isCreatingFolder ? 'Creating...' : 'Create'}
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  New
                 </button>
               </div>
-            )}
-          </div>
 
-          {/* Description */}
-          <div className="mb-5">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              disabled={isMutating}
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:border-gray-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-              placeholder="Optional description or notes for this document..."
-            />
-          </div>
-
-          {/* Study Tags */}
-          <div className="mb-7 relative">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Study Tags <span className="text-gray-400 font-normal">(Max 10)</span>
-            </label>
-
-            <div className="flex min-h-[44px] flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 transition-colors focus-within:border-gray-400 focus-within:bg-white">
-              {selectedTags.map((tag) => (
-                <span
-                  key={tag.slug}
-                  className="flex items-center gap-1.5 rounded-full bg-[#1a1c23] px-3 py-1 text-xs font-medium text-white"
-                >
-                  {tag.name}
+              {showCreateFolder && (
+                <div className="animate-in fade-in slide-in-from-top-2 mt-3 flex gap-3">
+                  <input
+                    type="text"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    disabled={isCreatingFolder}
+                    placeholder="Enter folder name..."
+                    className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm transition-all outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateFolder();
+                      }
+                    }}
+                  />
                   <button
                     type="button"
-                    onClick={() => handleRemoveTag(tag)}
-                    disabled={isMutating}
-                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-white/20 disabled:opacity-50"
+                    onClick={handleCreateFolder}
+                    disabled={isCreatingFolder || !newFolderName.trim()}
+                    className="rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50"
                   >
-                    <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    {isCreatingFolder ? 'Saving...' : 'Save'}
                   </button>
-                </span>
-              ))}
+                </div>
+              )}
+            </div>
 
-              <div className="relative flex-1 min-w-[120px]">
-                <input
-                  type="text"
-                  value={newTagName}
-                  onChange={(e) => {
-                    setNewTagName(e.target.value);
-                    setShowTagDropdown(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddTag(newTagName);
+            {/* Description */}
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">Description</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                disabled={isMutating}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                placeholder="Optional description or notes for this document..."
+              />
+            </div>
+
+            {/* Study Tags */}
+            <div className="relative">
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Study Tags <span className="ml-1 text-xs font-normal text-slate-400">(Max 10)</span>
+              </label>
+
+              <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 transition-all focus-within:border-slate-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-slate-100">
+                {selectedTags.map((tag) => (
+                  <span
+                    key={tag.slug}
+                    className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white shadow-sm"
+                  >
+                    {tag.name}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(tag)}
+                      disabled={isMutating}
+                      className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-white/20 disabled:opacity-50"
+                    >
+                      <svg
+                        className="h-3 w-3"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+
+                <div className="relative min-w-[150px] flex-1">
+                  <input
+                    type="text"
+                    value={newTagName}
+                    onChange={(e) => {
+                      setNewTagName(e.target.value);
+                      setShowTagDropdown(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddTag(newTagName);
+                      }
+                    }}
+                    onFocus={() => setShowTagDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowTagDropdown(false), 200)}
+                    disabled={isMutating || selectedTags.length >= 10}
+                    placeholder={
+                      selectedTags.length >= 10 ? 'Max tags reached' : 'Type or select a tag...'
                     }
-                  }}
-                  onFocus={() => setShowTagDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowTagDropdown(false), 200)}
-                  disabled={isMutating || selectedTags.length >= 10}
-                  placeholder={selectedTags.length >= 10 ? 'Max tags reached' : 'Type or select a tag...'}
-                  className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:cursor-not-allowed"
-                />
+                    className="w-full bg-transparent px-2 py-1 text-sm text-slate-900 placeholder-slate-400 outline-none disabled:cursor-not-allowed"
+                  />
 
-                {/* Dropdown for suggestions */}
-                {showTagDropdown && availableTags.length > 0 && (
-                  <div className="absolute left-0 top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                    {availableTags
-                      .filter(t => !selectedTags.some(st => st.slug === t.slug))
-                      .filter(t => t.name.toLowerCase().includes(newTagName.toLowerCase()))
-                      .map(tag => (
-                        <div
-                          key={tag.slug}
-                          onClick={() => handleAddTag(tag.name)}
-                          className="cursor-pointer px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          <span className="font-medium">{tag.name}</span>
-                          {tag.isSystem && <span className="ml-2 text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">System</span>}
-                        </div>
-                      ))}
-                  </div>
-                )}
+                  {showTagDropdown && availableTags.length > 0 && (
+                    <div className="absolute top-full left-0 z-10 mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg ring-1 ring-slate-900/5">
+                      {availableTags
+                        .filter((t) => !selectedTags.some((st) => st.slug === t.slug))
+                        .filter((t) => t.name.toLowerCase().includes(newTagName.toLowerCase()))
+                        .map((tag) => (
+                          <div
+                            key={tag.slug}
+                            onClick={() => handleAddTag(tag.name)}
+                            className="flex cursor-pointer items-center justify-between rounded-lg px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                          >
+                            <span className="font-medium">{tag.name}</span>
+                            {tag.isSystem && (
+                              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                                System
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3">
+          <div className="mt-10 flex items-center justify-end gap-3 border-t border-slate-100 pt-6">
             <button
               type="button"
               id="upload-cancel-btn"
               onClick={handleCancel}
               disabled={isMutating}
-              className="rounded-lg px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
@@ -890,7 +923,7 @@ export default function UploadZone() {
               id="upload-submit-btn"
               onClick={handleSubmit}
               disabled={isMutating || !selectedFile || !title.trim() || !selectedSubjectId}
-              className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 active:bg-gray-950 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isMutating ? (
                 <span className="flex items-center gap-2">

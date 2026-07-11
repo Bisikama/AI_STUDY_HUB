@@ -89,7 +89,52 @@ export async function seedUsers(prisma: PrismaClient) {
     }),
   ]);
 
-  console.log(`✅ Created ${users.length} users\n`);
+  console.log(`✅ Created ${users.length} users`);
 
+  // Tạo TeacherVerification cho giáo viên Nguyễn Văn A (APPROVED)
+  const teacherA = users.find((u) => u.email === 'teacher.nguyen@example.com');
+  if (teacherA) {
+    await prisma.teacherVerification.create({
+      data: {
+        userId: teacherA.id,
+        teacherCode: 'TCH001',
+        department: 'Software Engineering',
+        proofUrl: 'https://example.com/proofs/teacherA.pdf',
+        status: 'APPROVED',
+        adminNote: 'Verified during system setup',
+      },
+    });
+    console.log(`   ✓ TeacherVerification (APPROVED) for: ${teacherA.fullName}`);
+  }
+
+  // Tạo TeacherVerification cho giáo viên Trần Thị B (PENDING)
+  const teacherB = users.find((u) => u.email === 'teacher.tran@example.com');
+  if (teacherB) {
+    await prisma.teacherVerification.create({
+      data: {
+        userId: teacherB.id,
+        teacherCode: 'TCH002',
+        department: 'Artificial Intelligence',
+        proofUrl: 'https://example.com/proofs/teacherB.pdf',
+        status: 'PENDING',
+      },
+    });
+    console.log(`   ✓ TeacherVerification (PENDING) for: ${teacherB.fullName}`);
+  }
+
+  // Tạo PasswordResetToken cho student Phạm Thị D
+  const studentD = users.find((u) => u.email === 'student.pham@example.com');
+  if (studentD) {
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: studentD.id,
+        token: 'reset-token-demo-123456',
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Hạn 24 giờ
+      },
+    });
+    console.log(`   ✓ PasswordResetToken for: ${studentD.fullName}`);
+  }
+
+  console.log('\n');
   return users;
 }

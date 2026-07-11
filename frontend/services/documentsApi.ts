@@ -40,6 +40,7 @@ export interface Document {
   ratingCount?: number;
   reportCount?: number;
   moderationWarning?: string | null;
+  rejectReason?: string | null;
   status?: 'ACTIVE' | 'UNDER_REVIEW' | 'HIDDEN' | 'REMOVED';
   visibilityStatus: 'PUBLIC' | 'PENDING_REVIEW' | 'PRIVATE';
   deletionStatus?: 'ACTIVE' | 'SOFT_DELETED' | 'DELETING' | 'DELETE_FAILED' | 'REMOVED';
@@ -57,7 +58,7 @@ export interface Document {
   tags?: any[];
   canRequestPublic?: boolean;
   publicationEligibilityReason?: string | null;
-  copyrightSourceType?: 'OWN_ORIGINAL' | 'OPEN_LICENSE' | 'AUTHORIZED' | 'FPT_OFFICIAL' | 'THIRD_PARTY' | 'UNKNOWN';
+  copyrightSourceType?: 'OWN_ORIGINAL' | 'OPEN_LICENSE' | 'UNKNOWN';
   copyrightAuthorName?: string | null;
   copyrightSourceUrl?: string | null;
   copyrightLicense?: string | null;

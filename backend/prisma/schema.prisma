@@ -106,9 +106,6 @@ enum ReservationStatus {
 enum CopyrightSourceType {
   OWN_ORIGINAL
   OPEN_LICENSE
-  AUTHORIZED
-  FPT_OFFICIAL
-  THIRD_PARTY
   UNKNOWN
 }
 
@@ -123,6 +120,8 @@ model User {
   avatarUrl    String?  @map("avatar_url")
   role         UserRole @default(STUDENT)
   isActive     Boolean  @default(true) @map("is_active")
+  isTeacherBanned Boolean @default(false) @map("is_teacher_banned")
+  provider     String   @default("local") @map("provider")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -142,6 +141,7 @@ model User {
   storageReservations     StorageReservation[]
   personalFolders         PersonalFolder[]
   copyrightDeclarations   Document[]             @relation("DocumentCopyrightDeclarer")
+  notifications           Notification[]
 
   @@map("users")
 }
@@ -159,14 +159,14 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
-/// Quản lý Yêu cầu xác thực Giảng viên
+/// Quản lý Yêu cầu Xác Thực Giảng Viên
 model TeacherVerification {
   id          String             @id @default(uuid()) @db.Uuid
   userId      String             @unique @map("user_id") @db.Uuid
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   teacherCode String             @map("teacher_code")
   department  String
-  proofUrl    String             @map("proof_url")
+  proofUrl    String?            @map("proof_url")
   status      VerificationStatus @default(PENDING)
   adminNote   String?            @map("admin_note") @db.Text
   createdAt   DateTime           @default(now()) @map("created_at")
@@ -318,6 +318,8 @@ model Document {
   copyrightDeclaredAt          DateTime?           @map("copyright_declared_at")
   copyrightDeclaredBy          String?             @map("copyright_declared_by") @db.Uuid
   copyrightDeclarer            User?               @relation("DocumentCopyrightDeclarer", fields: [copyrightDeclaredBy], references: [id], onDelete: SetNull)
+  fileHash                     String?             @map("file_hash") @db.VarChar(64)
+  rejectReason                 String?             @map("reject_reason") @db.Text
 
   // Quan hệ
   summary             DocumentSummary?
@@ -332,6 +334,7 @@ model Document {
   storageReservations StorageReservation[]
 
   @@index([subjectId, status])
+  @@index([fileHash])
   @@map("documents")
 }
 
@@ -549,4 +552,16 @@ model StorageReservation {
 
   @@index([userId, status, expiresAt])
   @@map("storage_reservations")
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String
+  content   String   @db.Text
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }

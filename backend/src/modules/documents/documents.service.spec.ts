@@ -74,6 +74,7 @@ describe('DocumentsService', () => {
     document: {
       create: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       delete: jest.fn(),
@@ -1599,7 +1600,14 @@ describe('DocumentsService', () => {
       });
 
       it('should throw ConflictException if user already has active report', async () => {
-        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-other' });
+        mockPrisma.document.findUnique.mockResolvedValue({
+          id: 'doc-1',
+          uploadedBy: 'user-other',
+          visibilityStatus: 'PUBLIC',
+          deletionStatus: 'ACTIVE',
+          status: 'ACTIVE',
+          deletedAt: null,
+        });
         mockPrisma.documentReport.findFirst.mockResolvedValue({ id: 'report-1' });
 
         await expect(
@@ -1608,7 +1616,14 @@ describe('DocumentsService', () => {
       });
 
       it('should create report and auto moderate document if reports >= 3', async () => {
-        mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', uploadedBy: 'user-other' });
+        mockPrisma.document.findUnique.mockResolvedValue({
+          id: 'doc-1',
+          uploadedBy: 'user-other',
+          visibilityStatus: 'PUBLIC',
+          deletionStatus: 'ACTIVE',
+          status: 'ACTIVE',
+          deletedAt: null,
+        });
         mockPrisma.documentReport.findFirst.mockResolvedValue(null);
         mockPrisma.documentReport.create.mockResolvedValue({ id: 'report-new' });
         mockPrisma.document.update
@@ -1778,6 +1793,214 @@ describe('DocumentsService', () => {
       expect(summary.trashBytes).toBe('5');
       expect(summary.availableBytes).toBe('30');
       expect(summary.usedPercent).toBe(70);
+    });
+  });
+
+  describe('Copyright & Publication', () => {
+    const baseDoc = {
+      id: 'doc-1',
+      uploadedBy: 'user-id',
+      deletionStatus: 'ACTIVE',
+      visibilityStatus: 'PRIVATE',
+      deletedAt: null,
+      extractionStatus: 'READY',
+      storagePath: 'path/to/file',
+      aiStatus: 'READY',
+      summary: { id: 's-1' },
+      quizzes: [{ id: 'q-1', questions: [{ id: 'q-1-1' }] }],
+      subject: { isSystem: true },
+    };
+
+    describe('A. updateCopyright', () => {
+      it('1. OWN_ORIGINAL không cần URL/license/attribution', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue(baseDoc);
+        mockPrisma.document.update.mockResolvedValue(baseDoc);
+        await service.updateCopyright('doc-1', 'user-id', { sourceType: 'OWN_ORIGINAL' });
+        expect(mockPrisma.document.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'doc-1' },
+            data: expect.objectContaining({
+              copyrightSourceType: 'OWN_ORIGINAL',
+              copyrightSourceUrl: null,
+              copyrightLicense: null,
+              copyrightAttribution: null,
+              copyrightDeclaredAt: expect.any(Date),
+              copyrightDeclaredBy: 'user-id',
+            }),
+          })
+        );
+      });
+
+      it('2. OWN_ORIGINAL phải clear metadata cũ', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({
+          ...baseDoc,
+          copyrightSourceUrl: 'old-url',
+          copyrightLicense: 'old-license',
+          copyrightAttribution: 'old-attr',
+        });
+        mockPrisma.document.update.mockResolvedValue(baseDoc);
+        await service.updateCopyright('doc-1', 'user-id', { sourceType: 'OWN_ORIGINAL' });
+        expect(mockPrisma.document.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              copyrightSourceUrl: null,
+              copyrightLicense: null,
+              copyrightAttribution: null,
+            }),
+          })
+        );
+      });
+
+      it('7. UNKNOWN update thành công để reset declaration', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({
+          ...baseDoc,
+          copyrightDeclaredAt: new Date(),
+          copyrightDeclaredBy: 'old-user',
+        });
+        mockPrisma.document.update.mockResolvedValue(baseDoc);
+        await service.updateCopyright('doc-1', 'user-id', { sourceType: 'UNKNOWN' });
+        expect(mockPrisma.document.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              copyrightDeclaredAt: null,
+              copyrightDeclaredBy: null,
+            }),
+          })
+        );
+      });
+
+      it('8. Non-owner update copyright bị chặn', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue(baseDoc);
+        await expect(
+          service.updateCopyright('doc-1', 'hacker-id', { sourceType: 'OWN_ORIGINAL' })
+        ).rejects.toThrow('You do not have permission to update this document');
+      });
+
+      it('9. Client không spoof được copyrightDeclaredBy/At (Service luôn lấy từ userId parameter)', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue(baseDoc);
+        mockPrisma.document.update.mockResolvedValue(baseDoc);
+        await service.updateCopyright('doc-1', 'user-id', {
+          sourceType: 'OWN_ORIGINAL',
+          // DTO payload attempting to spoof
+          copyrightDeclaredBy: 'admin-id'
+        } as any);
+        expect(mockPrisma.document.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              copyrightDeclaredBy: 'user-id', // Safe!
+            }),
+          })
+        );
+      });
+    });
+
+    describe('B. checkCopyrightEligibility (OPEN_LICENSE rules & metadata checks)', () => {
+      it('3. OPEN_LICENSE thiếu sourceUrl bị reject', () => {
+        const doc = { ...baseDoc, copyrightSourceType: 'OPEN_LICENSE', copyrightLicense: 'MIT', copyrightAttribution: 'Author', copyrightDeclaredAt: new Date(), copyrightDeclaredBy: 'user-id' };
+        const result = service.checkCopyrightEligibility(doc);
+        expect(result).toEqual({ isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' });
+      });
+
+      it('4. OPEN_LICENSE thiếu license bị reject', () => {
+        const doc = { ...baseDoc, copyrightSourceType: 'OPEN_LICENSE', copyrightSourceUrl: 'http://foo.com', copyrightAttribution: 'Author', copyrightDeclaredAt: new Date(), copyrightDeclaredBy: 'user-id' };
+        const result = service.checkCopyrightEligibility(doc);
+        expect(result).toEqual({ isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' });
+      });
+
+      it('5. OPEN_LICENSE thiếu attribution bị reject', () => {
+        const doc = { ...baseDoc, copyrightSourceType: 'OPEN_LICENSE', copyrightSourceUrl: 'http://foo.com', copyrightLicense: 'MIT', copyrightDeclaredAt: new Date(), copyrightDeclaredBy: 'user-id' };
+        const result = service.checkCopyrightEligibility(doc);
+        expect(result).toEqual({ isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' });
+      });
+
+      it('6. OPEN_LICENSE với URL hợp lệ + license + attribution thành công', () => {
+        const doc = { ...baseDoc, copyrightSourceType: 'OPEN_LICENSE', copyrightSourceUrl: 'http://foo.com', copyrightLicense: 'MIT', copyrightAttribution: 'Author', copyrightDeclaredAt: new Date(), copyrightDeclaredBy: 'user-id' };
+        const result = service.checkCopyrightEligibility(doc);
+        expect(result).toEqual({ isEligible: true });
+      });
+    });
+
+    describe('C. requestPublic', () => {
+      it('10. UNKNOWN bị chặn request public', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({
+          ...baseDoc,
+          copyrightSourceType: 'UNKNOWN',
+        });
+        await expect(service.requestPublic('doc-1', 'user-id')).rejects.toThrow('Tài liệu thiếu thông tin bản quyền hoặc nguồn gốc không được phép chia sẻ.');
+      });
+
+      it('11. OWN_ORIGINAL đủ gate AI/publication thì request public thành công (STUDENT -> PENDING_REVIEW)', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({
+          ...baseDoc,
+          copyrightSourceType: 'OWN_ORIGINAL',
+          copyrightDeclaredAt: new Date(),
+          copyrightDeclaredBy: 'user-id',
+        });
+        mockPrisma.user.findUnique.mockResolvedValue({ role: 'STUDENT' });
+        mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+
+        await service.requestPublic('doc-1', 'user-id');
+        expect(mockPrisma.document.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ visibilityStatus: 'PENDING_REVIEW' })
+          })
+        );
+      });
+
+      it('12. OPEN_LICENSE đủ sourceUrl/license/attribution và đủ AI gate thì request public thành công (TEACHER -> PUBLIC)', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({
+          ...baseDoc,
+          copyrightSourceType: 'OPEN_LICENSE',
+          copyrightSourceUrl: 'http://foo.com',
+          copyrightLicense: 'MIT',
+          copyrightAttribution: 'Author',
+          copyrightDeclaredAt: new Date(),
+          copyrightDeclaredBy: 'user-id',
+        });
+        mockPrisma.user.findUnique.mockResolvedValue({ role: 'TEACHER' });
+        mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+
+        await service.requestPublic('doc-1', 'user-id');
+        expect(mockPrisma.document.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ visibilityStatus: 'PUBLIC' })
+          })
+        );
+      });
+
+      it('13. OPEN_LICENSE thiếu metadata bị chặn request public', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({
+          ...baseDoc,
+          copyrightSourceType: 'OPEN_LICENSE',
+          copyrightSourceUrl: 'http://foo.com',
+          copyrightLicense: null, // Thiếu metadata
+          copyrightAttribution: 'Author',
+          copyrightDeclaredAt: new Date(),
+          copyrightDeclaredBy: 'user-id',
+        });
+        await expect(service.requestPublic('doc-1', 'user-id')).rejects.toThrow('Tài liệu thiếu thông tin bản quyền hoặc nguồn gốc không được phép chia sẻ.');
+      });
+
+      it('14. AI chưa READY phải fail AI gate trước copyright gate', async () => {
+        mockPrisma.document.findUnique.mockResolvedValue({
+          ...baseDoc,
+          aiStatus: 'FAILED', // AI not ready
+          copyrightSourceType: 'UNKNOWN', // Copyright also fails
+        });
+        await expect(service.requestPublic('doc-1', 'user-id')).rejects.toThrow('Tài liệu phải hoàn tất AI Analyze, bao gồm Summary và Quiz, trước khi có thể chia sẻ.');
+      });
+    });
+
+    describe('Regression', () => {
+      it('15. Không còn branch runtime nào chấp nhận AUTHORIZED/FPT_OFFICIAL/THIRD_PARTY', () => {
+        const types = ['AUTHORIZED', 'FPT_OFFICIAL', 'THIRD_PARTY'];
+        types.forEach(type => {
+          const doc = { ...baseDoc, copyrightSourceType: type };
+          const res = service.checkCopyrightEligibility(doc);
+          expect(res.isEligible).toBe(false);
+          expect(res.reason).toBe('COPYRIGHT_SOURCE_UNKNOWN');
+        });
+      });
     });
   });
 });

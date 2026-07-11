@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength, IsBoolean } from 'class-validator';
 import { ReportStatus, DocumentStatus } from '../../../../generated/prisma/client';
 
 export class ResolveReportDto {
@@ -17,4 +17,8 @@ export class ResolveReportDto {
   @IsString()
   @MaxLength(1000, { message: 'Ghi chú tối đa 1000 ký tự.' })
   adminNote?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  banTeacher?: boolean;
 }

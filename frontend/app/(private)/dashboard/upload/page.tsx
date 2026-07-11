@@ -9,5 +9,9 @@ export const metadata = {
  * /dashboard/upload — Server component shell that mounts the UploadZone client component.
  */
 export default function DashboardUploadPage() {
-  return <UploadZone />;
+  return (
+    <div className="min-h-[calc(100vh-4rem)] w-full bg-slate-50/30">
+      <UploadZone />
+    </div>
+  );
 }

@@ -29,13 +29,13 @@ interface CustomWindow extends Window {
 // 1. SCHEMA ZOD (Bắt lỗi khi bấm Submit)
 const registerSchema = z
   .object({
-    name: z.string().min(1, 'Vui lòng nhập họ tên'),
-    email: z.string().min(1, 'Email không được để trống').email('Email không đúng định dạng'),
-    password: z.string().min(6, 'Mật khẩu phải từ 6 ký tự trở lên'),
-    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
+    name: z.string().min(1, 'Please enter your full name'),
+    email: z.string().min(1, 'Email cannot be empty').email('Invalid email format'),
+    password: z.string().min(6, 'Password must be at least 6 characters long'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: 'Mật khẩu xác nhận không khớp!',
+    message: 'The confirmation password does not match!',
     path: ['confirmPassword'],
   });
 
@@ -97,7 +97,7 @@ export default function RegisterPage() {
         email: data.email,
         password: data.password,
       });
-      toast.success('Đăng ký thành công! Hãy đăng nhập.');
+      toast.success('Registration successful! Please log in.');
       router.push('/login');
     } catch (err) {
       // eslint-disable-next-line no-console

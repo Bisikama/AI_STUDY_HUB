@@ -35,9 +35,19 @@ export class DashboardService {
   }
 
   async getDashboardData(userId: string) {
-    // 1. Recently Viewed: Top 4 documents viewed by the user
+    // 1. Recently Viewed: Top 12 documents viewed by the user (matching public display status)
     const recentlyViewedRecords = await this.prisma.userDocumentView.findMany({
-      where: { userId },
+      where: {
+        userId,
+        document: {
+          visibilityStatus: 'PUBLIC',
+          status: 'ACTIVE',
+          deletionStatus: 'ACTIVE',
+          extractionStatus: 'READY',
+          aiStatus: 'READY',
+          deletedAt: null,
+        },
+      },
       orderBy: { viewedAt: 'desc' },
       take: 12,
       include: {
@@ -57,11 +67,15 @@ export class DashboardService {
       .map((r) => this.mapDocument(r.document))
       .filter((doc) => doc !== null);
 
-    // 2. Public Documents from OTHER users (status APPROVED)
+    // 2. Public Documents from OTHER users (status APPROVED/PUBLIC & fully processed)
     const publicDocs = await this.prisma.document.findMany({
       where: {
         visibilityStatus: 'PUBLIC',
         status: 'ACTIVE',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+        deletedAt: null,
         uploadedBy: { not: userId },
       },
       orderBy: { createdAt: 'desc' },
@@ -82,6 +96,10 @@ export class DashboardService {
       where: {
         visibilityStatus: 'PUBLIC',
         status: 'ACTIVE',
+        deletionStatus: 'ACTIVE',
+        extractionStatus: 'READY',
+        aiStatus: 'READY',
+        deletedAt: null,
       },
       orderBy: [{ averageRating: 'desc' }, { viewCount: 'desc' }],
       take: 5,
@@ -96,13 +114,17 @@ export class DashboardService {
 
     const trending = trendingDocs.map((d) => this.mapDocument(d));
 
-    // 4. Top Contributors: Những người đăng tải tài liệu APPROVED nhiều nhất
+    // 4. Top Contributors: Những người đăng tải tài liệu APPROVED/PUBLIC nhiều nhất
     const contributors = await this.prisma.user.findMany({
       where: {
         documents: {
           some: {
             visibilityStatus: 'PUBLIC',
             status: 'ACTIVE',
+            deletionStatus: 'ACTIVE',
+            extractionStatus: 'READY',
+            aiStatus: 'READY',
+            deletedAt: null,
           },
         },
       },
@@ -116,6 +138,10 @@ export class DashboardService {
               where: {
                 visibilityStatus: 'PUBLIC',
                 status: 'ACTIVE',
+                deletionStatus: 'ACTIVE',
+                extractionStatus: 'READY',
+                aiStatus: 'READY',
+                deletedAt: null,
               },
             },
           },

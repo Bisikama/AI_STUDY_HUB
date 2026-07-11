@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { authApi, LoginCredentials, RegisterData } from '@/services/authApi';
+import { safeNavigateTo } from '../utils/navigation';
 
 export interface User {
   id: string;
@@ -22,7 +23,7 @@ export const useAuth = () => {
   const handleError = (err: unknown): string => {
     // Ép kiểu err để lấy message từ axios response
     const axiosError = err as { response?: { data?: { message?: string } } };
-    return axiosError.response?.data?.message || 'Đã có lỗi xảy ra!';
+    return axiosError.response?.data?.message || 'An error occurred!';
   };
 
   const login = async (credentials: LoginCredentials): Promise<User> => {
@@ -76,7 +77,7 @@ export const useAuth = () => {
       localStorage.removeItem('user');
       // Xóa cookie ở domain frontend
       document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
-      window.location.href = '/login';
+      safeNavigateTo('/login');
     }
   };
 

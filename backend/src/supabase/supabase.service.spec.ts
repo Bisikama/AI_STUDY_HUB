@@ -83,6 +83,25 @@ describe('SupabaseService', () => {
       expect(mockGetPublicUrl).not.toHaveBeenCalled();
     });
 
+    it('preserves other extensions like .docx and .txt instead of discarding them', async () => {
+      mockUpload.mockResolvedValue({ data: { path: 'some/path' }, error: null });
+
+      const result = await service.uploadPrivate({
+        userId: 'user123',
+        documentId: 'doc456',
+        fileName: 'report_file.docx',
+        buffer: Buffer.from('test'),
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+
+      expect(mockUpload).toHaveBeenCalledWith(
+        'documents/user123/doc456/report_file.docx',
+        expect.any(Buffer),
+        expect.objectContaining({ contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', upsert: true }),
+      );
+      expect(result.storagePath).toBe('documents/user123/doc456/report_file.docx');
+    });
+
     it('maps provider error to STORAGE_OPERATION_FAILED and avoids leaking service role key', async () => {
       const rawError = 'Provider network error containing test-service-role-key';
       mockUpload.mockResolvedValue({ data: null, error: { message: rawError } });

@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { documentsApi } from '@/services/documentsApi';
+import { getCleanFileType } from '@/utils/fileUtils';
 import { getVisibilityPresentation } from '@/utils/visibility-status';
 import { toast } from 'sonner';
 
@@ -109,8 +110,9 @@ export default function DocumentPreviewPage() {
 
   if (isDocLoading || isPreviewLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-gray-50">
-        <span className="material-symbols-outlined text-primary animate-spin text-4xl">sync</span>
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FAFAFA]">
+        <span className="material-symbols-outlined animate-spin text-3xl text-gray-400 mb-3">sync</span>
+        <p className="text-[13px] font-medium text-gray-500 animate-pulse">Preparing document...</p>
       </div>
     );
   }
@@ -139,17 +141,17 @@ export default function DocumentPreviewPage() {
     }
 
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-gray-50 p-8 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-500">
-          <span className="material-symbols-outlined text-3xl">error</span>
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FAFAFA] p-8 text-center">
+        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500 border border-red-100">
+          <span className="material-symbols-outlined text-2xl">error</span>
         </div>
-        <h2 className="mb-2 text-2xl font-bold text-gray-900">{title}</h2>
-        <p className="mb-6 text-gray-500">{message}</p>
+        <h2 className="mb-2 text-xl font-bold tracking-tight text-gray-900">{title}</h2>
+        <p className="mb-6 text-[13px] text-gray-500 max-w-sm leading-relaxed">{message}</p>
         <Link
           href="/dashboard/documents"
-          className="rounded-lg bg-[#1a1c23] px-6 py-2.5 font-semibold text-white transition-colors hover:bg-black"
+          className="rounded-md bg-gray-900 px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-black"
         >
-          Back to My Documents
+          Back to Documents
         </Link>
       </div>
     );
@@ -157,57 +159,71 @@ export default function DocumentPreviewPage() {
 
   const iframeSrc = previewData?.url;
 
+  const isNativePreviewSupported = (fileType: string) => {
+    if (!fileType) return false;
+    const type = fileType.toLowerCase();
+    return (
+      type === 'application/pdf' ||
+      type === 'text/plain' ||
+      type.startsWith('image/') ||
+      type.startsWith('audio/') ||
+      type.startsWith('video/')
+    );
+  };
+
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-[#F8F9FA] font-sans lg:flex-row">
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-[#FAFAFA] font-sans lg:flex-row text-gray-900">
       {/* Left Column (Preview Area) */}
-      <div className="flex flex-1 flex-col overflow-hidden border-r border-gray-200 bg-white">
-        {/* Header inside Preview */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center gap-4">
+      <div className="flex flex-1 flex-col overflow-hidden border-r border-gray-200/80 bg-white shadow-[1px_0_10px_rgba(0,0,0,0.02)] z-10">
+
+        {/* Minimal Header */}
+        <div className="flex items-center justify-between border-b border-gray-200/80 px-4 py-3 bg-white">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => router.push(`/dashboard/documents/${document.id}`)}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              title="Go Back"
             >
-              <span className="material-symbols-outlined">arrow_back</span>
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             </button>
-            <div>
+            <div className="flex flex-col">
               <h1
-                className="max-w-sm truncate font-semibold text-gray-900 sm:max-w-md lg:max-w-lg"
+                className="max-w-[200px] truncate text-[14px] font-semibold tracking-tight text-gray-900 sm:max-w-md lg:max-w-lg"
                 title={document.title}
               >
                 {document.title}
               </h1>
-              <p className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
-                <span>{document.fileType.split('/')[1] || document.fileType}</span>
-                <span>•</span>
+              <p className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                <span>{getCleanFileType(document.fileType)}</span>
+                <span className="h-0.5 w-0.5 rounded-full bg-gray-400"></span>
                 <span>{formatSize(document.fileSize)}</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={handleOpenOriginal}
-              className="hidden items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-200 sm:flex"
+              className="hidden items-center gap-1.5 rounded-md border border-gray-200/80 bg-white px-3 py-1.5 text-[13px] font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:text-gray-900 sm:flex"
             >
-              <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+              <span className="material-symbols-outlined text-[16px]">open_in_new</span>
               Open Original
             </button>
             <button
               onClick={handleDownload}
               disabled={isDownloading}
-              className="hidden items-center gap-2 rounded-lg bg-[#1a1c23] px-4 py-2 font-medium text-white transition-colors hover:bg-black disabled:opacity-50 sm:flex"
+              className="hidden items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-black disabled:opacity-50 sm:flex"
             >
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              {isDownloading ? 'Downloading...' : 'Download'}
+              <span className="material-symbols-outlined text-[16px]">download</span>
+              {isDownloading ? '...' : 'Download'}
             </button>
           </div>
         </div>
 
-        {/* Iframe Container */}
-        <div className="relative flex-1 overflow-hidden bg-gray-100 p-4 lg:p-8">
-          {iframeSrc ? (
-            <div className="h-full w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        {/* Iframe Container - Floating Paper Effect */}
+        <div className="relative flex-1 overflow-hidden bg-[#F4F5F7] p-4 lg:p-6 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] flex flex-col items-center">
+          {iframeSrc && isNativePreviewSupported(document.fileType) ? (
+            <div className="h-full w-full max-w-5xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md transition-all">
               <iframe
                 src={iframeSrc}
                 className="h-full w-full border-none"
@@ -216,30 +232,29 @@ export default function DocumentPreviewPage() {
               />
             </div>
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white p-8 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-                <span className="material-symbols-outlined text-3xl">visibility_off</span>
+            <div className="flex h-full w-full max-w-2xl flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center shadow-sm">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-gray-50 text-gray-400 border border-gray-100">
+                <span className="material-symbols-outlined text-[24px]">visibility_off</span>
               </div>
-              <h3 className="mb-2 font-semibold text-gray-900">No Preview Available</h3>
-              <p className="mb-6 max-w-sm text-sm text-gray-500">
-                This file type cannot be previewed directly in the browser, or the preview URL is
-                missing.
+              <h3 className="mb-1 text-[15px] font-semibold text-gray-900 tracking-tight">Preview Not Available</h3>
+              <p className="mb-6 max-w-sm text-[13px] text-gray-500 leading-relaxed">
+                This file format cannot be previewed natively in the browser. Please download it to view the contents.
               </p>
-              <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center justify-center gap-3">
                 <button
                   onClick={handleOpenOriginal}
-                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-6 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+                  className="flex items-center gap-1.5 rounded-md border border-gray-200/80 bg-white px-4 py-2 text-[13px] font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
                 >
-                  <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-                  Open Original
+                  <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                  External View
                 </button>
                 <button
                   onClick={handleDownload}
                   disabled={isDownloading}
-                  className="bg-primary flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-md bg-gray-900 px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-black disabled:opacity-50"
                 >
-                  <span className="material-symbols-outlined text-[18px]">download</span>
-                  {isDownloading ? 'Downloading...' : 'Download'}
+                  <span className="material-symbols-outlined text-[16px]">download</span>
+                  {isDownloading ? 'Downloading...' : 'Download File'}
                 </button>
               </div>
             </div>
@@ -247,69 +262,115 @@ export default function DocumentPreviewPage() {
         </div>
       </div>
 
-      {/* Right Column (Metadata / Assistant) */}
-      <div className="flex w-full flex-col overflow-y-auto bg-white lg:w-[350px] xl:w-[400px]">
-        <div className="flex border-b border-gray-200">
-          <button className="flex flex-1 items-center justify-center gap-2 border-b-2 border-gray-900 py-4 text-sm font-semibold text-gray-900">
-            <span className="material-symbols-outlined text-[18px]">info</span>
-            Metadata
-          </button>
+      {/* Right Column (Properties Panel) */}
+      <div className="flex w-full flex-col overflow-y-auto bg-[#FAFAFA] lg:w-[320px] xl:w-[360px]">
+
+        {/* Properties Header */}
+        <div className="flex border-b border-gray-200/80 bg-white px-5 pt-4">
+          <div className="border-b-2 border-gray-900 pb-3 text-[13px] font-semibold text-gray-900 tracking-tight flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px]">tune</span>
+            Properties
+          </div>
         </div>
 
-        <div className="flex flex-col gap-6 p-6">
-          {/* Metadata Card */}
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-5">
-            <h3 className="mb-4 text-xs font-bold tracking-wider text-gray-500 uppercase">
-              Document Info
-            </h3>
-            <div className="flex flex-col gap-4 text-sm">
-              <div>
-                <p className="mb-1 text-gray-500">Status</p>
-                <span
-                  className={`inline-flex rounded px-2 py-0.5 text-xs font-bold uppercase ${getVisibilityPresentation(document.visibilityStatus).className}`}
-                >
+        {/* Property List (Key-Value Pairs like Notion) */}
+        <div className="flex flex-col p-5">
+          {/* Tối ưu UI: Metadata Card */}
+          <div className="rounded-xl border border-gray-200/80 bg-white shadow-sm overflow-hidden mb-5">
+
+            {/* Tiêu đề Block */}
+            <div className="bg-gray-50/80 px-4 py-3 border-b border-gray-200/80">
+              <h3 className="text-[11px] font-bold tracking-widest text-gray-500 uppercase">
+                Document Metadata
+              </h3>
+            </div>
+
+            {/* Danh sách thuộc tính */}
+            <div className="flex flex-col px-4 py-1">
+
+              {/* Status */}
+              <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 gap-4">
+                <span className="text-[12.5px] text-gray-500 font-medium shrink-0">Visibility</span>
+                <span className={`inline-flex rounded text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 shrink-0 ${getVisibilityPresentation(document.visibilityStatus).className}`}>
                   {getVisibilityPresentation(document.visibilityStatus).label}
                 </span>
               </div>
 
-              <div>
-                <p className="mb-1 text-gray-500">File Type</p>
-                <p className="font-medium text-gray-900">{document.fileType}</p>
+              {/* File Type (Đã fix lỗi string dài) */}
+              <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 gap-4">
+                <span className="text-[12.5px] text-gray-500 font-medium shrink-0">Format</span>
+                <span
+                  className="text-[11px] font-mono font-semibold tracking-wide text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200 truncate max-w-[140px] text-right"
+                  title={document.fileType} // Hover vào sẽ thấy tên đầy đủ
+                >
+                  {getCleanFileType(document.fileType)}
+                </span>
               </div>
 
-              <div>
-                <p className="mb-1 text-gray-500">Size</p>
-                <p className="font-medium text-gray-900">{formatSize(document.fileSize)}</p>
+              {/* Size */}
+              <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 gap-4">
+                <span className="text-[12.5px] text-gray-500 font-medium shrink-0">Size</span>
+                <span className="text-[12.5px] font-semibold text-gray-900 truncate">
+                  {formatSize(document.fileSize)}
+                </span>
               </div>
 
-              <div>
-                <p className="mb-1 text-gray-500">Uploaded At</p>
-                <p className="font-medium text-gray-900">{formatDate(document.createdAt)}</p>
-              </div>
-
-              {document.description && (
-                <div>
-                  <p className="mb-1 text-gray-500">Description</p>
-                  <p className="font-medium text-gray-900">{document.description}</p>
+              {/* Pages */}
+              {document.pageCount && (
+                <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 gap-4">
+                  <span className="text-[12.5px] text-gray-500 font-medium shrink-0">Pages</span>
+                  <span className="text-[12.5px] font-semibold text-gray-900 truncate">
+                    {document.pageCount}
+                  </span>
                 </div>
               )}
 
-              <div>
-                <p className="mb-1 text-gray-500">AI Status</p>
-                <p className="font-medium text-gray-900">{document.aiStatus || '—'}</p>
+              {/* Upload Date (Đã fix lỗi rớt dòng, căn ngang hàng) */}
+              <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 gap-4">
+                <span className="text-[12.5px] text-gray-500 font-medium shrink-0">Uploaded At</span>
+                <span className="text-[12.5px] font-semibold text-gray-900 truncate text-right">
+                  {formatDate(document.createdAt)}
+                </span>
               </div>
 
-              <div>
-                <p className="mb-1 text-gray-500">Extraction</p>
-                <p className="font-medium text-gray-900">{document.extractionStatus || '—'}</p>
+              {/* AI Status */}
+              <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 gap-4">
+                <span className="text-[12.5px] text-gray-500 font-medium shrink-0">AI Processing</span>
+                <span className="flex items-center gap-1.5 text-[12px] font-semibold text-gray-900 shrink-0 truncate">
+                  {document.aiStatus === 'READY' ? (
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]"></span>
+                  ) : document.aiStatus === 'FAILED' ? (
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.5)]"></span>
+                  ) : (
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shadow-[0_0_4px_rgba(245,158,11,0.5)]"></span>
+                  )}
+                  {document.aiStatus || 'NOT_REQUESTED'}
+                </span>
               </div>
 
-              <div>
-                <p className="mb-1 text-gray-500">Pages</p>
-                <p className="font-medium text-gray-900">{document.pageCount || '—'}</p>
+              {/* Extraction Status */}
+              <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 gap-4">
+                <span className="text-[12.5px] text-gray-500 font-medium shrink-0">Text Extraction</span>
+                <span className="text-[12.5px] font-semibold text-gray-900 truncate text-right">
+                  {document.extractionStatus || '—'}
+                </span>
               </div>
+
             </div>
           </div>
+
+          {/* Optional Description Card */}
+          {document.description && (
+            <div className="mt-4 rounded-xl border border-gray-200/80 bg-white p-4 shadow-sm">
+              <h3 className="mb-2 text-[10px] font-bold tracking-widest text-gray-400 uppercase">
+                Notes / Description
+              </h3>
+              <p className="text-[13px] leading-relaxed text-gray-700">
+                {document.description}
+              </p>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

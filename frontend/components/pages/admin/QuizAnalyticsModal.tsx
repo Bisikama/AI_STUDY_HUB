@@ -31,7 +31,7 @@ export default function QuizAnalyticsModal({
         } catch (err: any) {
           console.error('Failed to load quiz analytics:', err);
           setError(
-            err.response?.data?.message || 'Không thể tải thống kê cho bộ câu hỏi này'
+            err.response?.data?.message || 'Failed to load analytics for this quiz'
           );
         } finally {
           setLoading(false);
@@ -69,7 +69,7 @@ export default function QuizAnalyticsModal({
               <span className="material-symbols-outlined text-3xl text-slate-500 mb-2">
                 assignment_turned_in
               </span>
-              <p className="text-sm font-semibold text-slate-500">Lượt tham gia</p>
+              <p className="text-sm font-semibold text-slate-500">Attempts</p>
               <p className="text-2xl font-bold text-slate-800 mt-1">
                 {analytics?.totalAttempts ?? 0}
               </p>
@@ -78,7 +78,7 @@ export default function QuizAnalyticsModal({
               <span className="material-symbols-outlined text-3xl text-slate-500 mb-2">
                 grade
               </span>
-              <p className="text-sm font-semibold text-slate-500">Điểm trung bình</p>
+              <p className="text-sm font-semibold text-slate-500">Average Score</p>
               <p className="text-2xl font-bold text-slate-800 mt-1">
                 {analytics?.averageScore !== undefined
                   ? `${analytics.averageScore} / 10`
@@ -92,7 +92,7 @@ export default function QuizAnalyticsModal({
           onClick={onClose}
           className="w-full rounded-xl bg-slate-900 py-3.5 font-semibold text-white transition-colors hover:bg-black"
         >
-          Đóng
+          Close
         </button>
       </div>
     </div>

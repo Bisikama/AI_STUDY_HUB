@@ -33,19 +33,19 @@ export default function MetricsPage() {
     const staticMetrics = [
         {
 
-            label: 'Tổng Sinh Viên Đăng Kí',
+            label: 'Total Registered Students',
             borderColor: 'border-cyan-500',
             bgGradient: 'bg-gradient-to-br from-cyan-900/20 to-blue-900/20',
         },
         {
 
-            label: 'Tổng File Đang Lưu Trữ',
+            label: 'Total Stored Files',
             borderColor: 'border-purple-500',
             bgGradient: 'bg-gradient-to-br from-purple-900/20 to-pink-900/20',
         },
         {
 
-            label: 'Dung Lượng S3 / Supabase',
+            label: 'S3 / Supabase Storage',
             borderColor: 'border-pink-500',
             bgGradient: 'bg-gradient-to-br from-pink-900/20 to-rose-900/20',
         },
@@ -64,10 +64,10 @@ export default function MetricsPage() {
             <div className="mx-auto max-w-7xl">
                 {/* Header */}
                 <div className="mb-12">
-                    <h1 className="text-4xl font-bold text-white">Bảng Điều Khiển</h1>
-                    <p className="mt-2 text-gray-400">Xem tổng quan hệ thống của bạn</p>
-                    {loading && <p className="mt-2 text-sm text-yellow-400">Đang tải dữ liệu...</p>}
-                    {error && <p className="mt-2 text-sm text-red-400">Lỗi: {error}</p>}
+                    <h1 className="text-4xl font-bold text-white">Dashboard</h1>
+                    <p className="mt-2 text-gray-400">View your system overview</p>
+                    {loading && <p className="mt-2 text-sm text-yellow-400">Loading data...</p>}
+                    {error && <p className="mt-2 text-sm text-red-400">Error: {error}</p>}
                 </div>
 
                 {/* Metrics Grid */}
@@ -85,7 +85,7 @@ export default function MetricsPage() {
                     </div>
                 ) : (
                     <div className="rounded-xl border-2 border-gray-600 bg-slate-900/50 p-8 text-center">
-                        <p className="text-gray-400">Không có dữ liệu</p>
+                        <p className="text-gray-400">No data</p>
                     </div>
                 )}
             </div>

@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { parseDocument } from './utils/documentParser';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -144,18 +145,23 @@ export class DocumentsService {
       // Admin and owner logic: only owner or admin can see these private copyright fields.
       // Assuming for now mapSafeDocumentResponse has isOwner=true when it's the owner's document.
       copyrightPermissionReference: isOwner ? document.copyrightPermissionReference : null,
-      copyrightDeclaredAt: isOwner && document.copyrightDeclaredAt ? new Date(document.copyrightDeclaredAt).toISOString() : null,
+      copyrightDeclaredAt:
+        isOwner && document.copyrightDeclaredAt
+          ? new Date(document.copyrightDeclaredAt).toISOString()
+          : null,
       copyrightDeclaredBy: isOwner ? document.copyrightDeclaredBy : null,
-      canRequestPublic: document.visibilityStatus === 'PRIVATE'
-        && this.checkPublicationEligibility(document).isEligible
-        && this.checkCopyrightEligibility(document).isEligible,
-      publicationEligibilityReason: document.visibilityStatus === 'PRIVATE'
-        ? (!this.checkPublicationEligibility(document).isEligible
-          ? this.checkPublicationEligibility(document).reason || 'AI_NOT_READY_FOR_PUBLICATION'
-          : (!this.checkCopyrightEligibility(document).isEligible
-            ? this.checkCopyrightEligibility(document).reason
-            : null))
-        : null,
+      canRequestPublic:
+        document.visibilityStatus === 'PRIVATE' &&
+        this.checkPublicationEligibility(document).isEligible &&
+        this.checkCopyrightEligibility(document).isEligible,
+      publicationEligibilityReason:
+        document.visibilityStatus === 'PRIVATE'
+          ? !this.checkPublicationEligibility(document).isEligible
+            ? this.checkPublicationEligibility(document).reason || 'AI_NOT_READY_FOR_PUBLICATION'
+            : !this.checkCopyrightEligibility(document).isEligible
+              ? this.checkCopyrightEligibility(document).reason
+              : null
+          : null,
     };
   }
 
@@ -463,7 +469,9 @@ export class DocumentsService {
     await this.subjectsService.validateSubjectAccess(subjectId, finalUserId);
 
     if (personalFolderId) {
-      const folder = await this.prisma.personalFolder.findUnique({ where: { id: personalFolderId } });
+      const folder = await this.prisma.personalFolder.findUnique({
+        where: { id: personalFolderId },
+      });
       if (!folder || folder.ownerId !== finalUserId) {
         throw new NotFoundException('Personal folder not found or access denied');
       }
@@ -497,6 +505,26 @@ export class DocumentsService {
       }
     }
 
+    // 2.7 Calculate file hash and check for duplicates
+    const fileHash = crypto.createHash('sha256').update(file.buffer).digest('hex');
+
+    const duplicate = await this.prisma.document.findFirst({
+      where: {
+        fileHash,
+        deletionStatus: 'ACTIVE',
+        deletedAt: null,
+      },
+      include: {
+        user: { select: { fullName: true } },
+      },
+    });
+
+    if (duplicate) {
+      throw new ConflictException(
+        `Tài liệu này đã tồn tại trên hệ thống (đăng bởi ${duplicate.user.fullName})`,
+      );
+    }
+
     // 3. Reserve storage quota
     const reservationId = await this.reserveStorage(finalUserId, file.size);
 
@@ -519,6 +547,7 @@ export class DocumentsService {
         aiStatus: 'NOT_REQUESTED',
         fullText: null,
         pageCount: null,
+        fileHash,
       },
     });
 
@@ -1026,6 +1055,7 @@ Quy định chặt chẽ:
         copyrightPermissionReference: true,
         copyrightDeclaredAt: true,
         copyrightDeclaredBy: true,
+        rejectReason: true,
 
         tags: {
           include: {
@@ -1325,7 +1355,13 @@ Quy định chặt chẽ:
   async updateDocument(
     documentId: string,
     userId: string,
-    dto: { title?: string; description?: string; subjectId?: number; tags?: string[]; personalFolderId?: string },
+    dto: {
+      title?: string;
+      description?: string;
+      subjectId?: number;
+      tags?: string[];
+      personalFolderId?: string;
+    },
   ): Promise<SanitizedDocument> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
@@ -1349,6 +1385,10 @@ Quy định chặt chẽ:
       throw new ForbiddenException('You do not have permission to edit this document');
     }
 
+    if (document.visibilityStatus === 'PENDING_REVIEW') {
+      throw new ConflictException('DOCUMENT_PENDING_REVIEW');
+    }
+
     let { title, description } = dto;
 
     if (title !== undefined) {
@@ -1368,7 +1408,9 @@ Quy định chặt chẽ:
     }
 
     if (dto.personalFolderId !== undefined && dto.personalFolderId !== null) {
-      const folder = await this.prisma.personalFolder.findUnique({ where: { id: dto.personalFolderId } });
+      const folder = await this.prisma.personalFolder.findUnique({
+        where: { id: dto.personalFolderId },
+      });
       if (!folder || folder.ownerId !== userId) {
         throw new NotFoundException('Personal folder not found or access denied');
       }
@@ -1758,24 +1800,20 @@ Quy định chặt chẽ:
         }
         return { isEligible: true };
       case 'OPEN_LICENSE':
-        if (!document.copyrightSourceUrl || !document.copyrightLicense || !document.copyrightAttribution) {
+        if (
+          !document.copyrightSourceUrl ||
+          !document.copyrightLicense ||
+          !document.copyrightAttribution
+        ) {
           return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
         }
-        return { isEligible: true };
-      case 'AUTHORIZED':
-        if (!document.copyrightPermissionReference) {
-          return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
+        if (!document.copyrightDeclaredAt || document.copyrightDeclaredBy !== document.uploadedBy) {
+          return { isEligible: false, reason: 'COPYRIGHT_DECLARATION_REQUIRED' };
         }
         return { isEligible: true };
-      case 'FPT_OFFICIAL':
-        if (!document.copyrightSourceUrl && !document.copyrightPermissionReference) {
-          return { isEligible: false, reason: 'COPYRIGHT_METADATA_INCOMPLETE' };
-        }
-        return { isEligible: true };
-      case 'THIRD_PARTY':
       case 'UNKNOWN':
       default:
-        return { isEligible: false, reason: 'COPYRIGHT_SHARING_NOT_ALLOWED' };
+        return { isEligible: false, reason: 'COPYRIGHT_SOURCE_UNKNOWN' };
     }
   }
 
@@ -1792,25 +1830,55 @@ Quy định chặt chẽ:
     if (document.deletionStatus !== 'ACTIVE' || document.deletedAt !== null) {
       throw new ConflictException('DOCUMENT_INVALID_STATE');
     }
+    if (document.visibilityStatus === 'PENDING_REVIEW') {
+      throw new ConflictException('DOCUMENT_PENDING_REVIEW');
+    }
+
+    let dataToUpdate: any = {
+      copyrightSourceType: dto.sourceType,
+    };
+
+    if (dto.sourceType === 'OWN_ORIGINAL') {
+      dataToUpdate = {
+        ...dataToUpdate,
+        copyrightSourceUrl: null,
+        copyrightLicense: null,
+        copyrightAttribution: null,
+        copyrightPermissionReference: null,
+        copyrightDeclaredAt: new Date(),
+        copyrightDeclaredBy: userId,
+      };
+    } else if (dto.sourceType === 'OPEN_LICENSE') {
+      dataToUpdate = {
+        ...dataToUpdate,
+        copyrightSourceUrl: dto.sourceUrl || null,
+        copyrightLicense: dto.license || null,
+        copyrightAttribution: dto.attribution || null,
+        copyrightPermissionReference: null,
+        copyrightDeclaredAt: new Date(),
+        copyrightDeclaredBy: userId,
+      };
+    } else {
+      dataToUpdate = {
+        ...dataToUpdate,
+        copyrightDeclaredAt: null,
+        copyrightDeclaredBy: null,
+      };
+    }
+
+    if (dto.authorName !== undefined) {
+      dataToUpdate.copyrightAuthorName = dto.authorName || null;
+    }
 
     const updatedDocument = await this.prisma.document.update({
       where: { id: documentId },
-      data: {
-        copyrightSourceType: dto.sourceType,
-        copyrightAuthorName: dto.authorName,
-        copyrightSourceUrl: dto.sourceUrl,
-        copyrightLicense: dto.license,
-        copyrightAttribution: dto.attribution,
-        copyrightPermissionReference: dto.permissionReference,
-        copyrightDeclaredAt: new Date(),
-        copyrightDeclaredBy: userId,
-      },
+      data: dataToUpdate,
       include: {
         subject: { select: { isSystem: true, id: true, name: true, code: true } },
         tags: { include: { tag: true } },
         summary: true,
         quizzes: { include: { questions: { include: { options: true } } } },
-      }
+      },
     });
 
     return this.mapSafeDocumentResponse(updatedDocument, true, false);
@@ -1894,6 +1962,7 @@ Quy định chặt chẽ:
       data: {
         visibilityStatus: targetVisibility,
         requestedAt: new Date(),
+        rejectReason: null,
       },
     });
 
@@ -2116,6 +2185,15 @@ Quy định chặt chẽ:
 
     if (document.uploadedBy === userId) {
       throw new BadRequestException('Bạn không thể báo cáo tài liệu của chính mình.');
+    }
+
+    if (
+      document.visibilityStatus !== 'PUBLIC' ||
+      document.deletionStatus !== 'ACTIVE' ||
+      document.status !== 'ACTIVE' ||
+      document.deletedAt !== null
+    ) {
+      throw new BadRequestException('Chỉ được báo cáo tài liệu đang hiển thị công khai và hoạt động bình thường.');
     }
 
     // Check if user already reported this document with a PENDING or REVIEWING status
