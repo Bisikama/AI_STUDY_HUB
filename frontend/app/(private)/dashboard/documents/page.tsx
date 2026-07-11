@@ -512,9 +512,16 @@ export default function MyDocumentsPage() {
                             </span>
                           )}
 
-                          {isFollowed && (
-                            <span className="rounded-md border border-blue-200 bg-blue-100 px-2 py-1 text-[10px] font-bold tracking-wider text-blue-700">
-                              FOLLOWED
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate font-bold text-gray-900 text-base group-hover:text-blue-600 transition-colors flex items-center gap-1.5" title={doc.title}>
+                            <span className="truncate">{doc.title}</span>
+                            {doc.visibilityStatus === 'PRIVATE' && doc.rejectReason && (
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-red-500 animate-pulse" title="Yêu cầu chia sẻ công khai bị từ chối" />
+                            )}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="truncate text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
+                              {doc.subject?.name ?? `SUB-${doc.subjectId ?? 'GEN'}`}
                             </span>
                           )}
                         </div>

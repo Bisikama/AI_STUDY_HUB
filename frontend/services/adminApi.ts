@@ -71,6 +71,7 @@ export interface ResolveReportPayload {
   status: ReportStatus;
   documentStatus?: DocumentModerationStatus;
   adminNote?: string;
+  banTeacher?: boolean;
 }
 
 export interface AdminMetrics {
@@ -268,5 +269,10 @@ export const adminApi = {
   resolveReport: async (reportId: string, payload: ResolveReportPayload): Promise<AdminReport> => {
     const response = await axiosClient.patch(`/admin/reports/${reportId}`, payload);
     return response.data;
+  },
+
+  /** PATCH /api/admin/users/:userId/ban-teacher */
+  banTeacher: async (userId: string, adminNote?: string): Promise<void> => {
+    await axiosClient.patch(`/admin/users/${userId}/ban-teacher`, { adminNote });
   },
 };

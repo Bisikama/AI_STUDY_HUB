@@ -53,3 +53,5 @@ yarn-error.log*
 # Không theo dõi các thư mục này
 docs/
 postman/
+
+TESTING_REPORT.md
