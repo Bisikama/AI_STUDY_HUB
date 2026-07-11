@@ -10,6 +10,10 @@ type Subject = {
   id: number;
   name: string;
   code: string;
+  majors?: {
+    code: string;
+    name: string;
+  }[];
 };
 
 type ExploreDocument = {
@@ -21,6 +25,8 @@ type ExploreDocument = {
   fileSize: string;
   downloadCount: number;
   viewCount: number;
+  averageRating?: number;
+  ratingCount?: number;
   quizCount: number;
   hasSummary: boolean;
   uploader: {
@@ -113,6 +119,14 @@ const FOLLOWED_DOCUMENT_IDS_STORAGE_KEY = 'studyhub_followed_document_ids';
 const FOLLOWED_DOCUMENTS_STORAGE_KEY = 'studyhub_followed_documents';
 
 const DOCUMENT_TYPES = ['Lecture notes', 'Summaries', 'Past Exams', 'Essays'];
+
+const MAJOR_OPTIONS = [
+  { code: 'BA', name: 'Business Administration' },
+  { code: 'SE', name: 'Software Engineering' },
+  { code: 'IS', name: 'Information Systems' },
+  { code: 'AI', name: 'Artificial Intelligence' },
+  { code: 'GD', name: 'Graphic Design' },
+];
 
 const POPULAR_FPT_SEARCHES = [
   'SDN302',
@@ -230,6 +244,10 @@ function getSubjectFilterOptions(documents: ExploreDocument[]): string[] {
   );
 }
 
+function getDocumentMajorCodes(doc: ExploreDocument): string[] {
+  return doc.subject?.majors?.map((major) => major.code) ?? [];
+}
+
 function getCategoryIcon(category: string): string {
   switch (category) {
     case 'Lecture notes':
@@ -258,15 +276,14 @@ function SearchExplore() {
     setActiveQuery(urlQuery);
   }
 
-  const [sortBy, setSortBy] = useState<'recent' | 'viewed'>('recent');
+  const [sortBy, setSortBy] = useState<'recent' | 'viewed' | 'rating'>('recent');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [selectedSemester, setSelectedSemester] = useState('All semesters');
+  const [subjectSearch, setSubjectSearch] = useState('');
+  const [selectedSemester, setSelectedSemester] = useState('All majors');
 
   const [collapsedSections, setCollapsedSections] = useState<{ [key: string]: boolean }>({
     sort: false,
     subject: false,
-    type: false,
     semester: false,
   });
 
@@ -369,6 +386,16 @@ function SearchExplore() {
     return getSubjectFilterOptions(displayDocs);
   }, [displayDocs]);
 
+  const visibleSubjectFilterOptions = useMemo(() => {
+    const keyword = subjectSearch.trim().toLowerCase();
+
+    if (!keyword) {
+      return subjectFilterOptions;
+    }
+
+    return subjectFilterOptions.filter((subject) => subject.toLowerCase().includes(keyword));
+  }, [subjectFilterOptions, subjectSearch]);
+
   const filteredDocuments = useMemo(() => {
     let list = [...displayDocs];
 
@@ -376,18 +403,24 @@ function SearchExplore() {
       list = list.filter((doc) => selectedSubjects.includes(getSubjectDisplayName(doc)));
     }
 
-    if (selectedTypes.length > 0) {
-      list = list.filter((doc) => selectedTypes.includes(getDocumentCategory(doc)));
+    if (selectedSemester !== 'All majors') {
+      list = list.filter((doc) => getDocumentMajorCodes(doc).includes(selectedSemester));
     }
 
     if (sortBy === 'recent') {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else if (sortBy === 'viewed') {
       list.sort((a, b) => b.viewCount - a.viewCount);
+    } else if (sortBy === 'rating') {
+      list.sort(
+        (a, b) =>
+          (b.averageRating ?? 0) - (a.averageRating ?? 0) ||
+          (b.ratingCount ?? 0) - (a.ratingCount ?? 0),
+      );
     }
 
     return list;
-  }, [displayDocs, selectedSubjects, selectedTypes, sortBy]);
+  }, [displayDocs, selectedSubjects, selectedSemester, sortBy]);
 
   const toggleSection = (section: string) => {
     setCollapsedSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -399,16 +432,10 @@ function SearchExplore() {
     );
   };
 
-  const handleTypeChange = (type: string) => {
-    setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
-    );
-  };
-
   const handleClearAll = () => {
     setSelectedSubjects([]);
-    setSelectedTypes([]);
-    setSelectedSemester('All semesters');
+    setSubjectSearch('');
+    setSelectedSemester('All majors');
     setSortBy('recent');
   };
 
@@ -748,7 +775,7 @@ function SearchExplore() {
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
-                  router.push('/');
+                  router.push('/dashboard/documents');
                 }}
               >
                 My Documents
@@ -849,6 +876,18 @@ function SearchExplore() {
                       Most Viewed
                     </span>
                   </label>
+                  <label className="group flex cursor-pointer items-center gap-3">
+                    <input
+                      type="radio"
+                      name="sort"
+                      checked={sortBy === 'rating'}
+                      onChange={() => setSortBy('rating')}
+                      className="border-outline-variant text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
+                      Highest Rating
+                    </span>
+                  </label>
                 </div>
               )}
             </section>
@@ -872,19 +911,38 @@ function SearchExplore() {
               {!collapsedSections.subject && (
                 <div className="space-y-3">
                   {subjectFilterOptions.length > 0 ? (
-                    subjectFilterOptions.map((subject) => (
-                      <label key={subject} className="group flex cursor-pointer items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedSubjects.includes(subject)}
-                          onChange={() => handleSubjectChange(subject)}
-                          className="filter-checkbox border-outline-variant text-primary focus:ring-primary h-4 w-4 rounded"
-                        />
-                        <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
-                          {subject}
-                        </span>
-                      </label>
-                    ))
+                    <>
+                      <input
+                        type="text"
+                        value={subjectSearch}
+                        onChange={(e) => setSubjectSearch(e.target.value)}
+                        placeholder="Search subject code..."
+                        className="bg-surface-container-low font-label-md text-on-surface-variant placeholder:text-secondary/70 focus:ring-primary w-full rounded-lg border-none px-4 py-2.5 outline-none focus:ring-2"
+                      />
+
+                      <div className="custom-scrollbar max-h-72 space-y-3 overflow-y-auto pr-1">
+                        {visibleSubjectFilterOptions.length > 0 ? (
+                          visibleSubjectFilterOptions.map((subject) => (
+                            <label
+                              key={subject}
+                              className="group flex cursor-pointer items-center gap-3"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedSubjects.includes(subject)}
+                                onChange={() => handleSubjectChange(subject)}
+                                className="filter-checkbox border-outline-variant text-primary focus:ring-primary h-4 w-4 rounded"
+                              />
+                              <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
+                                {subject}
+                              </span>
+                            </label>
+                          ))
+                        ) : (
+                          <p className="text-secondary text-sm">No matching subjects.</p>
+                        )}
+                      </div>
+                    </>
                   ) : (
                     <p className="text-secondary text-sm">No subjects available yet.</p>
                   )}
@@ -896,45 +954,10 @@ function SearchExplore() {
 
             <section>
               <div
-                onClick={() => toggleSection('type')}
-                className="group mb-4 flex cursor-pointer items-center justify-between"
-              >
-                <h3 className="font-label-md text-primary">Document Type</h3>
-                <span
-                  className={`material-symbols-outlined text-secondary transition-transform ${
-                    collapsedSections.type ? 'rotate-[-90deg]' : ''
-                  }`}
-                >
-                  expand_more
-                </span>
-              </div>
-              {!collapsedSections.type && (
-                <div className="space-y-3">
-                  {DOCUMENT_TYPES.map((type) => (
-                    <label key={type} className="group flex cursor-pointer items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedTypes.includes(type)}
-                        onChange={() => handleTypeChange(type)}
-                        className="filter-checkbox border-outline-variant text-primary focus:ring-primary h-4 w-4 rounded"
-                      />
-                      <span className="text-label-md text-on-surface-variant group-hover:text-primary transition-colors">
-                        {type}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <hr className="border-outline-variant" />
-
-            <section>
-              <div
                 onClick={() => toggleSection('semester')}
                 className="group mb-4 flex cursor-pointer items-center justify-between"
               >
-                <h3 className="font-label-md text-primary">Semester</h3>
+                <h3 className="font-label-md text-primary">Major / Specialization</h3>
                 <span
                   className={`material-symbols-outlined text-secondary transition-transform ${
                     collapsedSections.semester ? 'rotate-[-90deg]' : ''
@@ -949,16 +972,12 @@ function SearchExplore() {
                   onChange={(e) => setSelectedSemester(e.target.value)}
                   className="bg-surface-container-low font-label-md text-on-surface-variant focus:ring-primary w-full rounded-lg border-none px-4 py-2.5 outline-none focus:ring-2"
                 >
-                  <option>All semesters</option>
-                  <option>Semester 1</option>
-                  <option>Semester 2</option>
-                  <option>Semester 3</option>
-                  <option>Semester 4</option>
-                  <option>Semester 5</option>
-                  <option>Semester 6</option>
-                  <option>Semester 7</option>
-                  <option>Semester 8</option>
-                  <option>Semester 9</option>
+                  <option value="All majors">All majors</option>
+                  {MAJOR_OPTIONS.map((major) => (
+                    <option key={major.code} value={major.code}>
+                      {major.code} - {major.name}
+                    </option>
+                  ))}
                 </select>
               )}
             </section>
@@ -984,19 +1003,6 @@ function SearchExplore() {
                     results for &quot;
                     <span className="italic">{activeQuery || 'All Documents'}</span>&quot;
                   </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => toast.info('Grid view clicked (Simulated)')}
-                    className="bg-surface-container-low text-label-md text-primary hover:bg-surface-container-high flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">grid_view</span>
-                  </button>
-                  <button className="bg-primary text-on-primary text-label-md flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 shadow-sm transition-all active:scale-95">
-                    <span className="material-symbols-outlined text-[20px]">
-                      format_list_bulleted
-                    </span>
-                  </button>
                 </div>
               </div>
 
