@@ -206,9 +206,14 @@ export class AuthService {
 
     // 5. Gửi email
     const mailSent = await this.mailService.sendOtp(email, otp);
+    if (!mailSent) {
+      throw new BadRequestException(
+        'Gửi email OTP thất bại. Vui lòng kiểm tra lại cấu hình SMTP của bạn.',
+      );
+    }
 
     return {
-      message: 'Email khôi phục mật khẩu đã được gửi qua dịch vụ Supabase.',
+      message: 'Mã OTP khôi phục mật khẩu đã được gửi đến email của bạn.',
     };
   }
 
