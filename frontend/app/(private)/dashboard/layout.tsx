@@ -9,6 +9,13 @@ import TeacherVerificationModal from '@/components/TeacherVerificationModal';
 import { notificationsApi, SystemNotification } from '@/services/notificationsApi';
 import { toast } from 'sonner';
 
+type DashboardUser = {
+  id?: string;
+  email?: string;
+  fullName?: string;
+  role?: 'STUDENT' | 'TEACHER' | 'ADMIN' | string;
+};
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -16,15 +23,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [search, setSearch] = useState('');
+  const [user, setUser] = useState<DashboardUser | null>(null);
   const [userFullName, setUserFullName] = useState('User');
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
-  const [user, setUser] = useState<{ id: string; email: string; fullName: string; role: 'STUDENT' | 'TEACHER' | 'ADMIN' } | null>(null);
+
 
   // Fetch notifications
   const { data: notifications = [], mutate: mutateNotifications } = useSWR(
     '/notifications',
     () => notificationsApi.getNotifications(),
-    { refreshInterval: 10000 }
+    { refreshInterval: 10000 },
   );
 
   const unreadCount = notifications.filter((n: SystemNotification) => !n.isRead).length;
@@ -85,8 +93,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="bg-background text-on-background flex min-h-screen font-sans">
       {/* Sidebar Nav */}
       <nav
-        className={`${mobileMenuOpen ? 'flex' : 'hidden'
-          } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
+        className={`${
+          mobileMenuOpen ? 'flex' : 'hidden'
+        } border-outline-variant bg-surface-container-lowest fixed top-0 left-0 z-20 h-full w-64 flex-col border-r p-4 shadow-[0px_4px_12px_rgba(0,0,0,0.03)] transition-all md:flex`}
       >
         <div className="mt-2 mb-8 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
@@ -121,10 +130,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/dashboard"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname === '/dashboard'
-                ? 'bg-surface-container-low text-primary font-semibold'
-                : 'text-secondary hover:bg-surface-container-low'
-                }`}
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
+                pathname === '/dashboard'
+                  ? 'bg-surface-container-low text-primary font-semibold'
+                  : 'text-secondary hover:bg-surface-container-low'
+              }`}
             >
               <span className="material-symbols-outlined">search</span> Discover
             </Link>
@@ -132,10 +142,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/dashboard/documents"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname.includes('/dashboard/documents')
-                ? 'bg-surface-container-low text-primary font-semibold'
-                : 'text-secondary hover:bg-surface-container-low'
-                }`}
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
+                pathname.includes('/dashboard/documents')
+                  ? 'bg-surface-container-low text-primary font-semibold'
+                  : 'text-secondary hover:bg-surface-container-low'
+              }`}
             >
               <span className="material-symbols-outlined">description</span> My Documents
             </Link>
@@ -143,10 +154,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <li>
             <Link
               href="/practice"
-              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${pathname.includes('/practice')
-                ? 'bg-surface-container-low text-primary font-semibold'
-                : 'text-secondary hover:bg-surface-container-low'
-                }`}
+              className={`font-label-md text-label-md flex items-center gap-3 rounded-lg px-4 py-3 transition-transform active:scale-95 ${
+                pathname.includes('/practice')
+                  ? 'bg-surface-container-low text-primary font-semibold'
+                  : 'text-secondary hover:bg-surface-container-low'
+              }`}
             >
               <span className="material-symbols-outlined">lightbulb</span> Practice Mode
             </Link>
@@ -154,7 +166,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </ul>
 
         <ul className="border-outline-variant mt-auto flex flex-col gap-2 border-t pt-4">
-
           <li>
             <a
               className="text-error font-label-md text-label-md flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-transform hover:bg-red-50 hover:text-rose-700 active:scale-95"
@@ -207,11 +218,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     setShowNotificationsDropdown(!showNotificationsDropdown);
                     setShowAvatarDropdown(false);
                   }}
-                  className="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-outline-variant text-secondary hover:border-primary hover:text-primary transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  className="border-outline-variant text-secondary hover:border-primary hover:text-primary focus:ring-primary relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border transition-colors focus:ring-2 focus:ring-offset-2"
                 >
                   <span className="material-symbols-outlined text-[24px]">notifications</span>
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                    <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 animate-pulse items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm">
                       {unreadCount}
                     </span>
                   )}
@@ -223,23 +234,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       className="fixed inset-0 z-30"
                       onClick={() => setShowNotificationsDropdown(false)}
                     />
-                    <div className="bg-surface-container-lowest border-outline-variant absolute right-0 z-40 mt-2 w-80 rounded-2xl border py-3 px-4 shadow-xl flex flex-col gap-2 max-h-[400px]">
-                      <div className="flex items-center justify-between border-b border-outline-variant pb-2">
-                        <span className="font-title-md text-[16px] font-bold text-on-surface">Thông báo</span>
+                    <div className="bg-surface-container-lowest border-outline-variant absolute right-0 z-40 mt-2 flex max-h-[400px] w-80 flex-col gap-2 rounded-2xl border px-4 py-3 shadow-xl">
+                      <div className="border-outline-variant flex items-center justify-between border-b pb-2">
+                        <span className="font-title-md text-on-surface text-[16px] font-bold">
+                          Thông báo
+                        </span>
                         {unreadCount > 0 && (
                           <button
                             onClick={handleMarkAllAsRead}
-                            className="text-primary hover:underline text-xs font-semibold"
+                            className="text-primary text-xs font-semibold hover:underline"
                           >
                             Đọc tất cả
                           </button>
                         )}
                       </div>
 
-                      <div className="flex flex-col gap-1 divide-y divide-outline-variant/30 overflow-y-auto max-h-[300px] pr-1">
+                      <div className="divide-outline-variant/30 flex max-h-[300px] flex-col gap-1 divide-y overflow-y-auto pr-1">
                         {notifications.length === 0 ? (
-                          <div className="py-8 text-center text-secondary text-sm flex flex-col items-center justify-center gap-2">
-                            <span className="material-symbols-outlined text-[32px] text-secondary/50">notifications_off</span>
+                          <div className="text-secondary flex flex-col items-center justify-center gap-2 py-8 text-center text-sm">
+                            <span className="material-symbols-outlined text-secondary/50 text-[32px]">
+                              notifications_off
+                            </span>
                             Không có thông báo nào
                           </div>
                         ) : (
@@ -249,24 +264,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                               onClick={() => {
                                 if (!n.isRead) handleMarkAsRead(n.id);
                               }}
-                              className={`group flex flex-col gap-1 py-2.5 transition-colors cursor-pointer rounded-lg px-2 hover:bg-surface-container-low ${
+                              className={`group hover:bg-surface-container-low flex cursor-pointer flex-col gap-1 rounded-lg px-2 py-2.5 transition-colors ${
                                 !n.isRead ? 'bg-primary-container/10' : ''
                               }`}
                             >
                               <div className="flex items-start justify-between gap-2">
-                                <span className={`text-sm font-semibold truncate ${
-                                  !n.isRead ? 'text-primary' : 'text-on-surface'
-                                }`}>
+                                <span
+                                  className={`truncate text-sm font-semibold ${
+                                    !n.isRead ? 'text-primary' : 'text-on-surface'
+                                  }`}
+                                >
                                   {n.title}
                                 </span>
                                 {!n.isRead && (
-                                  <span className="h-2 w-2 shrink-0 rounded-full bg-primary mt-1.5" />
+                                  <span className="bg-primary mt-1.5 h-2 w-2 shrink-0 rounded-full" />
                                 )}
                               </div>
-                              <p className="text-secondary text-xs line-clamp-3 leading-relaxed">
+                              <p className="text-secondary line-clamp-3 text-xs leading-relaxed">
                                 {n.content}
                               </p>
-                              <span className="text-[10px] text-secondary/60 mt-1">
+                              <span className="text-secondary/60 mt-1 text-[10px]">
                                 {new Date(n.createdAt).toLocaleDateString('vi-VN', {
                                   hour: '2-digit',
                                   minute: '2-digit',
@@ -288,10 +305,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   onClick={() => setShowAvatarDropdown(!showAvatarDropdown)}
                   className={`border-outline-variant hover:border-primary focus:ring-primary flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border transition-colors focus:ring-2 focus:ring-offset-2 ${
                     user?.role === 'TEACHER'
-                      ? 'ring-2 ring-emerald-500 ring-offset-1 border-transparent'
+                      ? 'border-transparent ring-2 ring-emerald-500 ring-offset-1'
                       : user?.role === 'ADMIN'
-                      ? 'ring-2 ring-blue-600 ring-offset-1 border-transparent'
-                      : ''
+                        ? 'border-transparent ring-2 ring-blue-600 ring-offset-1'
+                        : ''
                   }`}
                 >
                   <img
@@ -321,7 +338,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             setShowVerificationModal(true);
                           }}
                         >
-                          <span className="material-symbols-outlined text-[18px]">verified_user</span>{' '}
+                          <span className="material-symbols-outlined text-[18px]">
+                            verified_user
+                          </span>{' '}
                           Instructor Verification
                         </button>
                       )}
