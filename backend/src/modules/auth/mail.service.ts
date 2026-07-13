@@ -1,32 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
 
   constructor(private configService: ConfigService) {
-    this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('SMTP_HOST') || 'smtp.gmail.com',
-      port: Number(this.configService.get<number>('SMTP_PORT') || 587),
-      secure: false, // TLS
-      auth: {
-        user: this.configService.get<string>('SMTP_USER'),
-        pass: this.configService.get<string>('SMTP_PASS'),
-      },
-    });
-    this.logger.log('🚀 Gmail Nodemailer transporter initialized.');
+    // Khởi tạo client Resend bằng API Key
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    this.resend = new Resend(apiKey);
+    this.logger.log('🚀 Resend email client initialized.');
   }
 
   async sendOtp(to: string, otp: string): Promise<boolean> {
     try {
       const from =
-        this.configService.get<string>('SMTP_FROM') || 'ScholarHub <no-reply@scholarhub.com>';
-      const mailOptions = {
+        this.configService.get<string>('RESEND_FROM') || 'ScholarHub <onboarding@resend.dev>';
+
+      // Resend SDK trả về một object có chứa { data, error }
+      const { data, error } = await this.resend.emails.send({
         from,
-        to,
+        to: [to], // Resend nhận danh sách người nhận là một mảng hoặc chuỗi
         subject: `[ScholarHub] Mã xác thực OTP khôi phục mật khẩu`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 24px; color: #333;">
@@ -41,20 +37,29 @@ export class MailService {
             <p style="font-size: 12px; color: #666; text-align: center; margin-bottom: 0;">ScholarHub - Hệ thống quản lý tài liệu học thuật trực tuyến</p>
           </div>
         `,
-      };
+      });
 
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`📧 OTP mail successfully sent to: ${to}`);
+      if (error) {
+        this.logger.error(`❌ Lỗi gửi email OTP qua Resend API: ${error.message}`);
+        return false;
+      }
+
+      this.logger.log(`📧 OTP mail successfully sent to: ${to} (ID: ${data?.id})`);
       return true;
     } catch (error) {
       this.logger.error(
-        `❌ Lỗi gửi email OTP qua Nodemailer: ${error instanceof Error ? error.message : String(error)}`,
+        `❌ Lỗi hệ thống khi gửi email OTP: ${error instanceof Error ? error.message : String(error)}`,
       );
       return false;
     }
   }
 
-  async sendDocumentRejection(to: string, fullName: string, docTitle: string, reason: string): Promise<boolean> {
+  async sendDocumentRejection(
+    to: string,
+    fullName: string,
+    docTitle: string,
+    reason: string,
+  ): Promise<boolean> {
     try {
       console.log('\n==================================================');
       console.log(`✉️ [EMAIL NOTIFICATION - DOCUMENT REJECTED]`);
