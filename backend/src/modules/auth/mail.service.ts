@@ -1,26 +1,33 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Resend } from 'resend';
+import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private resend: Resend;
+  private transporter: nodemailer.Transporter;
 
   constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    this.resend = new Resend(apiKey);
-    this.logger.log('🚀 Resend email client initialized.');
+    this.transporter = nodemailer.createTransport({
+      host: this.configService.get<string>('SMTP_HOST') || 'smtp.gmail.com',
+      port: Number(this.configService.get<number>('SMTP_PORT') || 587),
+      secure: false, // TLS
+      auth: {
+        user: this.configService.get<string>('SMTP_USER'),
+        pass: this.configService.get<string>('SMTP_PASS'),
+      },
+    });
+    this.logger.log('🚀 Gmail Nodemailer transporter initialized.');
   }
 
   async sendOtp(to: string, otp: string): Promise<boolean> {
     try {
       const from =
-        this.configService.get<string>('RESEND_FROM') || 'ScholarHub <onboarding@resend.dev>';
+        this.configService.get<string>('SMTP_FROM') || 'ScholarHub <no-reply@scholarhub.com>';
       
-      const { data, error } = await this.resend.emails.send({
+      const mailOptions = {
         from,
-        to: [to],
+        to,
         subject: `[ScholarHub] Verification Code: ${otp}`,
         html: `
           <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; padding: 40px 20px; color: #1f2937; line-height: 1.6;">
@@ -65,18 +72,14 @@ export class MailService {
             </div>
           </div>
         `,
-      });
+      };
 
-      if (error) {
-        this.logger.error(`❌ Lỗi gửi email OTP qua Resend API: ${error.message}`);
-        return false;
-      }
-
-      this.logger.log(`📧 OTP mail successfully sent to: ${to} (ID: ${data?.id})`);
+      await this.transporter.sendMail(mailOptions);
+      this.logger.log(`📧 OTP mail successfully sent to: ${to}`);
       return true;
     } catch (error) {
       this.logger.error(
-        `❌ Lỗi gửi email OTP qua Resend: ${error instanceof Error ? error.message : String(error)}`,
+        `❌ Lỗi gửi email OTP qua Nodemailer: ${error instanceof Error ? error.message : String(error)}`,
       );
       return false;
     }
