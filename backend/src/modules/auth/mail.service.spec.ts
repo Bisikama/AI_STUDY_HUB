@@ -1,36 +1,35 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MailService } from './mail.service';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
 
-jest.mock('nodemailer');
+// Mock lớp Resend và phương thức send
+const mockSend = jest.fn();
+jest.mock('resend', () => {
+  return {
+    Resend: jest.fn().mockImplementation(() => {
+      return {
+        emails: {
+          send: mockSend,
+        },
+      };
+    }),
+  };
+});
 
 describe('MailService', () => {
   let service: MailService;
-  let mockTransporter: any;
 
   const mockConfigService = {
     get: jest.fn((key: string) => {
-      if (key === 'SMTP_HOST') return 'smtp.test.com';
-      if (key === 'SMTP_PORT') return 587;
-      if (key === 'SMTP_USER') return 'user@test.com';
-      if (key === 'SMTP_PASS') return 'password';
-      if (key === 'SMTP_FROM') return 'Test <no-reply@test.com>';
+      if (key === 'RESEND_API_KEY') return 're_test_key';
+      if (key === 'RESEND_FROM') return 'Test <onboarding@resend.dev>';
       return null;
     }),
   };
 
   beforeEach(async () => {
-    mockTransporter = {
-      sendMail: jest.fn().mockResolvedValue({ messageId: 'test-id' }),
-    };
-    (nodemailer.createTransport as jest.Mock).mockReturnValue(mockTransporter);
-
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        MailService,
-        { provide: ConfigService, useValue: mockConfigService },
-      ],
+      providers: [MailService, { provide: ConfigService, useValue: mockConfigService }],
     }).compile();
 
     service = module.get<MailService>(MailService);
@@ -43,19 +42,26 @@ describe('MailService', () => {
 
   describe('sendOtp', () => {
     it('should send email successfully and return true', async () => {
+      mockSend.mockResolvedValue({ data: { id: 'test-id' }, error: null });
       const result = await service.sendOtp('user@example.com', '123456');
       expect(result).toBe(true);
-      expect(mockTransporter.sendMail).toHaveBeenCalledWith(
+      expect(mockSend).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'user@example.com',
-          from: 'Test <no-reply@test.com>',
+          to: ['user@example.com'],
+          from: 'Test <onboarding@resend.dev>',
           subject: '[ScholarHub] Mã xác thực OTP khôi phục mật khẩu',
         }),
       );
     });
 
-    it('should catch error and return false', async () => {
-      mockTransporter.sendMail.mockRejectedValue(new Error('SMTP Fail'));
+    it('should handle API error and return false', async () => {
+      mockSend.mockResolvedValue({ data: null, error: { message: 'Invalid API Key' } });
+      const result = await service.sendOtp('user@example.com', '123456');
+      expect(result).toBe(false);
+    });
+
+    it('should catch generic exception and return false', async () => {
+      mockSend.mockRejectedValue(new Error('Network Fail'));
       const result = await service.sendOtp('user@example.com', '123456');
       expect(result).toBe(false);
     });
