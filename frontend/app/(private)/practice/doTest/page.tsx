@@ -64,7 +64,12 @@ type ExploreAiCache = {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
-  const response = await fetch(url, { credentials: 'include' });
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(url, { credentials: 'include', headers });
   if (!response.ok) {
     throw new Error('Failed to fetch AI Cache');
   }
