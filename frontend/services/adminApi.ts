@@ -270,6 +270,7 @@ export const adminApi = {
     const response = await axiosClient.patch(`/admin/reports/${reportId}`, payload);
     return response.data;
   },
+
   /** PATCH /api/admin/users/:userId/ban-teacher */
   banTeacher: async (userId: string, adminNote?: string): Promise<void> => {
     await axiosClient.patch(`/admin/users/${userId}/ban-teacher`, { adminNote });
