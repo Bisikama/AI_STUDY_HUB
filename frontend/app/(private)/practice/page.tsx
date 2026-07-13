@@ -65,7 +65,12 @@ type ExploreAiCache = {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
-  const response = await fetch(url, { credentials: 'include' });
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(url, { credentials: 'include', headers });
   if (!response.ok) {
     throw new Error('Failed to fetch explore documents');
   }
@@ -74,7 +79,12 @@ const fetcher = async (url: string): Promise<ExploreDocument[]> => {
 };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
-  const response = await fetch(url, { credentials: 'include' });
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(url, { credentials: 'include', headers });
   if (!response.ok) {
     throw new Error('Failed to fetch AI Cache');
   }
@@ -195,11 +205,21 @@ export default function PracticePage() {
   const handleLogout = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     try {
-      await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+      });
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
       localStorage.removeItem('user');
+      localStorage.removeItem('access_token');
       window.location.href = '/login';
     }
   };
@@ -276,9 +296,15 @@ export default function PracticePage() {
     setAnalyzeError(null);
 
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`${API_BASE_URL}/api/documents/analyze/${selectedDocId}`, {
         method: 'POST',
         credentials: 'include',
+        headers,
       });
 
       if (!response.ok) {
