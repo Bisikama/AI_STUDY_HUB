@@ -52,6 +52,7 @@ describe('useAuth hook', () => {
       expect(user).toEqual(mockUser);
       expect(authApi.login).toHaveBeenCalledWith({ email: 'test@example.com', password: 'password' });
       expect(localStorage.getItem('user')).toBe(JSON.stringify(mockUser));
+      expect(localStorage.getItem('access_token')).toBe('fake-token');
       expect(document.cookie).toContain('access_token=fake-token');
       expect(result.current.isLoading).toBe(false);
       expect(result.current.error).toBeNull();
@@ -77,6 +78,7 @@ describe('useAuth hook', () => {
   describe('logout', () => {
     it('should clear localStorage and cookie on logout', async () => {
       localStorage.setItem('user', JSON.stringify({ id: '1' }));
+      localStorage.setItem('access_token', 'token');
       document.cookie = 'access_token=token';
 
       (authApi.logout as jest.Mock).mockResolvedValue({});
@@ -89,6 +91,7 @@ describe('useAuth hook', () => {
 
       expect(authApi.logout).toHaveBeenCalled();
       expect(localStorage.getItem('user')).toBeNull();
+      expect(localStorage.getItem('access_token')).toBeNull();
       expect(safeNavigateTo).toHaveBeenCalledWith('/login');
     });
   });
