@@ -518,6 +518,11 @@ export default function MyDocumentsPage() {
                             <span className="truncate text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
                               {doc.subject?.name ?? `SUB-${doc.subjectId ?? 'GEN'}`}
                             </span>
+                            {isFollowed && (
+                              <span className="rounded-md border border-blue-200 bg-blue-100 px-2 py-1 text-[10px] font-bold tracking-wider text-blue-700">
+                                FOLLOWED
+                              </span>
+                            )}
                             {viewMode === 'list' && (doc.isAIGenerated || isFollowed) && (
                               <span className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded-md ${doc.isAIGenerated ? 'bg-gray-900 text-white' : 'bg-blue-100 text-blue-700'}`}>
                                 {doc.isAIGenerated ? 'AI' : 'FOLLOWED'}

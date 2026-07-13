@@ -653,9 +653,21 @@ function SearchExplore() {
         return acc;
       }, {});
 
+      const score = results.filter((result) => result.isCorrect).length;
+      const normalizedScore = Math.round((score / questions.length) * 10);
       setQuizAnswerResults(resultMap);
-      setQuizScore(results.filter((result) => result.isCorrect).length);
+      setQuizScore(score);
       setIsQuizSubmitted(true);
+
+      // Save attempt to backend database
+      try {
+        await axiosClient.post(`/explore/${selectedDocumentId}/quiz/submit`, {
+          quizId: questions[0].quizId,
+          score: normalizedScore,
+        });
+      } catch (submitErr) {
+        console.error('Failed to submit quiz attempt to database:', submitErr);
+      }
     } catch (err) {
       console.error('Failed to submit quiz:', err);
       setQuizAuthWarning('Could not submit quiz. Please log in again and try later.');

@@ -93,12 +93,7 @@ const mainNavItems: NavItem[] = [
     label: 'Reports',
     href: '/admin/reports',
     icon: <FlagIcon />,
-  },
-  {
-    label: 'Sessions',
-    href: '/admin/sessions',
-    icon: <SessionIcon />,
-  },
+  }
 ];
 
 const bottomNavItems: NavItem[] = [

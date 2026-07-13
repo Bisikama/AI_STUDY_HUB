@@ -420,11 +420,15 @@ export class AdminService {
       throw new NotFoundException('Không tìm thấy tài liệu với ID đã cho');
     }
 
-    // 2. Xóa file vật lý trên Supabase Storage trước
+    // 2. Xóa file vật lý trên Supabase Storage trước (xóa ở Private Bucket hoặc Public Bucket tùy loại file)
     try {
-      await this.supabaseService.deleteFromSupabase(document.fileUrl);
+      if (document.storagePath) {
+        await this.supabaseService.deleteObject(document.storagePath);
+      } else {
+        await this.supabaseService.deleteFromSupabase(document.fileUrl);
+      }
     } catch (error) {
-      console.error('Lỗi khi xóa file trên Supabase Storage:', error);
+      this.logger.error('Lỗi khi xóa file trên Supabase Storage:', error);
       throw new InternalServerErrorException(
         `Không thể xóa file trên Cloud Storage: ${error instanceof Error ? error.message : String(error)}`,
       );

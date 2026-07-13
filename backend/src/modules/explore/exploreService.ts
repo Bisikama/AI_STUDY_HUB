@@ -288,4 +288,14 @@ export class ExploreService {
       correctOptionId,
     };
   }
+
+  async submitQuizAttempt(userId: string, quizId: string, score: number) {
+    return this.prisma.userQuizAttempt.create({
+      data: {
+        userId,
+        quizId,
+        score,
+      },
+    });
+  }
 }

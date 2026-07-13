@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { adminApi, AdminQuizDetail } from '@/services/adminApi';
+import { toast } from 'sonner';
 
 interface QuizDetailModalProps {
   isOpen: boolean;
@@ -117,6 +118,7 @@ export default function QuizDetailModal({
       });
 
       setSuccessMsg('Question saved successfully!');
+      toast.success('Question saved successfully!');
 
       // Update local detail state
       const updatedQuestions = [...quizDetail.questions];
@@ -140,7 +142,9 @@ export default function QuizDetailModal({
       }
     } catch (err: any) {
       console.error('Failed to update question:', err);
-      setError(err.response?.data?.message || 'Failed to save question');
+      const errMsg = err.response?.data?.message || 'Failed to save question';
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setSaving(false);
     }
