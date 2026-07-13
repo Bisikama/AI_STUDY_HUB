@@ -45,6 +45,45 @@ export class AdminService {
     return data as T;
   }
 
+  private calculateJaccardSimilarity(text1: string, text2: string): number {
+    if (!text1 || !text2) return 0;
+    const words1 = text1.toLowerCase().match(/[a-z]{2,}/g) || [];
+    const words2 = text2.toLowerCase().match(/[a-z]{2,}/g) || [];
+    if (words1.length === 0 || words2.length === 0) return 0;
+    const set1 = new Set(words1);
+    const set2 = new Set(words2);
+    let intersectionCount = 0;
+    for (const w of set1) {
+      if (set2.has(w)) {
+        intersectionCount++;
+      }
+    }
+    const unionCount = set1.size + set2.size - intersectionCount;
+    return intersectionCount / unionCount;
+  }
+
+  private calculateTitleOverlap(title1: string, title2: string): number {
+    if (!title1 || !title2) return 0;
+    const clean1 = title1.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const clean2 = title2.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (clean1 === clean2) return 1.0;
+    if (clean1.includes(clean2) || clean2.includes(clean1)) {
+      return Math.min(clean1.length, clean2.length) / Math.max(clean1.length, clean2.length);
+    }
+    const words1 = title1.toLowerCase().match(/[a-z0-9]+/g) || [];
+    const words2 = title2.toLowerCase().match(/[a-z0-9]+/g) || [];
+    if (words1.length === 0 || words2.length === 0) return 0;
+    const set1 = new Set(words1);
+    const set2 = new Set(words2);
+    let intersection = 0;
+    for (const w of set1) {
+      if (set2.has(w)) {
+        intersection++;
+      }
+    }
+    return intersection / Math.max(set1.size, set2.size);
+  }
+
   async getSystemMetrics() {
     try {
       // 1. Đếm tổng số lượng user
@@ -143,43 +182,74 @@ export class AdminService {
         orderBy: { createdAt: 'asc' }, // File nào chờ lâu nhất hiện trước
       });
 
-      const enrichedDocs = await Promise.all(
-        documents.map(async (doc) => {
-          let duplicateSource: any = null;
-          if (doc.fileHash) {
-            duplicateSource = await this.prisma.document.findFirst({
-              where: {
-                fileHash: doc.fileHash,
-                id: { not: doc.id },
-                visibilityStatus: VisibilityStatus.PUBLIC,
-                status: DocumentStatus.ACTIVE,
-              },
-              select: {
-                id: true,
-                title: true,
-                createdAt: true,
-                user: {
-                  select: { fullName: true, email: true },
-                },
-              },
-            });
+      // 1. Lấy tất cả tài liệu PUBLIC và ACTIVE hiện tại để đối chiếu trùng lặp
+      const publicDocs = await this.prisma.document.findMany({
+        where: {
+          visibilityStatus: VisibilityStatus.PUBLIC,
+          status: DocumentStatus.ACTIVE,
+        },
+        select: {
+          id: true,
+          title: true,
+          fileHash: true,
+          fileSize: true,
+          fullText: true,
+          createdAt: true,
+          user: {
+            select: { fullName: true, email: true },
+          },
+        },
+      });
+
+      const enrichedDocs = documents.map((doc) => {
+        let duplicateSource: any = null;
+
+        for (const pDoc of publicDocs) {
+          if (pDoc.id === doc.id) continue;
+
+          // TH1: Khớp mã băm SHA-256 tuyệt đối (100% trùng lặp file)
+          if (doc.fileHash && pDoc.fileHash && doc.fileHash === pDoc.fileHash) {
+            duplicateSource = pDoc;
+            break;
           }
 
-          return {
-            ...doc,
-            isDuplicateDetected: !!duplicateSource,
-            duplicateSourceInfo: duplicateSource
-              ? {
-                  id: duplicateSource.id,
-                  title: duplicateSource.title,
-                  author: duplicateSource.user.fullName,
-                  email: duplicateSource.user.email,
-                  createdAt: duplicateSource.createdAt,
-                }
-              : null,
-          };
-        }),
-      );
+          // TH2: Khớp trùng lặp nội dung văn bản Jaccard (Similarity >= 70%)
+          if (doc.fullText && pDoc.fullText) {
+            const contentSim = this.calculateJaccardSimilarity(doc.fullText, pDoc.fullText);
+            if (contentSim >= 0.7) {
+              duplicateSource = pDoc;
+              break;
+            }
+          }
+
+          // TH3: Trùng lặp Tiêu đề (Overlap >= 80%) và Kích thước file tương đồng (trong khoảng +/- 50%)
+          const titleSim = this.calculateTitleOverlap(doc.title, pDoc.title);
+          const docSize = Number(doc.fileSize);
+          const pDocSize = Number(pDoc.fileSize);
+          const sizeRatio = docSize > 0 && pDocSize > 0
+            ? Math.min(docSize, pDocSize) / Math.max(docSize, pDocSize)
+            : 0;
+
+          if (titleSim >= 0.8 && sizeRatio >= 0.5) {
+            duplicateSource = pDoc;
+            break;
+          }
+        }
+
+        return {
+          ...doc,
+          isDuplicateDetected: !!duplicateSource,
+          duplicateSourceInfo: duplicateSource
+            ? {
+                id: duplicateSource.id,
+                title: duplicateSource.title,
+                author: duplicateSource.user.fullName,
+                email: duplicateSource.user.email,
+                createdAt: duplicateSource.createdAt,
+              }
+            : null,
+        };
+      });
 
       return this.sanitizeData(enrichedDocs);
     } catch (error) {
@@ -350,11 +420,15 @@ export class AdminService {
       throw new NotFoundException('Không tìm thấy tài liệu với ID đã cho');
     }
 
-    // 2. Xóa file vật lý trên Supabase Storage trước
+    // 2. Xóa file vật lý trên Supabase Storage trước (xóa ở Private Bucket hoặc Public Bucket tùy loại file)
     try {
-      await this.supabaseService.deleteFromSupabase(document.fileUrl);
+      if (document.storagePath) {
+        await this.supabaseService.deleteObject(document.storagePath);
+      } else {
+        await this.supabaseService.deleteFromSupabase(document.fileUrl);
+      }
     } catch (error) {
-      console.error('Lỗi khi xóa file trên Supabase Storage:', error);
+      this.logger.error('Lỗi khi xóa file trên Supabase Storage:', error);
       throw new InternalServerErrorException(
         `Không thể xóa file trên Cloud Storage: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -664,7 +738,6 @@ export class AdminService {
                   select: {
                     fullName: true,
                     email: true,
-                    role: true,
                   },
                 },
               },
@@ -817,39 +890,15 @@ export class AdminService {
 
         // 3. If resolved and documentStatus is provided
         if (dto.status === 'RESOLVED' && dto.documentStatus) {
-          const doc = await tx.document.update({
+          await tx.document.update({
             where: { id: report.documentId },
             data: {
               status: dto.documentStatus,
-            },
-            include: {
-              user: true,
             },
           });
 
           // If documentStatus is HIDDEN or REMOVED, auto resolve all other active reports
           if (dto.documentStatus === 'HIDDEN' || dto.documentStatus === 'REMOVED') {
-            // Auto ban/demote the teacher if banTeacher is true OR if it's set by default
-            const shouldBan = dto.banTeacher !== undefined ? dto.banTeacher : true;
-            if (shouldBan && doc.user.role === 'TEACHER') {
-              await tx.user.update({
-                where: { id: doc.uploadedBy },
-                data: {
-                  role: 'STUDENT',
-                  isTeacherBanned: true,
-                },
-              });
-
-              await tx.teacherVerification.updateMany({
-                where: { userId: doc.uploadedBy },
-                data: {
-                  status: 'REJECTED',
-                  adminNote:
-                    'Tự động bị hạ quyền và chặn đăng ký Giảng viên do vi phạm điều khoản (tài liệu bị báo cáo và gỡ bỏ).',
-                },
-              });
-            }
-
             await tx.documentReport.updateMany({
               where: {
                 documentId: report.documentId,
@@ -879,7 +928,6 @@ export class AdminService {
       throw new InternalServerErrorException('Không thể cập nhật báo cáo');
     }
   }
-
   async banTeacher(userId: string, adminNote?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

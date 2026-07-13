@@ -7,6 +7,7 @@ import { dashboardApi, ExploreDocument, Contributor } from '@/services/dashboard
 import { documentsApi } from '@/services/documentsApi';
 import useSWR from 'swr';
 import axiosClient from '@/utils/axios';
+import { notificationsApi, SystemNotification } from '@/services/notificationsApi';
 import Link from 'next/link';
 import TeacherVerificationModal from '@/components/TeacherVerificationModal';
 import { toast } from 'sonner';
@@ -149,6 +150,35 @@ function DashboardPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+
+  // Fetch notifications
+  const { data: notifications = [], mutate: mutateNotifications } = useSWR(
+    '/notifications',
+    () => notificationsApi.getNotifications(),
+    { refreshInterval: 10000 },
+  );
+
+  const unreadCount = notifications.filter((n: SystemNotification) => !n.isRead).length;
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await notificationsApi.markAsRead(id);
+      mutateNotifications();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationsApi.markAllAsRead();
+      mutateNotifications();
+      toast.success('Đã đánh dấu tất cả thông báo là đã đọc');
+    } catch (e) {
+      console.error(e);
+    }
+  };
   const [followedDocumentIds, setFollowedDocumentIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') {
       return [];
@@ -623,6 +653,95 @@ function DashboardPage() {
               >
                 <span className="material-symbols-outlined text-[20px]">upload</span> Upload
               </button>
+
+              {/* Notification Bell & Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowNotificationsDropdown(!showNotificationsDropdown);
+                    setShowAvatarDropdown(false);
+                  }}
+                  className="border-outline-variant text-secondary hover:border-primary hover:text-primary focus:ring-primary relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border transition-colors focus:ring-2 focus:ring-offset-2"
+                >
+                  <span className="material-symbols-outlined text-[24px]">notifications</span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 animate-pulse items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotificationsDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setShowNotificationsDropdown(false)}
+                    />
+                    <div className="bg-surface-container-lowest border-outline-variant absolute right-0 z-40 mt-2 flex max-h-[400px] w-80 flex-col gap-2 rounded-2xl border px-4 py-3 shadow-xl">
+                      <div className="border-outline-variant flex items-center justify-between border-b pb-2">
+                        <span className="font-title-md text-on-surface text-[16px] font-bold">
+                          Thông báo
+                        </span>
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={handleMarkAllAsRead}
+                            className="text-primary text-xs font-semibold hover:underline"
+                          >
+                            Đọc tất cả
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="divide-outline-variant/30 flex max-h-[300px] flex-col gap-1 divide-y overflow-y-auto pr-1">
+                        {notifications.length === 0 ? (
+                          <div className="text-secondary flex flex-col items-center justify-center gap-2 py-8 text-center text-sm">
+                            <span className="material-symbols-outlined text-secondary/50 text-[32px]">
+                              notifications_off
+                            </span>
+                            Không có thông báo nào
+                          </div>
+                        ) : (
+                          notifications.map((n: SystemNotification) => (
+                            <div
+                              key={n.id}
+                              onClick={() => {
+                                if (!n.isRead) handleMarkAsRead(n.id);
+                              }}
+                              className={`group hover:bg-surface-container-low flex cursor-pointer flex-col gap-1 rounded-lg px-2 py-2.5 transition-colors ${
+                                !n.isRead ? 'bg-primary-container/10' : ''
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span
+                                  className={`truncate text-sm font-semibold ${
+                                    !n.isRead ? 'text-primary' : 'text-on-surface'
+                                  }`}
+                                >
+                                  {n.title}
+                                </span>
+                                {!n.isRead && (
+                                  <span className="bg-primary mt-1.5 h-2 w-2 shrink-0 rounded-full" />
+                                )}
+                              </div>
+                              <p className="text-secondary line-clamp-3 text-xs leading-relaxed">
+                                {n.content}
+                              </p>
+                              <span className="text-secondary/60 mt-1 text-[10px]">
+                                {new Date(n.createdAt).toLocaleDateString('vi-VN', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
 
               <div className="relative">
                 <button

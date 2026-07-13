@@ -213,7 +213,7 @@ describe('AuthService', () => {
       expect(result.message).toBe('Đặt lại mật khẩu thành công!');
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        data: { passwordHash: 'newHashedPassword' },
+        data: { passwordHash: 'newHashedPassword', provider: 'local' },
       });
       expect(mockPrisma.passwordResetToken.update).toHaveBeenCalledWith({
         where: { id: 'token-1' },
