@@ -151,7 +151,12 @@ const REPORT_REASONS: { value: ReportReason; label: string }[] = [
 ];
 
 const fetcher = async (url: string): Promise<ExploreDocument[]> => {
-  const response = await fetch(url, { credentials: 'include' });
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(url, { credentials: 'include', headers });
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
@@ -171,7 +176,12 @@ const fetcher = async (url: string): Promise<ExploreDocument[]> => {
 };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
-  const response = await fetch(url, { credentials: 'include' });
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(url, { credentials: 'include', headers });
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {

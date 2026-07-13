@@ -619,29 +619,28 @@ describe('DocumentsService', () => {
         },
       });
 
-      // Verify create quiz
+      // Verify create quiz with nested questions and options
       expect(mockPrisma.quiz.create).toHaveBeenCalledWith({
         data: {
           documentId: mockDocumentId,
           title: 'Document Title.pdf - AI Quiz',
           createdBy: mockUserId,
+          questions: {
+            create: [
+              {
+                questionText: 'Question 1?',
+                options: {
+                  create: [
+                    { optionText: 'Opt A', isCorrect: false },
+                    { optionText: 'Opt B', isCorrect: true },
+                    { optionText: 'Opt C', isCorrect: false },
+                    { optionText: 'Opt D', isCorrect: false },
+                  ],
+                },
+              },
+            ],
+          },
         },
-      });
-
-      // Verify create questions and options
-      expect(mockPrisma.quizQuestion.create).toHaveBeenCalledWith({
-        data: {
-          quizId: 'quiz-id',
-          questionText: 'Question 1?',
-        },
-      });
-
-      expect(mockPrisma.quizOption.create).toHaveBeenCalledTimes(4);
-      expect(mockPrisma.quizOption.create).toHaveBeenNthCalledWith(1, {
-        data: { questionId: 'question-id', optionText: 'Opt A', isCorrect: false },
-      });
-      expect(mockPrisma.quizOption.create).toHaveBeenNthCalledWith(2, {
-        data: { questionId: 'question-id', optionText: 'Opt B', isCorrect: true },
       });
 
       // Verify document flag updates (PROCESSING -> READY)

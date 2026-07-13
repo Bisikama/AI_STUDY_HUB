@@ -27,6 +27,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userFullName, setUserFullName] = useState('User');
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
+
   // Fetch notifications
   const { data: notifications = [], mutate: mutateNotifications } = useSWR(
     '/notifications',

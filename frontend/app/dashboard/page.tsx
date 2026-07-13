@@ -66,7 +66,12 @@ type ApiResponse<T> =
   };
 
 const aiCacheFetcher = async (url: string): Promise<ExploreAiCache> => {
-  const response = await fetch(url, { credentials: 'include' });
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(url, { credentials: 'include', headers });
 
   if (!response.ok) {
     throw new Error('Failed to fetch AI cache');
@@ -916,15 +921,7 @@ function DashboardPage() {
                               </div>
                             </div>
                           </div>
-                          <button
-                            onClick={(e) => toggleSaveDoc(doc.id, e)}
-                            className={`font-label-sm text-label-sm hidden cursor-pointer rounded-full border px-4 py-2 transition-colors sm:block ${followedDocumentIds.includes(doc.id)
-                              ? 'bg-primary-container border-primary-container text-white'
-                              : 'border-[#212529] text-[#212529] hover:bg-[#212529] hover:text-white'
-                              }`}
-                          >
-                            {followedDocumentIds.includes(doc.id) ? 'Saved' : 'Save'}
-                          </button>
+                          
                         </div>
                       );
                     })

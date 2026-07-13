@@ -917,36 +917,25 @@ Quy định chặt chẽ:
             },
           });
 
-          // 2. Create Quiz
+          // 2. Create Quiz with nested questions and options in a single database write (huge performance boost to avoid transaction timeouts)
           const quiz = await tx.quiz.create({
             data: {
               documentId,
               title: `${document.title} - AI Quiz`,
               createdBy: userId,
+              questions: {
+                create: parsedData.quizzes.map((item) => ({
+                  questionText: item.question,
+                  options: {
+                    create: item.options.map((optText, index) => ({
+                      optionText: optText,
+                      isCorrect: index === item.correctAnswer,
+                    })),
+                  },
+                })),
+              },
             },
           });
-
-          // 3. Create Questions and Options
-          for (const item of parsedData.quizzes) {
-            const question = await tx.quizQuestion.create({
-              data: {
-                quizId: quiz.id,
-                questionText: item.question,
-              },
-            });
-
-            const optionPromises = item.options.map((optText, index) =>
-              tx.quizOption.create({
-                data: {
-                  questionId: question.id,
-                  optionText: optText,
-                  isCorrect: index === item.correctAnswer,
-                },
-              }),
-            );
-
-            await Promise.all(optionPromises);
-          }
 
           // 4. Update Document status/flag
           const updatedDoc = await tx.document.update({
