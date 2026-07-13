@@ -7,12 +7,6 @@ export const mapDocumentError = (error: any): string => {
 
   const code = responseData?.code || responseData?.message || error?.message;
 
-  if (error?.response?.status === 409 && responseData?.message) {
-    return responseData.message;
-  }
-
-  const code = responseData?.code || responseData?.message || error?.message;
-
   switch (code) {
     case 'DOCUMENT_INVALID_FILE':
       return 'Invalid file format or corrupted file. Please check again.';
