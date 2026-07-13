@@ -35,6 +35,9 @@ export const useAuth = () => {
       // nên res.data chính là { user, token }
       const payload = res.data as unknown as { user: User; token: string };
       localStorage.setItem('user', JSON.stringify(payload.user));
+      if (payload.token) {
+        localStorage.setItem('access_token', payload.token);
+      }
 
       // Lưu cookie ở domain frontend để Next.js middleware đọc được
       if (payload.token) {
@@ -75,6 +78,7 @@ export const useAuth = () => {
       console.error('Logout error:', err);
     } finally {
       localStorage.removeItem('user');
+      localStorage.removeItem('access_token');
       // Xóa cookie ở domain frontend
       document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
       safeNavigateTo('/login');
@@ -118,6 +122,9 @@ export const useAuth = () => {
       const res = await authApi.loginWithGoogle(idToken);
       const payload = res.data as unknown as { user: User; token: string };
       localStorage.setItem('user', JSON.stringify(payload.user));
+      if (payload.token) {
+        localStorage.setItem('access_token', payload.token);
+      }
 
       // Lưu cookie ở domain frontend để Next.js middleware đọc được
       if (payload.token) {

@@ -12,8 +12,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly prisma: PrismaService,
   ) {
     super({
-      // Hỗ trợ trích xuất JWT Token duy nhất từ Cookie (access_token)
+      // Hỗ trợ trích xuất JWT Token từ cả Authorization Header (Bearer) và Cookie (access_token)
       jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
         (request: Request) => {
           return request?.cookies?.access_token || null;
         },
