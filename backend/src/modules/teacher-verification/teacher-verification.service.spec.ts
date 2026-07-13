@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TeacherVerificationService } from './teacher-verification.service';
 import { PrismaService } from '../../database/prisma.service';
 import { SupabaseService } from '../../supabase/supabase.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 
 describe('TeacherVerificationService', () => {
@@ -25,12 +26,17 @@ describe('TeacherVerificationService', () => {
     uploadToSupabase: jest.fn(),
   };
 
+  const mockNotifications = {
+    create: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TeacherVerificationService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: SupabaseService, useValue: mockSupabase },
+        { provide: NotificationsService, useValue: mockNotifications },
       ],
     }).compile();
 

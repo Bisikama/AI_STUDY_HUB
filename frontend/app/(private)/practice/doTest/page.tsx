@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { toast } from 'sonner';
+import axiosClient from '@/utils/axios';
 
 type Subject = {
   id: number;
@@ -148,7 +149,7 @@ export default function DoTestPage() {
   };
 
   // Nộp bài và tính điểm
-  function handleSubmitQuiz() {
+  async function handleSubmitQuiz() {
     if (isSubmitted || questions.length === 0) return;
 
     let correctCount = 0;
@@ -163,6 +164,19 @@ export default function DoTestPage() {
     setScore(correctCount);
     setIsSubmitted(true);
     setMobileSidebarOpen(false);
+
+    // Save attempt to backend database
+    if (documentId && questions[0]?.quizId) {
+      try {
+        const normalizedScore = Math.round((correctCount / questions.length) * 10);
+        await axiosClient.post(`/explore/${documentId}/quiz/submit`, {
+          quizId: questions[0].quizId,
+          score: normalizedScore,
+        });
+      } catch (submitErr) {
+        console.error('Failed to submit quiz attempt to database:', submitErr);
+      }
+    }
   }
 
   // Làm lại bài test

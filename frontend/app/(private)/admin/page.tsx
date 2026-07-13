@@ -101,7 +101,7 @@ function RoleBadge({ role }: { role: string }) {
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${roleBadgeClass[role] ?? 'bg-slate-100 text-slate-600'}`}
     >
-      {role === 'TEACHER' ? 'Giảng viên' : role === 'STUDENT' ? 'Sinh viên' : 'Quản trị viên'}
+      {role === 'TEACHER' ? 'Teacher' : role === 'STUDENT' ? 'Student' : 'Admin'}
     </span>
   );
 }
@@ -222,13 +222,13 @@ export default function AdminOverviewPage() {
     adminApi
       .getMetrics()
       .then(setMetrics)
-      .catch(() => setError('Không thể tải metrics'))
+      .catch(() => setError('Failed to load metrics'))
       .finally(() => setMetricsLoading(false));
 
     adminApi
       .getAllUsers()
       .then(setUsers)
-      .catch(() => setError('Không thể tải danh sách users'))
+      .catch(() => setError('Failed to load user list'))
       .finally(() => setUsersLoading(false));
   };
 
@@ -241,7 +241,7 @@ export default function AdminOverviewPage() {
         const list = Array.isArray(res) ? res : Array.isArray(resObj?.data) ? resObj.data : [];
         setVerifications(list as TeacherVerificationData[]);
       })
-      .catch(() => setError('Không thể tải danh sách Xác Thực Giảng Viên'))
+      .catch(() => setError('Failed to load teacher verification list'))
       .finally(() => setVerificationsLoading(false));
   };
 
@@ -254,7 +254,7 @@ export default function AdminOverviewPage() {
         const list = Array.isArray(res) ? res : Array.isArray(resObj?.data) ? resObj.data : [];
         setReports(list as AdminReport[]);
       })
-      .catch(() => setError('Không thể tải danh sách báo cáo'))
+      .catch(() => setError('Failed to load report list'))
       .finally(() => setReportsLoading(false));
   };
 
@@ -278,7 +278,7 @@ export default function AdminOverviewPage() {
       loadData(); // refresh user list role updates
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
-      toast.error(errorObj.response?.data?.message || 'Có lỗi xảy ra khi phê duyệt!');
+      toast.error(errorObj.response?.data?.message || 'An error occurred during verification review!');
     } finally {
       setProcessingId(null);
     }
@@ -286,18 +286,18 @@ export default function AdminOverviewPage() {
 
   const handleBanTeacher = async (userId: string) => {
     const confirm = window.confirm(
-      'Bạn có chắc chắn muốn hạ quyền Giảng viên của người này về Sinh viên và chặn nâng quyền Giảng viên vĩnh viễn không?',
+      'Are you sure you want to demote this Teacher to Student and permanently block them from applying for Teacher status?',
     );
     if (!confirm) return;
 
     setProcessingId(userId);
     try {
       await adminApi.banTeacher(userId);
-      toast.success('Đã hạ quyền và chặn Giảng viên thành công!');
+      toast.success('Teacher demoted and blocked successfully!');
       loadData(); // refresh user list
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
-      toast.error(errorObj.response?.data?.message || 'Có lỗi xảy ra khi chặn Giảng viên!');
+      toast.error(errorObj.response?.data?.message || 'An error occurred while blocking the Teacher!');
     } finally {
       setProcessingId(null);
     }
@@ -324,7 +324,7 @@ export default function AdminOverviewPage() {
         adminNote: resolveAdminNote.trim(),
         banTeacher: resolveBanTeacher,
       });
-      toast.success('Xử lý báo cáo vi phạm thành công!');
+      toast.success('Report resolved successfully!');
       setResolveModalOpen(false);
       setSelectedReport(null);
       setResolveAdminNote('');
@@ -332,26 +332,26 @@ export default function AdminOverviewPage() {
       loadData();
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
-      toast.error(errorObj.response?.data?.message || 'Có lỗi xảy ra khi giải quyết báo cáo!');
+      toast.error(errorObj.response?.data?.message || 'An error occurred while resolving the report!');
     } finally {
       setProcessingId(null);
     }
   };
 
   const handleRejectReport = async (reportId: string) => {
-    const confirm = window.confirm('Bạn có chắc chắn muốn bác bỏ báo cáo này không?');
+    const confirm = window.confirm('Are you sure you want to reject this report?');
     if (!confirm) return;
     setProcessingId(reportId);
     try {
       await adminApi.resolveReport(reportId, {
         status: 'REJECTED',
-        adminNote: 'Báo cáo bị bác bỏ bởi quản trị viên.',
+        adminNote: 'Report rejected by administrator.',
       });
-      toast.success('Đã bác bỏ báo cáo thành công!');
+      toast.success('Report rejected successfully!');
       loadReports();
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
-      toast.error(errorObj.response?.data?.message || 'Có lỗi xảy ra khi bác bỏ báo cáo!');
+      toast.error(errorObj.response?.data?.message || 'An error occurred while rejecting the report!');
     } finally {
       setProcessingId(null);
     }
@@ -392,7 +392,7 @@ export default function AdminOverviewPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Admin Control Center</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Quản lý người dùng, tài khoản và phê duyệt Xác Thực Giảng Viên.
+              Manage users, accounts, and approve instructor verifications.
             </p>
           </div>
 
@@ -406,7 +406,7 @@ export default function AdminOverviewPage() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Quản lý Người dùng ({users.length})
+              User Management ({users.length})
             </button>
             <button
               onClick={() => setActiveTab('VERIFICATIONS')}
@@ -416,7 +416,7 @@ export default function AdminOverviewPage() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Phê duyệt Giảng viên
+              Teacher Verification
               {pendingVerificationsCount > 0 && (
                 <span className="ml-2 inline-flex items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                   {pendingVerificationsCount}
@@ -431,7 +431,7 @@ export default function AdminOverviewPage() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Báo cáo vi phạm
+              Reports
               {reports.filter((r) => r.status === 'PENDING' || r.status === 'REVIEWING').length >
                 0 && (
                 <span className="ml-2 inline-flex items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
@@ -455,7 +455,7 @@ export default function AdminOverviewPage() {
             label="Total Users"
             value={metricsLoading ? '—' : (metrics?.totalUsers ?? 0).toLocaleString()}
             sub="Registered accounts"
-            subColor="text-emerald-500"
+            subColor="text-slate-400"
             icon={<UsersIcon />}
             loading={metricsLoading}
           />
@@ -490,9 +490,9 @@ export default function AdminOverviewPage() {
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col justify-between gap-3 border-b border-slate-100 px-6 py-4 sm:flex-row sm:items-center">
               <div>
-                <h2 className="text-sm font-semibold text-slate-800">Danh sách người dùng</h2>
+                <h2 className="text-sm font-semibold text-slate-800">User List</h2>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  {usersLoading ? 'Đang tải...' : `Tìm thấy ${filtered.length} kết quả`}
+                  {usersLoading ? 'Loading...' : `Found ${filtered.length} results`}
                 </p>
               </div>
 
@@ -503,7 +503,7 @@ export default function AdminOverviewPage() {
                   </span>
                   <input
                     type="text"
-                    placeholder="Tìm tên hoặc email..."
+                    placeholder="Search name or email..."
                     value={search}
                     onChange={(e) => handleSearch(e.target.value)}
                     className="w-56 rounded-lg border border-slate-200 bg-white py-2 pr-3 pl-9 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
@@ -522,11 +522,11 @@ export default function AdminOverviewPage() {
                       }`}
                     >
                       {r === 'ALL'
-                        ? 'Tất cả'
+                        ? 'All'
                         : r === 'TEACHER'
-                          ? 'Giảng viên'
+                          ? 'Teacher'
                           : r === 'STUDENT'
-                            ? 'Sinh viên'
+                            ? 'Student'
                             : 'Admin'}
                     </button>
                   ))}
@@ -542,25 +542,25 @@ export default function AdminOverviewPage() {
                       ID
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Họ và tên
+                      Full Name
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-blue-400 uppercase">
                       Email
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Ngày tạo
+                      Created Date
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Tài liệu
+                      Documents
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-blue-400 uppercase">
-                      Vai trò
+                      Role
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Trạng thái
+                      Status
                     </th>
                     <th className="px-6 py-3 text-right text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Hành động
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -581,7 +581,7 @@ export default function AdminOverviewPage() {
                   ) : paginated.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-6 py-12 text-center text-sm text-slate-400">
-                        Không có người dùng nào khớp với bộ lọc.
+                        No users match the filter.
                       </td>
                     </tr>
                   ) : (
@@ -609,7 +609,7 @@ export default function AdminOverviewPage() {
                               disabled={processingId === user.id}
                               className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
                             >
-                              Hạ quyền & Chặn
+                              Demote & Block
                             </button>
                           )}
                         </td>
@@ -623,8 +623,8 @@ export default function AdminOverviewPage() {
             {!usersLoading && totalPages > 1 && (
               <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3">
                 <p className="text-xs text-slate-400">
-                  Hiển thị {(currentPage - 1) * PAGE_SIZE + 1}–
-                  {Math.min(currentPage * PAGE_SIZE, filtered.length)} / {filtered.length} mục
+                  Showing {(currentPage - 1) * PAGE_SIZE + 1}–
+                  {Math.min(currentPage * PAGE_SIZE, filtered.length)} / {filtered.length} items
                 </p>
                 <div className="flex items-center gap-1">
                   <button
@@ -664,9 +664,9 @@ export default function AdminOverviewPage() {
         {activeTab === 'VERIFICATIONS' && (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-6 py-4">
-              <h2 className="text-sm font-semibold text-slate-800">Yêu cầu Xác Thực Giảng Viên</h2>
+              <h2 className="text-sm font-semibold text-slate-800">Instructor Verification Requests</h2>
               <p className="mt-0.5 text-xs text-slate-400">
-                Duyệt minh chứng để nâng quyền tài khoản người dùng lên Giảng viên (`TEACHER`).
+                Review evidence to promote user account roles to Instructor (`TEACHER`).
               </p>
             </div>
 
@@ -675,22 +675,22 @@ export default function AdminOverviewPage() {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/60">
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Người đăng ký
+                      Applicant
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Mã Giảng viên
+                      Teacher Code
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Khoa / Bộ môn
+                      Department
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Minh chứng
+                      Evidence
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Trạng thái
+                      Status
                     </th>
                     <th className="px-6 py-3 text-right text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Hành động
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -708,7 +708,7 @@ export default function AdminOverviewPage() {
                   ) : verifications.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
-                        Chưa có yêu cầu Xác Thực Giảng Viên nào.
+                        No instructor verification requests yet.
                       </td>
                     </tr>
                   ) : (
@@ -732,7 +732,7 @@ export default function AdminOverviewPage() {
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
                             >
-                              <span>Xem minh chứng</span>
+                              <span>View Proof</span>
                               <svg
                                 className="h-3 w-3"
                                 fill="none"
@@ -748,23 +748,23 @@ export default function AdminOverviewPage() {
                               </svg>
                             </a>
                           ) : (
-                            <span className="text-xs text-slate-400">Không gửi kèm</span>
+                            <span className="text-xs text-slate-400">Not provided</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
                           {item.status === 'PENDING' && (
                             <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
-                              Chờ phê duyệt
+                              Pending
                             </span>
                           )}
                           {item.status === 'APPROVED' && (
                             <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
-                              Đã phê duyệt (Giảng viên)
+                              Approved (Teacher)
                             </span>
                           )}
                           {item.status === 'REJECTED' && (
                             <span className="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">
-                              Từ chối
+                              Rejected
                             </span>
                           )}
                         </td>
@@ -776,18 +776,18 @@ export default function AdminOverviewPage() {
                                 disabled={processingId === item.id}
                                 className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
                               >
-                                Phê duyệt
+                                Approve
                               </button>
                               <button
                                 onClick={() => handleReviewVerification(item.id, 'REJECTED')}
                                 disabled={processingId === item.id}
                                 className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-300 disabled:opacity-50"
                               >
-                                Từ chối
+                                Reject
                               </button>
                             </div>
                           ) : (
-                            <span className="text-xs text-slate-400">Hoàn tất</span>
+                            <span className="text-xs text-slate-400">Completed</span>
                           )}
                         </td>
                       </tr>
@@ -803,10 +803,9 @@ export default function AdminOverviewPage() {
         {activeTab === 'REPORTS' && (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-6 py-4">
-              <h2 className="text-sm font-semibold text-slate-800">Báo cáo vi phạm Tài liệu</h2>
+              <h2 className="text-sm font-semibold text-slate-800">Document Reports</h2>
               <p className="mt-0.5 text-xs text-slate-400">
-                Xem xét báo cáo của người dùng về tài liệu học thuật và thực hiện các biện pháp điều
-                duyệt.
+                Review user reports regarding academic documents and perform moderation actions.
               </p>
             </div>
 
@@ -815,22 +814,22 @@ export default function AdminOverviewPage() {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/60">
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Tài liệu bị báo cáo
+                      Reported Document
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Người upload (Vai trò)
+                      Uploader (Role)
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Lý do & Mô tả
+                      Reason & Description
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Người báo cáo
+                      Reporter
                     </th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Trạng thái
+                      Status
                     </th>
                     <th className="px-6 py-3 text-right text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Hành động
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -848,7 +847,7 @@ export default function AdminOverviewPage() {
                   ) : reports.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
-                        Chưa có báo cáo vi phạm tài liệu nào.
+                        No document reports yet.
                       </td>
                     </tr>
                   ) : (
@@ -856,7 +855,7 @@ export default function AdminOverviewPage() {
                       <tr key={item.id} className="transition-colors hover:bg-slate-50/70">
                         <td className="px-6 py-4">
                           <div className="max-w-xs truncate font-semibold text-slate-800">
-                            {item.document?.title || 'Tài liệu không xác định'}
+                            {item.document?.title || 'Unknown Document'}
                           </div>
                           {item.document?.id && (
                             <a
@@ -865,7 +864,7 @@ export default function AdminOverviewPage() {
                               rel="noreferrer"
                               className="text-xs text-blue-500 hover:underline"
                             >
-                              Xem tài liệu
+                              View Document
                             </a>
                           )}
                         </td>
@@ -875,11 +874,11 @@ export default function AdminOverviewPage() {
                           </div>
                           <div className="text-xs text-slate-400">
                             {item.document?.user?.role === 'TEACHER' ? (
-                              <span className="font-semibold text-violet-600">Giảng viên</span>
+                              <span className="font-semibold text-violet-600">Teacher</span>
                             ) : item.document?.user?.role === 'ADMIN' ? (
                               <span className="text-blue-600">Admin</span>
                             ) : (
-                              <span>Sinh viên</span>
+                              <span>Student</span>
                             )}
                           </div>
                         </td>
@@ -902,22 +901,22 @@ export default function AdminOverviewPage() {
                         <td className="px-6 py-4">
                           {item.status === 'PENDING' && (
                             <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
-                              Chờ xử lý
+                              Pending
                             </span>
                           )}
                           {item.status === 'REVIEWING' && (
                             <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
-                              Đang xem xét
+                              Reviewing
                             </span>
                           )}
                           {item.status === 'RESOLVED' && (
                             <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
-                              Đã giải quyết
+                              Resolved
                             </span>
                           )}
                           {item.status === 'REJECTED' && (
                             <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
-                              Bác bỏ
+                              Rejected
                             </span>
                           )}
                         </td>
@@ -929,18 +928,18 @@ export default function AdminOverviewPage() {
                                 disabled={processingId === item.id}
                                 className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
                               >
-                                Giải quyết
+                                Resolve
                               </button>
                               <button
                                 onClick={() => handleRejectReport(item.id)}
                                 disabled={processingId === item.id}
                                 className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-300 disabled:opacity-50"
                               >
-                                Bác bỏ
+                                Reject
                               </button>
                             </div>
                           ) : (
-                            <span className="text-xs text-slate-400">Hoàn tất</span>
+                            <span className="text-xs text-slate-400">Completed</span>
                           )}
                         </td>
                       </tr>
@@ -972,9 +971,9 @@ export default function AdminOverviewPage() {
                 <span className="material-symbols-outlined">gavel</span>
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-800">Giải quyết báo cáo vi phạm</h3>
+                <h3 className="text-lg font-bold text-slate-800">Resolve Document Report</h3>
                 <p className="text-xs text-slate-500">
-                  Xử lý tài liệu:{' '}
+                  Target Document:{' '}
                   <span className="font-semibold text-slate-700">
                     {selectedReport.document?.title}
                   </span>
@@ -985,39 +984,39 @@ export default function AdminOverviewPage() {
             <form onSubmit={handleResolveReport} className="space-y-4">
               <div>
                 <label className="mb-1 block text-xs font-bold tracking-wider text-slate-700 uppercase">
-                  Hành động tài liệu <span className="text-red-500">*</span>
+                  Document Action <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={resolveDocStatus}
                   onChange={(e) => setResolveDocStatus(e.target.value as 'HIDDEN' | 'REMOVED')}
                   className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 >
-                  <option value="HIDDEN">Ẩn tài liệu (HIDDEN)</option>
-                  <option value="REMOVED">Gỡ bỏ tài liệu (REMOVED)</option>
+                  <option value="HIDDEN">Hide document (HIDDEN)</option>
+                  <option value="REMOVED">Remove document (REMOVED)</option>
                 </select>
               </div>
 
               <div>
                 <label className="mb-1 block text-xs font-bold tracking-wider text-slate-700 uppercase">
-                  Lý do / Ghi chú <span className="text-red-500">*</span>
+                  Reason / Notes <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   required
-                  placeholder="Nhập lý do ẩn/gỡ bỏ tài liệu..."
+                  placeholder="Enter reason for hiding/removing document..."
                   value={resolveAdminNote}
                   onChange={(e) => setResolveAdminNote(e.target.value)}
                   className="h-24 w-full resize-none rounded-lg border border-slate-300 p-2.5 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
-              {/* Chặn & Hạ quyền nếu uploader là TEACHER */}
+              {/* Demote & Block option if uploader is a TEACHER */}
               {selectedReport.document?.user?.role === 'TEACHER' && (
                 <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
                   <p className="font-bold text-amber-800">
-                    ⚠️ PHÁT HIỆN TÀI KHOẢN GIẢNG VIÊN VI PHẠM
+                    ⚠️ VIOLATING INSTRUCTOR ACCOUNT DETECTED
                   </p>
                   <p className="font-medium text-slate-600">
-                    Người upload tài liệu này hiện tại đang giữ quyền Giảng viên (`TEACHER`).
+                    The uploader of this document currently holds the Instructor (`TEACHER`) role.
                   </p>
                   <label className="flex cursor-pointer items-start gap-2 pt-1 font-bold text-slate-700">
                     <input
@@ -1027,8 +1026,7 @@ export default function AdminOverviewPage() {
                       className="mt-0.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
                     />
                     <span>
-                      Hạ quyền tài khoản này về Sinh viên (STUDENT) và chặn duyệt làm Giảng viên
-                      vĩnh viễn
+                      Demote this account to Student (STUDENT) and permanently block them from applying as Instructor
                     </span>
                   </label>
                 </div>
@@ -1043,14 +1041,14 @@ export default function AdminOverviewPage() {
                   }}
                   className="rounded-lg px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
                 >
-                  Hủy
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={processingId === selectedReport.id}
                   className="rounded-lg bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-md transition hover:bg-rose-700 disabled:opacity-50"
                 >
-                  {processingId === selectedReport.id ? 'Đang xử lý...' : 'Xác nhận xử lý'}
+                  {processingId === selectedReport.id ? 'Processing...' : 'Confirm Resolution'}
                 </button>
               </div>
             </form>

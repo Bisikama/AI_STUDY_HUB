@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { SupabaseService } from '../../supabase/supabase.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   CreateTeacherVerificationDto,
   ReviewTeacherVerificationDto,
@@ -16,6 +17,7 @@ export class TeacherVerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async submitRequest(userId: string, dto: CreateTeacherVerificationDto) {
@@ -100,7 +102,7 @@ export class TeacherVerificationService {
       throw new NotFoundException('Không tìm thấy yêu cầu xác thực');
     }
 
-    return await this.prisma.$transaction(async (tx) => {
+    const updatedVerification = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.teacherVerification.update({
         where: { id },
         data: {
@@ -116,11 +118,27 @@ export class TeacherVerificationService {
         });
       }
 
-      return {
-        message: `Đã ${dto.status === 'APPROVED' ? 'phe duyệt' : 'từ chối'} yêu cầu Xác Thực Giảng Viên.`,
-        verification: updated,
-      };
+      return updated;
     });
+
+    // Tạo thông báo hệ thống trực tiếp trên web cho người dùng tương ứng
+    try {
+      const title = dto.status === 'APPROVED'
+        ? 'Yêu cầu xác thực Giảng viên được phê duyệt'
+        : 'Yêu cầu xác thực Giảng viên bị từ chối';
+      const content = dto.status === 'APPROVED'
+        ? 'Yêu cầu xác thực Giảng viên của bạn đã được phê duyệt thành công. Bạn hiện đã có quyền Giảng viên trên hệ thống.'
+        : `Yêu cầu xác thực Giảng viên của bạn đã bị từ chối. Lý do: ${dto.adminNote?.trim() || 'Không có lý do cụ thể'}`;
+
+      await this.notificationsService.create(verification.userId, title, content);
+    } catch (err) {
+      console.error('Lỗi khi tạo thông báo xác thực giảng viên:', err);
+    }
+
+    return {
+      message: `Đã ${dto.status === 'APPROVED' ? 'phe duyệt' : 'từ chối'} yêu cầu Xác Thực Giảng Viên.`,
+      verification: updatedVerification,
+    };
   }
 
   async uploadProofImage(file: Express.Multer.File): Promise<string> {
