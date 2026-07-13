@@ -8,7 +8,6 @@ export class MailService {
   private resend: Resend;
 
   constructor(private configService: ConfigService) {
-    // Khởi tạo client Resend bằng API Key
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
     this.resend = new Resend(apiKey);
     this.logger.log('🚀 Resend email client initialized.');
@@ -18,23 +17,52 @@ export class MailService {
     try {
       const from =
         this.configService.get<string>('RESEND_FROM') || 'ScholarHub <onboarding@resend.dev>';
-
-      // Resend SDK trả về một object có chứa { data, error }
+      
       const { data, error } = await this.resend.emails.send({
         from,
-        to: [to], // Resend nhận danh sách người nhận là một mảng hoặc chuỗi
-        subject: `[ScholarHub] Mã xác thực OTP khôi phục mật khẩu`,
+        to: [to],
+        subject: `[ScholarHub] Verification Code: ${otp}`,
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 24px; color: #333;">
-            <h2 style="color: #1a73e8; margin-top: 0;">Khôi Phục Mật Khẩu</h2>
-            <p>Chào bạn,</p>
-            <p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản tại <strong>ScholarHub</strong>. Vui lòng sử dụng mã OTP dưới đây để hoàn tất quá trình này:</p>
-            <div style="text-align: center; margin: 32px 0;">
-              <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #1a73e8; background-color: #f1f3f4; padding: 12px 24px; border-radius: 4px; display: inline-block;">${otp}</span>
+          <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; padding: 40px 20px; color: #1f2937; line-height: 1.6;">
+            <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); border: 1px solid #f3f4f6;">
+              
+              <!-- Header -->
+              <div style="background: linear-gradient(135deg, #2563eb, #1d4ed8); padding: 32px 24px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">ScholarHub</h1>
+                <p style="color: #bfdbfe; margin: 6px 0 0 0; font-size: 14px; font-weight: 500;">Academic Document Management System</p>
+              </div>
+
+              <!-- Body -->
+              <div style="padding: 40px 32px;">
+                <h2 style="font-size: 20px; font-weight: 600; color: #111827; margin-top: 0; margin-bottom: 16px;">Reset Your Password</h2>
+                <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px;">Hello,</p>
+                <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px; line-height: 1.6;">We received a request to reset the password for your ScholarHub account. Please use the following One-Time Password (OTP) to complete the verification process:</p>
+                
+                <!-- OTP Display -->
+                <div style="text-align: center; margin: 32px 0;">
+                  <div style="display: inline-block; background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 32px;">
+                    <span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #1d4ed8; display: inline-block; margin-left: 8px;">${otp}</span>
+                  </div>
+                </div>
+
+                <!-- Expiry Alert -->
+                <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px; padding: 12px 16px; margin-bottom: 28px;">
+                  <p style="margin: 0; font-size: 14px; color: #b45309; font-weight: 500;">
+                    ⏰ This verification code is only valid for <strong>10 minutes</strong>.
+                  </p>
+                </div>
+
+                <p style="margin: 0 0 8px 0; color: #4b5563; font-size: 15px;">If you did not request this password reset, you can safely ignore this email.</p>
+                <p style="margin: 0; color: #9ca3af; font-size: 14px; font-style: italic;">Your account security is important to us. Please do not share this code with anyone.</p>
+              </div>
+
+              <!-- Footer -->
+              <div style="background-color: #f9fafb; padding: 24px 32px; border-top: 1px solid #f3f4f6; text-align: center;">
+                <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280; font-weight: 500;">&copy; 2026 ScholarHub. All rights reserved.</p>
+                <p style="margin: 0; font-size: 11px; color: #9ca3af;">This is an automated email. Please do not reply directly to this message.</p>
+              </div>
+
             </div>
-            <p>Mã OTP này có hiệu lực trong vòng <strong>10 phút</strong>. Nếu bạn không yêu cầu hành động này, vui lòng bỏ qua email này.</p>
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 24px 0;" />
-            <p style="font-size: 12px; color: #666; text-align: center; margin-bottom: 0;">ScholarHub - Hệ thống quản lý tài liệu học thuật trực tuyến</p>
           </div>
         `,
       });
@@ -48,18 +76,13 @@ export class MailService {
       return true;
     } catch (error) {
       this.logger.error(
-        `❌ Lỗi hệ thống khi gửi email OTP: ${error instanceof Error ? error.message : String(error)}`,
+        `❌ Lỗi gửi email OTP qua Resend: ${error instanceof Error ? error.message : String(error)}`,
       );
       return false;
     }
   }
 
-  async sendDocumentRejection(
-    to: string,
-    fullName: string,
-    docTitle: string,
-    reason: string,
-  ): Promise<boolean> {
+  async sendDocumentRejection(to: string, fullName: string, docTitle: string, reason: string): Promise<boolean> {
     try {
       console.log('\n==================================================');
       console.log(`✉️ [EMAIL NOTIFICATION - DOCUMENT REJECTED]`);

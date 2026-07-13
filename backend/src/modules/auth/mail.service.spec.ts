@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MailService } from './mail.service';
 import { ConfigService } from '@nestjs/config';
 
-// Mock lớp Resend và phương thức send
+// Mock Resend class
 const mockSend = jest.fn();
 jest.mock('resend', () => {
   return {
@@ -29,7 +29,10 @@ describe('MailService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [MailService, { provide: ConfigService, useValue: mockConfigService }],
+      providers: [
+        MailService,
+        { provide: ConfigService, useValue: mockConfigService },
+      ],
     }).compile();
 
     service = module.get<MailService>(MailService);
@@ -49,7 +52,7 @@ describe('MailService', () => {
         expect.objectContaining({
           to: ['user@example.com'],
           from: 'Test <onboarding@resend.dev>',
-          subject: '[ScholarHub] Mã xác thực OTP khôi phục mật khẩu',
+          subject: '[ScholarHub] Verification Code: 123456',
         }),
       );
     });
