@@ -171,7 +171,7 @@ describe('AuthService', () => {
 
       const result = await service.forgotPassword('test@example.com');
 
-      expect(result.message).toBe('Email khôi phục mật khẩu đã được gửi qua dịch vụ Supabase.');
+      expect(result.message).toBe('Mã OTP khôi phục mật khẩu đã được gửi đến email của bạn.');
       expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
       });
@@ -213,7 +213,7 @@ describe('AuthService', () => {
       expect(result.message).toBe('Đặt lại mật khẩu thành công!');
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        data: { passwordHash: 'newHashedPassword' },
+        data: { passwordHash: 'newHashedPassword', provider: 'local' },
       });
       expect(mockPrisma.passwordResetToken.update).toHaveBeenCalledWith({
         where: { id: 'token-1' },
