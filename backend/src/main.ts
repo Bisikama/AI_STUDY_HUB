@@ -25,7 +25,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const allowedOrigins =
     configService.get<string>('ALLOWED_ORIGINS') ||
-    'http://localhost:3000,http://localhost:5000,https://ai-study-ph9xjpnls-bisikamas-projects.vercel.app/';
+    'http://localhost:3000,http://localhost:5000,https://ai-study-ph9xjpnls-bisikamas-projects.vercel.app/,https://aistudyhub.space,https://www.aistudyhub.space';
   const originArray = allowedOrigins.split(',').map((origin) => origin.trim().replace(/\/$/, ''));
 
   app.enableCors({
@@ -35,7 +35,13 @@ async function bootstrap() {
         return callback(null, true);
       }
 
-      const isAllowed = originArray.includes(origin) || origin.endsWith('.vercel.app');
+      const isAllowed =
+        originArray.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin === 'https://aistudyhub.space' ||
+        origin === 'https://www.aistudyhub.space' ||
+        origin.endsWith('.aistudyhub.space');
+
       if (isAllowed) {
         return callback(null, true);
       }
