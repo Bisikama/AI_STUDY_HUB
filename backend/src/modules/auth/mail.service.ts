@@ -16,7 +16,7 @@ export class MailService {
   async sendOtp(to: string, otp: string): Promise<boolean> {
     try {
       const from =
-        this.configService.get<string>('RESEND_FROM') || 'ScholarHub <onboarding@resend.dev>';
+        this.configService.get<string>('RESEND_FROM') || 'AiStudyHub <no-reply@aistudyhub.space>';
 
       const { data, error } = await this.resend.emails.send({
         from,
@@ -28,15 +28,14 @@ export class MailService {
               
               <!-- Header -->
               <div style="background: linear-gradient(135deg, #2563eb, #1d4ed8); padding: 32px 24px; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">ScholarHub</h1>
+                <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">AiStudyHub</h1>
                 <p style="color: #bfdbfe; margin: 6px 0 0 0; font-size: 14px; font-weight: 500;">Academic Document Management System</p>
               </div>
 
               <!-- Body -->
               <div style="padding: 40px 32px;">
                 <h2 style="font-size: 20px; font-weight: 600; color: #111827; margin-top: 0; margin-bottom: 16px;">Reset Your Password</h2>
-                <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px;">Hello,</p>
-                <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px; line-height: 1.6;">We received a request to reset the password for your ScholarHub account. Please use the following One-Time Password (OTP) to complete the verification process:</p>
+                <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px; line-height: 1.6;">We received a request to reset the password for your AiStudyHub account. Please use the following One-Time Password (OTP) to complete the verification process:</p>
                 
                 <!-- OTP Display -->
                 <div style="text-align: center; margin: 32px 0;">
@@ -58,7 +57,7 @@ export class MailService {
 
               <!-- Footer -->
               <div style="background-color: #f9fafb; padding: 24px 32px; border-top: 1px solid #f3f4f6; text-align: center;">
-                <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280; font-weight: 500;">&copy; 2026 ScholarHub. All rights reserved.</p>
+                <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280; font-weight: 500;">&copy; 2026 AiStudyHub. All rights reserved.</p>
                 <p style="margin: 0; font-size: 11px; color: #9ca3af;">This is an automated email. Please do not reply directly to this message.</p>
               </div>
 

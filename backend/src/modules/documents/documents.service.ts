@@ -52,7 +52,7 @@ export class DocumentsService {
     private readonly tagsService: TagsService,
     private readonly documentAccessService: DocumentAccessService,
     private readonly geminiKeyManager: GeminiKeyManager,
-  ) { }
+  ) {}
 
   /**
    * Helper function to convert BigInt to Number/String in objects to prevent serialization crashes.
@@ -88,12 +88,12 @@ export class DocumentsService {
       personalFolderId: isOwner ? document.personalFolderId : null,
       subject: document.subject
         ? {
-          id: document.subject.id,
-          name: document.subject.name,
-          code: document.subject.code,
-          isSystem: document.subject.isSystem,
-          ...(document.subject.majors && { majors: document.subject.majors }),
-        }
+            id: document.subject.id,
+            name: document.subject.name,
+            code: document.subject.code,
+            isSystem: document.subject.isSystem,
+            ...(document.subject.majors && { majors: document.subject.majors }),
+          }
         : null,
       fileType: document.fileType,
       fileSize:
@@ -131,10 +131,10 @@ export class DocumentsService {
       isFollowed,
       tags: document.tags
         ? document.tags.map((t: any) => ({
-          id: t.tag.id,
-          name: t.tag.name,
-          slug: t.tag.slug,
-        }))
+            id: t.tag.id,
+            name: t.tag.name,
+            slug: t.tag.slug,
+          }))
         : [],
       isAIGenerated: document.isAIGenerated,
       summary: document.summary || null,
@@ -825,7 +825,9 @@ Quy định chặt chẽ:
             const tokenCountResult = await model.countTokens(text);
             totalTokens = tokenCountResult.totalTokens;
           } catch (error) {
-            throw new Error(`Failed to verify token count: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(
+              `Failed to verify token count: ${error instanceof Error ? error.message : String(error)}`,
+            );
           }
 
           if (totalTokens > 30000) {
@@ -840,7 +842,9 @@ Quy định chặt chẽ:
               contents: [
                 {
                   role: 'user',
-                  parts: [{ text: `Dưới đây là nội dung tài liệu học tập cần phân tích:\n\n${text}` }],
+                  parts: [
+                    { text: `Dưới đây là nội dung tài liệu học tập cần phân tích:\n\n${text}` },
+                  ],
                 },
               ],
               generationConfig: {
@@ -852,7 +856,9 @@ Quy định chặt chẽ:
 
             responseText = result.response.text();
           } catch (error) {
-            throw new Error(`Gemini API generation failed: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(
+              `Gemini API generation failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
           }
         });
       } catch (error) {
@@ -995,7 +1001,8 @@ Quy định chặt chẽ:
         });
       } catch (dbUpdateError) {
         this.logger.error(
-          `Failed to update FAILED status in DB for document ${documentId}: ${dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
+          `Failed to update FAILED status in DB for document ${documentId}: ${
+            dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError)
           }`,
         );
       }
@@ -1681,7 +1688,7 @@ Quy định chặt chẽ:
           where: { id: input.documentId },
           data: { extractionStatus: 'FAILED' },
         })
-        .catch(() => { });
+        .catch(() => {});
       return { extractionStatus: 'FAILED', chunkCount: 0 };
     }
 
@@ -2190,7 +2197,9 @@ Quy định chặt chẽ:
       document.status !== 'ACTIVE' ||
       document.deletedAt !== null
     ) {
-      throw new BadRequestException('Chỉ được báo cáo tài liệu đang hiển thị công khai và hoạt động bình thường.');
+      throw new BadRequestException(
+        'Chỉ được báo cáo tài liệu đang hiển thị công khai và hoạt động bình thường.',
+      );
     }
 
     // Check if user already reported this document with a PENDING or REVIEWING status
