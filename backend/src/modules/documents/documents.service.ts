@@ -17,6 +17,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { parseDocument } from './utils/documentParser';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiKeyManager, NonRetryableError } from './utils/gemini-key-manager';
 import * as fs from 'fs';
 import * as path from 'path';
 import type {
@@ -50,6 +51,7 @@ export class DocumentsService {
     private readonly subjectsService: SubjectsService,
     private readonly tagsService: TagsService,
     private readonly documentAccessService: DocumentAccessService,
+    private readonly geminiKeyManager: GeminiKeyManager,
   ) { }
 
   /**
@@ -762,9 +764,6 @@ export class DocumentsService {
     });
 
     try {
-      // ==========================================
-      // LAYER 2: Token Count Defense (Gemini SDK)
-      // ==========================================
       const apiKey = this.configService.get<string>('GEMINI_API_KEY');
       if (!apiKey) {
         throw new InternalServerErrorException(
@@ -772,26 +771,7 @@ export class DocumentsService {
         );
       }
 
-      const genAI = new GoogleGenerativeAI(apiKey);
-      // Use gemini-1.5-flash which is standard and support responseMimeType
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
-
-      let totalTokens = 0;
-      try {
-        const tokenCountResult = await model.countTokens(text);
-        totalTokens = tokenCountResult.totalTokens;
-      } catch (error) {
-        throw new InternalServerErrorException(
-          `Failed to verify token count: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-
-      if (totalTokens > 30000) {
-        throw new BadRequestException(
-          `Document contains too many tokens: ${totalTokens} (maximum allowed is 30,000 tokens).`,
-        );
-      }
-
+      let responseText = '';
       // ==========================================
       // Prompt Engineering & JSON Forcing (Gemini SDK call)
       // ==========================================
@@ -833,26 +813,54 @@ Quy định chặt chẽ:
 5. Không được tự bịa ra thông tin không có trong tài liệu.
 `;
 
-      let responseText = '';
       try {
-        const result = await model.generateContent({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `Dưới đây là nội dung tài liệu học tập cần phân tích:\n\n${text}` }],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.2,
-          },
-          systemInstruction: systemInstruction,
-        });
+        await this.geminiKeyManager.execute(async (keyToUse) => {
+          const genAI = new GoogleGenerativeAI(keyToUse);
+          // Use gemini-1.5-flash which is standard and support responseMimeType
+          const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
-        responseText = result.response.text();
+          // LAYER 2: Token Count Defense (Gemini SDK)
+          let totalTokens = 0;
+          try {
+            const tokenCountResult = await model.countTokens(text);
+            totalTokens = tokenCountResult.totalTokens;
+          } catch (error) {
+            throw new Error(`Failed to verify token count: ${error instanceof Error ? error.message : String(error)}`);
+          }
+
+          if (totalTokens > 30000) {
+            throw new NonRetryableError(
+              `Document contains too many tokens: ${totalTokens} (maximum allowed is 30,000 tokens).`,
+              400,
+            );
+          }
+
+          try {
+            const result = await model.generateContent({
+              contents: [
+                {
+                  role: 'user',
+                  parts: [{ text: `Dưới đây là nội dung tài liệu học tập cần phân tích:\n\n${text}` }],
+                },
+              ],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                temperature: 0.2,
+              },
+              systemInstruction: systemInstruction,
+            });
+
+            responseText = result.response.text();
+          } catch (error) {
+            throw new Error(`Gemini API generation failed: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        });
       } catch (error) {
+        if (error instanceof NonRetryableError) {
+          throw new BadRequestException(error.message);
+        }
         throw new InternalServerErrorException(
-          `Gemini API generation failed: ${error instanceof Error ? error.message : String(error)}`,
+          `AI Analysis failed: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
 

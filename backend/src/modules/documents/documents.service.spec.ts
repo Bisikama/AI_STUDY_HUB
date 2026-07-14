@@ -12,6 +12,7 @@ import type { StorageAdapter } from '../../supabase/storage-adapter.interface';
 import { SubjectsService } from '../subjects/subjects.service';
 import { TagsService } from '../tags/tags.service';
 import { DocumentAccessService } from './document-access.service';
+import { GeminiKeyManager } from './utils/gemini-key-manager';
 import {
   NotFoundException,
   BadRequestException,
@@ -152,6 +153,11 @@ describe('DocumentsService', () => {
     get: jest.fn().mockReturnValue('mock-api-key-123'),
   };
 
+  const mockGeminiKeyManager = {
+    execute: jest.fn().mockImplementation((fn: (key: string) => any) => fn('mock-api-key-123')),
+    getDiagnostics: jest.fn().mockReturnValue([]),
+  };
+
   const mockStorageAdapter = {
     uploadPrivate: jest.fn().mockResolvedValue({ storagePath: 'private/path/file.pdf' }),
     createPreviewUrl: jest.fn(),
@@ -215,6 +221,7 @@ describe('DocumentsService', () => {
         { provide: SubjectsService, useValue: mockSubjectsService },
         { provide: TagsService, useValue: mockTagsService },
         { provide: DocumentAccessService, useValue: mockDocumentAccessService },
+        { provide: GeminiKeyManager, useValue: mockGeminiKeyManager },
       ],
     }).compile();
 
